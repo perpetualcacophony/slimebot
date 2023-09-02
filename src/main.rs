@@ -1,13 +1,9 @@
 use scraper::{Html, Selector};
 use anyhow::{anyhow};
-use tokio::sync::mpsc;
-use tracing::span::AsId;
-use std::{env, fs};
+use std::{env, fs, time::Duration};
 use poise::serenity_prelude::{self as serenity, json::{Value, json}, ChannelId, Http};
-use log::{info, error};
-use tokio::sync::mpsc::{Sender, Receiver};
-
-const INTERTWINED_ROLE: u64 = 1142348135079891005;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender, UnboundedReceiver};
+use tracing::{info, error};
 
 struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -15,7 +11,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command)]
 async fn intertwined(ctx: Context<'_>) -> Result<(), Error> {
-    let intertwined = 48499684;
+/*
     let mut stored_chapter_count = read_chapter_count(intertwined)?;
     let mut chapter_ids = get_chapter_ids(intertwined).await?;
 
@@ -25,14 +21,18 @@ async fn intertwined(ctx: Context<'_>) -> Result<(), Error> {
         }
         
         std::thread::sleep(std::time::Duration::from_millis(10000))
-    }
+    }*/
 
     Ok(())
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
-    dotenv::dotenv()?;
+async fn main() {
+    dotenv::dotenv().unwrap();
+
+    let log_channel: u64 = env::var("LOG_CHANNEL").unwrap().parse().unwrap();
+    let intertwined_role: u64 = env::var("INTERTWINED_ROLE").unwrap().parse().unwrap();
+    let intertwined_channel: u64 = env::var("INTERTWINED_CHANNEL").unwrap().parse().unwrap();
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -45,80 +45,51 @@ async fn main() -> Result<(), Error> {
             Ok(Data {  })
         }))
         .build()
-        .await?;
+        .await.unwrap();
         //.build()
         //.await?;
 
-    let (tx, mut rx) = mpsc::channel(1);
-
     let http = framework.client().cache_and_http.http.clone();
-    
-    let logger = DiscordLogger::new(http.clone(), tx, 1142654870487302184);
-    let log2 = logger.clone();
 
-    tokio::spawn(log2.sender(rx));
-    
-    log::set_boxed_logger(Box::new(logger))
-        .map(|()| log::set_max_level(LevelFilter::Trace))?;
+    DiscordSubscriber::init(http.clone(), log_channel);
 
-    error!("boop");
-    println!("booped");
+    //for i in 0..10 {
+    //    ChannelId(1098748588273713184).say(&http, "...").await.unwrap();
+    //    tracing::error!("boop {i}");
+    //    tokio::time::sleep(Duration::from_millis(2000)).await
+    //}
 
-        /*.setup(|ctx, _ready, framework| async {
-            ctx.http.send_message(1141851433029861427, &Value::String("boop".to_string()))
-                .await;
-        
-            Box::pin(async move {
-                poise::builtins::register_in_guild(ctx, &framework.options().commands, 1098746787050836100.into()).await?;
-                Ok(Data {})
-            })
-        });*/
-
-    //ChannelId(1098748588273713184).say(http, "whatever").await?;
+    //tracing::error!("error!");
 
     let intertwined = 48499684;
-    let mut stored_chapter_count = read_chapter_count(intertwined)?;
-    let mut chapter_ids = get_chapter_ids(intertwined).await?;
-    let mut looper = 0;
 
     loop {
-        if looper >= 12 {
-            stored_chapter_count = read_chapter_count(intertwined)?;
-            chapter_ids = get_chapter_ids(intertwined).await?;
-            looper = 0;
+        let stored_chapter_count = read_chapter_count(intertwined).unwrap();
+        let chapter_ids = get_chapter_ids(intertwined).await.unwrap();
 
-            if stored_chapter_count < chapter_ids.len() {
-                ChannelId(1141851433029861427).say(
-                    &http,
-                    format!(
-                        "<@&{INTERTWINED_ROLE}> **Intertwined has updated!**
-                        chapter {}: https://archiveofourown.org/works/{intertwined}/chapters/{}",
-                        chapter_ids.len(),
-                        chapter_ids.last().unwrap().to_string()
-                    )
-                ).await?;
-    
-                store_chapter_count(intertwined, chapter_ids.len()).await?;
-                stored_chapter_count = read_chapter_count(intertwined)?;
-                println!("request made. update!")
-            } else {
-                println!("request made. no update")
-            }
+        if stored_chapter_count < chapter_ids.len() {
+            info!("request made. update!");
+            store_chapter_count(intertwined, chapter_ids.len()).await.unwrap();
+
+            ChannelId(intertwined_channel).say(
+                &http,
+                format!(
+                    "<@&{intertwined_role}> **Intertwined has updated!**
+                    chapter {}: https://archiveofourown.org/works/{intertwined}/chapters/{}",
+                    chapter_ids.len(),
+                    chapter_ids.last().unwrap().to_string()
+                )
+            ).await.unwrap();
         } else {
-            looper += 1
+            info!("request made. no update")
         }
 
-        http.broadcast_typing(1141851433029861427).await?;
-
-        std::thread::sleep(std::time::Duration::from_millis(5000));
+        std::thread::sleep(std::time::Duration::from_secs(60));
     }
 
     //http.send_message(1098748588273713184, &json!({"message": "bar"})).await?;
 
     //framework.start().await?;
-
-    println!("homos");
-
     //let msg = http.http.send_message(1098748588273713184, &Value::String("boop".to_string())).await;
 
     //println!("{:?}", msg);
@@ -127,8 +98,6 @@ async fn main() -> Result<(), Error> {
     //let current_chapter_count = get_chapter_count(work_id)?;
 
     //dbg!(has_updated(work_id, current_chapter_count)?);
-
-    Ok(())
 }
 
 fn has_updated(work_id: usize, current_chapter_count: usize) -> Result<bool, Error> {
@@ -230,93 +199,91 @@ fn get_latest_chapter_id(work_id: usize) -> Result<usize, Error> {
     Ok(chapter_id)
 }
 
-//use tokio::sync::Mutex;
 use std::sync::Arc;
 
-#[derive(Clone)]
-struct DiscordLogger {
-    http: Arc<Http>,
-    tx: Sender<String>,
-    channel: u64,
+struct DiscordSubscriber {
+    tx: UnboundedSender<String>,
 }
 
-use log::{SetLoggerError, LevelFilter, Log};
+struct DiscordSender {
+    http: Arc<Http>,
+    channel: u64,
+    rx: UnboundedReceiver<String>
+}
 
-impl DiscordLogger {
-    async fn sender(self, mut rx: Receiver<String>) {
-        while let Some(message) = rx.recv().await {
-            ChannelId(self.channel).say(
-                &self.http,
-                message
-            ).await.expect("logging failure - this is very bad!");
-        }
+impl DiscordSubscriber {
+    fn init(http: Arc<Http>, channel: u64) {
+        let (tx, rx) = unbounded_channel();
+        tracing_subscriber::registry()
+            .with(DiscordLayer { tx })
+            .with(tracing_subscriber::EnvFilter::from_default_env())
+            .init();
+            
+        tokio::spawn(
+            DiscordSender::new(http, channel, rx).start()
+        );
     }
-
-    fn new(http: Arc<Http>, tx: Sender<String>, channel: u64) -> Self {
-        Self {
-            http,
-            tx,
-            channel
-        }
-    }
-
-    fn init(http: Arc<Http>, tx: Sender<String>, channel: u64) -> Result<(), SetLoggerError> {
-        let logger = DiscordLogger::new(http, tx, channel);
-        log::set_boxed_logger(Box::new(logger))
-            .map(|()| log::set_max_level(LevelFilter::Trace)) 
-    }
-
     
 }
 
-impl Log for DiscordLogger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        true
+impl DiscordSender {
+    async fn start(mut self) {
+        println!("spawning sender");
+
+        while let Some(message) = self.rx.recv().await {
+            ChannelId(self.channel).say(
+                &self.http,
+                &message
+            ).await.expect("log failed to reach discord");
+
+            //self.http.send_message(self.channel, &Value::String("m".to_string())).await.ok();
+
+            println!("sent to discord: {message}");
+        }
     }
 
-    fn flush(&self) {}
-
-    fn log(&self, record: &log::Record) {
-        if !self.enabled(record.metadata()) {
-            return;
+    fn new(http: Arc<Http>, channel: u64, rx: UnboundedReceiver<String>) -> Self {
+        Self {
+            http,
+            channel,
+            rx
         }
-        
-        let message = format!("[{}] {}", record.level(), "boop");
-
-        let tx = self.tx.clone();
-        tokio::spawn(async move {tx.send(message).await});
     }
 }
 
 use tracing::Subscriber;
-use tracing_subscriber::Layer;
+use tracing_subscriber::{Layer, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 use std::fmt::Write;
 
-/*impl tracing::Subscriber for DiscordLogger {
-    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
-        true
-    }
+struct DiscordLayer {
+    tx: UnboundedSender<String>
+}
 
-    fn new_span(&self, span: &span::Attributes<'_>) -> span::Id {
-        span
-    }
-}*/
-
-struct LayerCake;
-
-impl<S: Subscriber> Layer<S> for LayerCake {
+impl<S: Subscriber> Layer<S> for DiscordLayer {
     fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
-        let mut visitor = DiscordVisitor(String::new());
+        let mut visitor = DiscordVisitor::default();
         event.record(&mut visitor);
 
+        let message = format!(
+            "`[{}] {}`",
+            event.metadata().level(),
+            visitor.message
+        );
         
+        self.tx.send(message).expect("subscriber threading failed")
     }
 }
 
-struct DiscordVisitor(String);
+#[derive(Default)]
+struct DiscordVisitor{
+    message: String
+}
 
 impl tracing::field::Visit for DiscordVisitor {
-    fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        write!(self.0, "{:?}", value).unwrap()
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        write!(self.message, "{:?}", value).unwrap();
+        println!("record_debug: {}: {:?}", field.name(), value)
+        //write!(self.message, "fgjfdkjdgfhj").unwrap()
+        //println!("recorder: {:?}", self.message)
     }
 }
