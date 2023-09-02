@@ -86,18 +86,6 @@ async fn main() {
 
         std::thread::sleep(std::time::Duration::from_secs(60));
     }
-
-    //http.send_message(1098748588273713184, &json!({"message": "bar"})).await?;
-
-    //framework.start().await?;
-    //let msg = http.http.send_message(1098748588273713184, &Value::String("boop".to_string())).await;
-
-    //println!("{:?}", msg);
-
-    //let work_id = env::args().nth(1).unwrap().parse()?;
-    //let current_chapter_count = get_chapter_count(work_id)?;
-
-    //dbg!(has_updated(work_id, current_chapter_count)?);
 }
 
 fn has_updated(work_id: usize, current_chapter_count: usize) -> Result<bool, Error> {
