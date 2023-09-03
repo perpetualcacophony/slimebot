@@ -1,111 +1,45 @@
+mod logging;
+use logging::DiscordSubscriber;
+
+mod discord;
+use discord::commands::{ping, pfp, watch_fic};
+
 use anyhow::anyhow;
-use poise::serenity_prelude::{self as serenity, json::json, ChannelId, Member, User};
+use poise::serenity_prelude::{self as serenity, ChannelId, GuildId};
 use scraper::{Html, Selector};
-use std::{env, fs, str::FromStr, time::Duration};
-use tracing::{error, info};
+use std::{env, fs, time::Duration};
+use tracing::info;
 
-mod log;
+#[derive(Debug)]
+pub struct Data {}
 
-struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
-
-// i am not using this yet.
-// still figuring out poise
-// but poise will break without it
-// coconut.jpg
-#[poise::command(slash_command)]
-async fn intertwined(_ctx: Context<'_>) -> Result<(), Error> {
-    /*
-    let mut stored_chapter_count = read_chapter_count(intertwined)?;
-    let mut chapter_ids = get_chapter_ids(intertwined).await?;
-
-    loop {
-        if stored_chapter_count < chapter_ids.len() {
-            ctx.say(chapter_ids.last().unwrap().to_string()).await?;
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(10000))
-    }*/
-
-    Ok(())
-}
-
-#[poise::command(slash_command)]
-async fn pfp(
-    ctx: Context<'_>,
-    user: Option<Member>,
-    global: Option<bool>,
-) -> Result<(), Error> {
-    let target = match user {
-        Some(user) => user,
-        None => ctx.author_member().await.unwrap().into_owned(),
-    };
-
-    enum PfpType {
-        Guild,
-        Global,
-        Unset,
-    }
-
-    // required args are ugly
-    let global = global.map_or(false, |b| b);
-
-    let (pfp, pfp_type) = match global {
-        true => (
-            target.user.face(),
-            target
-                .user
-                .avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Global),
-        ),
-        false => (
-            target.face(),
-            target
-                .user
-                .avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Guild),
-        ),
-    };
-
-    let flavor_text = match pfp_type {
-        PfpType::Guild => format!("**{}'s profile picture:**", target.display_name()),
-        PfpType::Global => format!("**`{}`'s global profile picture:**", target.user.name),
-        PfpType::Unset => format!(
-            "**{} does not have a profile picture set!**",
-            target.display_name()
-        ),
-    };
-
-    ctx.send(|f| f.content(flavor_text).attachment((*pfp).into()))
-        .await?;
-
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().unwrap();
+
+    let rx = DiscordSubscriber::init_stdout();
+
+    info!("hi!");
 
     // i really should decouple the console logging functionality from discord.
     // like, these panic, because half the code is reliant on a discord connection
     // but they really shouldn't
     let log_channel: u64 = env::var("LOG_CHANNEL").unwrap().parse().unwrap();
     let discord_token = env::var("DISCORD_TOKEN").unwrap();
+    let testing_server: u64 = env::var("TESTING_SERVER").unwrap().parse().unwrap();
 
-    // tbh, i don't love initializing the bot this early
-    // but it needs the connection for logs to work
-    // maybe i can do some stuff with layers? not terribly optimistic
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![pfp()],
+            commands: vec![ping(), pfp(), watch_fic()],
             ..Default::default()
         })
         .token(discord_token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(|ctx, _, framework| {
+        .setup( move |ctx, _, framework| {
             Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                poise::builtins::register_in_guild(ctx, &framework.options().commands, GuildId(testing_server)).await?;
                 Ok(Data {})
             })
         })
@@ -116,7 +50,9 @@ async fn main() {
     // i don't like how far in you have to go to access this :<
     let http = framework.client().cache_and_http.http.clone();
 
-    log::DiscordSubscriber::init(http.clone(), log_channel);
+    DiscordSubscriber::init_discord(http.clone(), log_channel, rx).await;
+
+    info!("hi discord!");
 
     // i think this is an okay pattern?
     // it's probably a bad idea for *all* of the bot's
