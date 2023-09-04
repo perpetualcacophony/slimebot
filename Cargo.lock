@@ -60,19 +60,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c6f84b74db2535ebae81eede2f39b947dcbf01d093ae5f791e5dd414a1bf289"
 
 [[package]]
-name = "async-compression"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b74f44609f0f91493e3082d3734d98497e094777144380ea4db9f9905dd5b6"
-dependencies = [
- "flate2",
- "futures-core",
- "memchr",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -563,16 +550,6 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
-]
-
-[[package]]
-name = "gethostname"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1ebd34e35c46e00bb73e81363248d627782724609fe1b6396f553f68fe3862e"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -1316,7 +1293,6 @@ version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
- "async-compression",
  "base64 0.21.2",
  "bytes",
  "encoding_rs",
@@ -1672,15 +1648,16 @@ name = "slimebot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "dotenv",
+ "log",
  "poise",
  "reqwest",
  "scraper",
  "tokio",
  "tracing",
- "tracing-layer-discord",
+ "tracing-log",
  "tracing-subscriber",
+ "tracing-unwrap",
 ]
 
 [[package]]
@@ -1978,24 +1955,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-bunyan-formatter"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5c266b9ac83dedf0e0385ad78514949e6d89491269e7065bee51d2bb8ec7373"
-dependencies = [
- "ahash",
- "gethostname",
- "log",
- "serde",
- "serde_json",
- "time",
- "tracing",
- "tracing-core",
- "tracing-log",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-core"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2003,22 +1962,6 @@ checksum = "0955b8137a1df6f1a2e9a37d8a6656291ff0297c1a97c24e0d8425fe2312f79a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-layer-discord"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53451f5077a4a7da393b579d1d2f6eb84fbd071a63dfcf272be3c3095b19ec24"
-dependencies = [
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-bunyan-formatter",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -2048,6 +1991,15 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tracing-unwrap"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77934bd2f10b38daeb37d0e24fb94f7bb83e08b474a0568d6ba71876c797c02e"
+dependencies = [
+ "tracing",
 ]
 
 [[package]]

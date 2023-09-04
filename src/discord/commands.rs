@@ -1,7 +1,7 @@
 mod watch_fic;
 
 use poise::serenity_prelude::Member;
-use tracing::{error, info};
+use tracing::{error, info, debug, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
@@ -31,7 +31,7 @@ pub async fn watch_fic(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[tracing::instrument(skip_all)]
+#[instrument(skip_all)]
 #[poise::command(slash_command)]
 pub async fn ping(ctx: Context<'_>)  -> Result<(), Error> {
     info!("called by user {}", ctx.author().name);
@@ -41,7 +41,7 @@ pub async fn ping(ctx: Context<'_>)  -> Result<(), Error> {
     Ok(())
 }
 
-#[tracing::instrument(skip_all)]
+#[instrument(skip_all, fields(author = ctx.author().name, global = global))]
 #[poise::command(slash_command)]
 pub async fn pfp(
     ctx: Context<'_>,
@@ -58,6 +58,8 @@ pub async fn pfp(
         Some(user) => user,
         None => ctx.author_member().await.unwrap().into_owned(),
     };
+
+    //debug!("target nickname: {}, username: {}", target.display_name(), target.user.name);
 
     enum PfpType {
         Guild,

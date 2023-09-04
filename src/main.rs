@@ -8,7 +8,8 @@ use anyhow::anyhow;
 use poise::serenity_prelude::{self as serenity, ChannelId, GuildId};
 use scraper::{Html, Selector};
 use std::{env, fs, time::Duration};
-use tracing::info;
+use tracing::{info, error, debug, trace};
+use tracing_unwrap::{ResultExt, OptionExt};
 
 #[derive(Debug)]
 pub struct Data {}
@@ -21,13 +22,16 @@ async fn main() {
 
     let rx = DiscordSubscriber::init_stdout();
 
-    info!("hi!");
+    //tracing_log::LogTracer::init().unwrap_or_log();
+
+    trace!("hi!");
+
+    let bot_token = env::var("BOT_TOKEN").expect_or_log("no BOT_TOKEN in environment");
 
     // i really should decouple the console logging functionality from discord.
     // like, these panic, because half the code is reliant on a discord connection
     // but they really shouldn't
     let log_channel: u64 = env::var("LOG_CHANNEL").unwrap().parse().unwrap();
-    let discord_token = env::var("DISCORD_TOKEN").unwrap();
     let testing_server: u64 = env::var("TESTING_SERVER").unwrap().parse().unwrap();
 
     let framework = poise::Framework::builder()
@@ -35,7 +39,7 @@ async fn main() {
             commands: vec![ping(), pfp(), watch_fic()],
             ..Default::default()
         })
-        .token(discord_token)
+        .token(bot_token)
         .intents(serenity::GatewayIntents::non_privileged())
         .setup( move |ctx, _, framework| {
             Box::pin(async move {
@@ -52,7 +56,7 @@ async fn main() {
 
     DiscordSubscriber::init_discord(http.clone(), log_channel, rx).await;
 
-    info!("hi discord!");
+    trace!("hi discord!");
 
     // i think this is an okay pattern?
     // it's probably a bad idea for *all* of the bot's

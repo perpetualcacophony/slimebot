@@ -1,8 +1,9 @@
 use poise::serenity_prelude::{ChannelId, Http};
+use tracing_unwrap::ResultExt;
 use std::fmt::Write;
 use std::sync::Arc;
 use tokio::sync::{mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel}, oneshot::Sender};
-use tracing::{Subscriber, info};
+use tracing::{Subscriber, info, instrument, field::Field, error};
 use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Layer, EnvFilter,
 };
@@ -19,9 +20,15 @@ impl DiscordSubscriber {
             .with(EnvFilter::from_default_env())
             .init();
 
+        let span = tracing::info_span!("init_stdout");
+        span.in_scope(|| {
+            info!("done")
+        });
+
         rx
     }
 
+    #[instrument(skip(http, rx))]
     pub async fn init_discord(http: Arc<Http>, channel: u64, rx: UnboundedReceiver<String>) {
         // just to nail down the multithreading, let's create a disposable channel...
         let (confirm_tx, confirm_rx) = tokio::sync::oneshot::channel();
@@ -30,10 +37,13 @@ impl DiscordSubscriber {
         tokio::spawn(DiscordSender::new(http.clone(), channel, rx).start(confirm_tx));
 
         // and await the response (which doesn't really matter) once it's ready
-        confirm_rx.await.unwrap();
+        confirm_rx.await.ok();
+
+        info!("done");
     }
 }
 
+#[derive(Debug)]
 pub struct DiscordSender {
     http: Arc<Http>,
     channel: u64,
@@ -41,19 +51,19 @@ pub struct DiscordSender {
 }
 
 impl DiscordSender {
+    #[instrument(skip_all, name = "DiscordSender::start", fields(channel = self.channel))]
     pub async fn start(mut self, oneshot: Sender<bool>) {
-        info!("starting DiscordSender");
-        
         // i don't know any other way to clear the discord buffer lmao
         while let Ok(_) = self.rx.try_recv() {}
 
         oneshot.send(true).unwrap();
 
         while let Some(message) = self.rx.recv().await {
-            ChannelId(self.channel)
+            if let Err(_) = ChannelId(self.channel)
                 .say(&self.http, &message)
-                .await
-                .expect("log failed to reach discord");
+                .await {
+                    error!(no_discord = true, "log failed to reach discord")
+                }
         }
     }
 
@@ -83,7 +93,9 @@ impl<S: Subscriber> Layer<S> for DiscordLayer {
 
         let message = format!("`[{}] {}`", event.metadata().level(), visitor.message);
 
-        self.tx.send(message).expect("subscriber threading failed")
+        if event.metadata().fields().field("no_discord").is_none() {
+            self.tx.send(message).expect("subscriber threading failed")
+        }
     }
 }
 
