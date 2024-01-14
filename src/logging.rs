@@ -1,11 +1,13 @@
 use poise::serenity_prelude::{ChannelId, Http};
-use tracing_unwrap::ResultExt;
 use std::fmt::Write;
 use std::sync::Arc;
-use tokio::sync::{mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel}, oneshot::Sender};
-use tracing::{Subscriber, info, instrument, field::Field, error};
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    oneshot::Sender,
+};
+use tracing::{error, instrument, Subscriber, trace};
 use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Layer, EnvFilter,
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
 
 pub struct DiscordSubscriber;
@@ -21,9 +23,7 @@ impl DiscordSubscriber {
             .init();
 
         let span = tracing::info_span!("init_stdout");
-        span.in_scope(|| {
-            info!("done")
-        });
+        span.in_scope(|| trace!("stdout logging set up"));
 
         rx
     }
@@ -39,7 +39,7 @@ impl DiscordSubscriber {
         // and await the response (which doesn't really matter) once it's ready
         confirm_rx.await.ok();
 
-        info!("done");
+        trace!("discord logging set up");
     }
 }
 
@@ -59,11 +59,9 @@ impl DiscordSender {
         oneshot.send(true).unwrap();
 
         while let Some(message) = self.rx.recv().await {
-            if let Err(_) = ChannelId(self.channel)
-                .say(&self.http, &message)
-                .await {
-                    error!(no_discord = true, "log failed to reach discord")
-                }
+            if let Err(_) = ChannelId(self.channel).say(&self.http, &message).await {
+                error!(no_discord = true, "log failed to reach discord")
+            }
         }
     }
 
