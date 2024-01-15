@@ -43,8 +43,8 @@ async fn main() {
     // but init_stdout has a sneaky env var call
     dotenv::dotenv().unwrap();
 
-    // the stdout logger is started, and very cleanly returns
-    // the receiver for initializing the discord logger later.
+    // the stdout logger is started, and returns the
+    // receiver for initializing the discord logger later.
     // because that can't be done until we get the http from the framework
     let discord_receiver = DiscordSubscriber::init_stdout();
     // now the first log can be sent!

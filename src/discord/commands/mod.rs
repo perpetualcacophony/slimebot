@@ -1,16 +1,12 @@
+mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{
-    AttachmentType, CacheHttp, Channel, Color, Embed, Member, User, Webhook,
-};
-use reqwest::Url;
-use serde_json::json;
-use tracing::{error, info, instrument, warn};
+use poise::serenity_prelude::{CacheHttp, Channel, Member, User};
+use tracing::{error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
 
-use tracing_unwrap::ResultExt;
 pub use watch_fic::watch_fic;
 
 /// Responds on successful execution.
@@ -167,123 +163,19 @@ pub async fn audio(
 #[poise::command(prefix_command)]
 pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<(), Error> {
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
-        joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
+        ban::joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
     } else {
-        joke_ban(ctx, &user, ctx.author().id.0, reason).await?;
+        ban::joke_ban(ctx, &user, ctx.author().id.0, reason).await?;
     }
 
     Ok(())
-}
-
-async fn joke_ban(
-    ctx: Context<'_>,
-    user: &User,
-    moderator_id: u64,
-    reason: impl Into<Option<String>>,
-) -> Result<(), Error> {
-    let reason = reason.into().unwrap_or("No reason".to_string());
-
-    let embed = ban_embed(&reason, &moderator_id, &user.name);
-    let webhook = wick_webhook(ctx).await;
-    webhook
-        .execute(ctx.http(), false, |w| w.embeds(vec![embed]))
-        .await?;
-
-    Ok(())
-}
-
-async fn wick_webhook(ctx: Context<'_>) -> Webhook {
-    let wick = ctx
-        .http()
-        .get_member(1098746787050836100, 536991182035746816)
-        .await
-        .unwrap_or_log();
-
-    let mut hook = ctx
-        .http()
-        .get_channel_webhooks(ctx.channel_id().0)
-        .await
-        .unwrap()
-        .into_iter()
-        .find(|wh| wh.name == Some("Wick".to_string()))
-        .unwrap_or(
-            async {
-                warn!(
-                    "no webhook for channel {}, creating",
-                    ctx.channel_id().as_ref()
-                );
-                ctx.http()
-                    .create_webhook(
-                        *ctx.channel_id().as_u64(),
-                        &json!({
-                            "name": wick.display_name().as_ref()
-                        }),
-                        None,
-                    )
-                    .await
-                    .unwrap_or_log()
-            }
-            .await,
-        );
-
-    if &hook.name.clone().unwrap() != wick.display_name().as_ref() {
-        hook.edit_name(ctx.http(), wick.display_name().as_ref())
-            .await
-            .unwrap_or_log()
-    }
-
-    if hook.avatar.clone().is_none() || hook.avatar.clone().unwrap() != wick.face() {
-        hook.edit_avatar(
-            ctx.http(),
-            AttachmentType::Image(Url::parse(&wick.face()).unwrap()),
-        )
-        .await
-        .unwrap_or_log()
-    }
-
-    hook
-}
-
-fn ban_embed(reason: &str, moderator_id: &u64, user: &str) -> serde_json::value::Value {
-    Embed::fake(|e| {
-        e
-        .title("Ban result:")
-        .fields([
-            (
-                "",
-                format!(
-                    "<:reason:1167852271560839248> **Reason:** {reason}
-                    <:moderator:1167852275868389537> **Moderator:** <@{moderator_id}><:ticket:1167852279383216198><:message:1167852277273464956><:star_ticket:1167852280264003634><:star:1167852409989627954><:bomb:1167852281551663166>
-                    <:crosshair:1167852283422314588> **Details:**
-                    \u{200B}\u{200B}\u{200B}\u{200B}<:double_arrow:1167852272659734550> Duration: <:fail:1167852407028461648>
-                    \u{200B}\u{200B}\u{200B}\u{200B}<:double_arrow:1167852272659734550> Soft Ban: <:fail:1167852407028461648>
-                    \u{200B}\u{200B}\u{200B}\u{200B}<:double_arrow:1167852272659734550> Hack Ban: <:fail:1167852407028461648>
-                    \u{200B}\u{200B}\u{200B}\u{200B}<:double_arrow:1167852272659734550> DM-Members: <:fail:1167852407028461648>",    
-                ),
-                false
-            ),
-            (
-                "",
-                format!("<:success:1167852408626499664> **Successful bans**
-                <:arrow:1167852274589122631> `{user}`"),
-                false
-            ),
-            (
-                "",
-                "<:fail:1167852407028461648> **Unsuccessful bans**
-                All users were banned!".to_string(),
-                false
-            )
-        ])
-        .color(Color::from_rgb(47, 49, 54))
-    })
 }
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
 pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
     if ctx.author().id == 497014954935713802 {
-        joke_ban(
+        ban::joke_ban(
             ctx,
             ctx.author(),
             966519580266737715,
@@ -291,10 +183,9 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
         )
         .await?;
     } else {
-        ctx.send(|m| m.attachment(
-            "https://cdn.discordapp.com/attachments/1098748818104791122/1167856331940691978/image.png?ex=654fa5f7&is=653d30f7&hm=aec68049fc65377e003368104426b7a19a8e54897fe02de0bf96d95d019b2610&"
-            .into()
-        )).await.ok();
+        ctx.send(|m| m.attachment("https://files.catbox.moe/jm6sr9.png".into()))
+            .await
+            .ok();
     }
 
     Ok(())
