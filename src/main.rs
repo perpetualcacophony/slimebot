@@ -1,6 +1,6 @@
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
@@ -24,12 +24,12 @@ use tracing_unwrap::ResultExt;
 #[derive(Debug)]
 pub struct Data {
     config: Config,
-    more_data: MoreData
+    more_data: MoreData,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct MoreData {
-    last_vore_mention: DateTime<Utc>
+    last_vore_mention: DateTime<Utc>,
 }
 
 // i should replace this with anyhow::Error
@@ -69,7 +69,7 @@ async fn main() {
     let mut handler = Handler {
         data: Data {
             config: config.clone(),
-            more_data
+            more_data,
         },
         options: poise::FrameworkOptions {
             commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],

@@ -5,7 +5,7 @@ use poise::serenity_prelude::{
 };
 use reqwest::Url;
 use serde_json::json;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
@@ -18,24 +18,43 @@ pub use watch_fic::watch_fic;
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    info!("called by user `{}`", ctx.author().name);
+    let channel = ctx
+        .channel_id()
+        .name(ctx.cache().unwrap())
+        .await
+        .map_or("dms".to_string(), |c| format!("#{c}"));
+    info!(
+        "@{} ({}): {}",
+        ctx.author().name,
+        channel,
+        ctx.invocation_string()
+    );
 
     ctx.say("pong!").await?;
 
     Ok(())
 }
 
-#[instrument(skip_all, fields(author = ctx.author().name, global = global))]
+#[instrument(skip_all)]
 #[poise::command(prefix_command, slash_command)]
 pub async fn pfp(
     ctx: Context<'_>,
     user: Option<Member>,
     global: Option<bool>,
 ) -> Result<(), Error> {
-    info!("{}", ctx.invocation_string());
-    info!("called by user `{}`", ctx.author().name);
+    let channel = ctx
+        .channel_id()
+        .name(ctx.cache().unwrap())
+        .await
+        .map_or("dms".to_string(), |c| format!("#{c}"));
+    info!(
+        "@{} ({}): {}",
+        ctx.author().name,
+        channel,
+        ctx.invocation_string()
+    );
 
-    debug!("{:?}", ctx.guild_id());
+    // debug!("{:?}", ctx.guild_id());
 
     if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!")
