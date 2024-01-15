@@ -2,3 +2,4 @@
 .env
 /works
 slimebot.toml
+slimebot_data.json

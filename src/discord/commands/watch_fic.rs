@@ -1,16 +1,21 @@
 use std::{fs, time::Duration};
 
 use anyhow::{anyhow, bail};
-use poise::serenity_prelude::{Channel, CacheHttp, Role};
+use poise::serenity_prelude::{CacheHttp, Channel, Role};
 use scraper::{Html, Selector};
-use tracing::{instrument, error, info};
+use tracing::{error, info, instrument};
 
-use crate::{Error, Data};
+use crate::{Data, Error};
 
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command)]
-pub async fn watch_fic(ctx: Context<'_>, id: usize, channel: Channel, role: Role) -> Result<(), Error> {
+pub async fn watch_fic(
+    ctx: Context<'_>,
+    id: usize,
+    channel: Channel,
+    role: Role,
+) -> Result<(), Error> {
     /*let reply = ctx
         .send(|f| {
             f.content("boop").components(|f| {
@@ -36,11 +41,10 @@ pub async fn watch_fic(ctx: Context<'_>, id: usize, channel: Channel, role: Role
 
         if stored_chapter_count < chapter_ids.len() {
             info!("request made. update!");
-            store_chapter_count(id, chapter_ids.len())
-                .await
-                .unwrap();
+            store_chapter_count(id, chapter_ids.len()).await.unwrap();
 
-            channel.id()
+            channel
+                .id()
                 .say(
                     &ctx.http(),
                     format!(

@@ -1,6 +1,8 @@
 mod watch_fic;
 
-use poise::serenity_prelude::{CacheHttp, Channel, Member, User, Webhook, Embed, Color, AttachmentType};
+use poise::serenity_prelude::{
+    AttachmentType, CacheHttp, Channel, Color, Embed, Member, User, Webhook,
+};
 use reqwest::Url;
 use serde_json::json;
 use tracing::{debug, error, info, instrument, warn};
@@ -35,13 +37,13 @@ pub async fn pfp(
 
     debug!("{:?}", ctx.guild_id());
 
-    if let Err(_) = ctx.defer().await {
+    if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!")
     }
 
     let user = match user {
         Some(user) => user,
-        None => ctx.author_member().await.unwrap().into_owned()
+        None => ctx.author_member().await.unwrap().into_owned(),
     };
 
     //debug!("target nickname: {}, username: {}", target.display_name(), target.user.name);
@@ -60,14 +62,12 @@ pub async fn pfp(
     let (pfp, pfp_type) = match global {
         true => (
             user.user.face(),
-            user
-                .avatar_url()
+            user.avatar_url()
                 .map_or(PfpType::Unset, |_| PfpType::Global),
         ),
         false => (
             user.face(),
-            user
-                .user
+            user.user
                 .avatar_url()
                 .map_or(PfpType::Unset, |_| PfpType::Guild),
         ),
@@ -112,7 +112,7 @@ pub async fn audio(
     let manager = songbird::get(ctx.serenity_context()).await.unwrap();
 
     manager.join(ctx.guild_id().unwrap(), 1098746787868712983).await;
-    
+
     if let Some(handler_lock) = manager.get(ctx.guild_id().unwrap()) {
         let mut handler = handler_lock.lock().await;
 
@@ -146,11 +146,7 @@ pub async fn audio(
 
 #[instrument(skip(ctx, user))]
 #[poise::command(prefix_command)]
-pub async fn ban(
-    ctx: Context<'_>,
-    user: User,
-    reason: Option<String>
-) -> Result<(), Error> {
+pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<(), Error> {
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
         joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
     } else {
@@ -160,54 +156,77 @@ pub async fn ban(
     Ok(())
 }
 
-async fn joke_ban(ctx: Context<'_>, user: &User, moderator_id: u64, reason: impl Into<Option<String>>) -> Result<(), Error> {
+async fn joke_ban(
+    ctx: Context<'_>,
+    user: &User,
+    moderator_id: u64,
+    reason: impl Into<Option<String>>,
+) -> Result<(), Error> {
     let reason = reason.into().unwrap_or("No reason".to_string());
-    
+
     let embed = ban_embed(&reason, &moderator_id, &user.name);
     let webhook = wick_webhook(ctx).await;
-    webhook.execute(ctx.http(), false, |w| w.embeds(vec![embed])).await?;
+    webhook
+        .execute(ctx.http(), false, |w| w.embeds(vec![embed]))
+        .await?;
 
     Ok(())
 }
 
 async fn wick_webhook(ctx: Context<'_>) -> Webhook {
-    let wick = ctx.http().get_member(1098746787050836100, 536991182035746816).await.unwrap_or_log();
+    let wick = ctx
+        .http()
+        .get_member(1098746787050836100, 536991182035746816)
+        .await
+        .unwrap_or_log();
 
-    let mut hook = ctx.http().get_channel_webhooks(ctx.channel_id().0)
+    let mut hook = ctx
+        .http()
+        .get_channel_webhooks(ctx.channel_id().0)
         .await
         .unwrap()
         .into_iter()
         .find(|wh| wh.name == Some("Wick".to_string()))
-        .unwrap_or(async { 
-            warn!("no webhook for channel {}, creating", ctx.channel_id().as_ref());
-            ctx.http().create_webhook(
-                *ctx.channel_id().as_u64(),
-                &json!({
-                    "name": wick.display_name().as_ref()
-                }),
-                None
-            ).await.unwrap_or_log()
-        }.await);
+        .unwrap_or(
+            async {
+                warn!(
+                    "no webhook for channel {}, creating",
+                    ctx.channel_id().as_ref()
+                );
+                ctx.http()
+                    .create_webhook(
+                        *ctx.channel_id().as_u64(),
+                        &json!({
+                            "name": wick.display_name().as_ref()
+                        }),
+                        None,
+                    )
+                    .await
+                    .unwrap_or_log()
+            }
+            .await,
+        );
 
     if &hook.name.clone().unwrap() != wick.display_name().as_ref() {
-        hook.edit_name(
-            ctx.http(),
-            wick.display_name().as_ref()
-        ).await.unwrap_or_log()
+        hook.edit_name(ctx.http(), wick.display_name().as_ref())
+            .await
+            .unwrap_or_log()
     }
 
     if hook.avatar.clone().is_none() || hook.avatar.clone().unwrap() != wick.face() {
         hook.edit_avatar(
             ctx.http(),
-            AttachmentType::Image(Url::parse(&wick.face()).unwrap())
-        ).await.unwrap_or_log()
+            AttachmentType::Image(Url::parse(&wick.face()).unwrap()),
+        )
+        .await
+        .unwrap_or_log()
     }
-    
+
     hook
 }
 
 fn ban_embed(reason: &str, moderator_id: &u64, user: &str) -> serde_json::value::Value {
-    Embed::fake(|e|
+    Embed::fake(|e| {
         e
         .title("Ban result:")
         .fields([
@@ -238,16 +257,20 @@ fn ban_embed(reason: &str, moderator_id: &u64, user: &str) -> serde_json::value:
             )
         ])
         .color(Color::from_rgb(47, 49, 54))
-    )
+    })
 }
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
-pub async fn banban(
-    ctx: Context<'_>
-) -> Result<(), Error> {
+pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
     if ctx.author().id == 497014954935713802 {
-        joke_ban(ctx, ctx.author(), 966519580266737715, "get banbanned lol".to_string()).await?;
+        joke_ban(
+            ctx,
+            ctx.author(),
+            966519580266737715,
+            "get banbanned lol".to_string(),
+        )
+        .await?;
     } else {
         ctx.send(|m| m.attachment(
             "https://cdn.discordapp.com/attachments/1098748818104791122/1167856331940691978/image.png?ex=654fa5f7&is=653d30f7&hm=aec68049fc65377e003368104426b7a19a8e54897fe02de0bf96d95d019b2610&"

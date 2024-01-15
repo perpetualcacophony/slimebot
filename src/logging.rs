@@ -5,7 +5,7 @@ use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot::Sender,
 };
-use tracing::{error, instrument, Subscriber, trace};
+use tracing::{error, instrument, trace, Subscriber};
 use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
@@ -54,12 +54,16 @@ impl DiscordSender {
     #[instrument(skip_all, name = "DiscordSender::start", fields(channel = self.channel))]
     pub async fn start(mut self, oneshot: Sender<bool>) {
         // i don't know any other way to clear the discord buffer lmao
-        while let Ok(_) = self.rx.try_recv() {}
+        while self.rx.try_recv().is_ok() {}
 
         oneshot.send(true).unwrap();
 
         while let Some(message) = self.rx.recv().await {
-            if let Err(_) = ChannelId(self.channel).say(&self.http, &message).await {
+            if ChannelId(self.channel)
+                .say(&self.http, &message)
+                .await
+                .is_err()
+            {
                 error!(no_discord = true, "log failed to reach discord")
             }
         }

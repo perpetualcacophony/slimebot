@@ -1,11 +1,13 @@
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
+use chrono::{Utc, DateTime};
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
 mod discord;
 use discord::commands::*;
 use discord::framework::Handler;
+use serde::{Deserialize, Serialize};
 
 /// Config file parsing and option access.
 mod config;
@@ -22,6 +24,12 @@ use tracing_unwrap::ResultExt;
 #[derive(Debug)]
 pub struct Data {
     config: Config,
+    more_data: MoreData
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct MoreData {
+    last_vore_mention: DateTime<Utc>
 }
 
 // i should replace this with anyhow::Error
@@ -51,8 +59,18 @@ async fn main() {
         .try_deserialize()
         .expect_or_log("configuration could not be parsed");
 
+    let more_data: MoreData = ::config::Config::builder()
+        .add_source(::config::File::with_name("slimebot_data.json"))
+        .build()
+        .unwrap()
+        .try_deserialize()
+        .unwrap();
+
     let mut handler = Handler {
-        data: Data { config: config.clone() },
+        data: Data {
+            config: config.clone(),
+            more_data
+        },
         options: poise::FrameworkOptions {
             commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
             prefix_options: PrefixFrameworkOptions {
@@ -104,7 +122,7 @@ async fn main() {
                             panic!()
                         }
                     };
-                    
+
                     ctx.set_activity(activity).await;
                 }
 
@@ -117,12 +135,17 @@ async fn main() {
     */
 
     trace!("discord framework set up");
-    
+
     // i don't like how far in you have to go to access this :<
     let http = client.cache_and_http.http.clone();
 
     if config.logs.discord.enabled() {
-        DiscordSubscriber::init_discord(http.clone(), config.logs.discord.channel().unwrap().into(), discord_receiver).await;
+        DiscordSubscriber::init_discord(
+            http.clone(),
+            config.logs.discord.channel().unwrap().into(),
+            discord_receiver,
+        )
+        .await;
         trace!("hi discord!");
     }
 
@@ -131,9 +154,7 @@ async fn main() {
     // functionality to be defined by command responses.
     // right now it's silly though. the ao3 pinger
     // *should* be a command handler.
-    tokio::spawn(async move {
-        client.start().await
-    });
+    tokio::spawn(async move { client.start().await });
 
     trace!("discord framework started");
 
@@ -144,7 +165,10 @@ async fn main() {
         if http.get_bot_gateway().await.is_err() {
             error!("failed to connect to discord!")
         }
-        let ping = SystemTime::now().duration_since(before).unwrap().as_millis();
+        let ping = SystemTime::now()
+            .duration_since(before)
+            .unwrap()
+            .as_millis();
         info!("discord connection active! ({ping}ms)");
 
         keep_alive.tick().await;

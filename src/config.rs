@@ -1,6 +1,6 @@
 use poise::serenity_prelude::{ChannelId, GuildId, UserId};
 use serde::Deserialize;
-use tracing::{warn, info};
+use tracing::{info, warn};
 use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
@@ -16,12 +16,13 @@ pub struct BotConfig {
     token: Option<DiscordToken>,
     id: Option<UserId>,
     pub testing_server: Option<GuildId>,
-    pub status: Option<String>
+    pub status: Option<String>,
 }
 
 impl BotConfig {
     pub fn token(&self) -> &str {
-        self.token.as_ref()
+        self.token
+            .as_ref()
             .expect_or_log("no token in config or environment!")
     }
 
@@ -64,6 +65,5 @@ impl DiscordConfig {
         } else {
             None
         }
-
     }
 }
