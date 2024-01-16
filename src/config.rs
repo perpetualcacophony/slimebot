@@ -9,6 +9,7 @@ use crate::DiscordToken;
 pub struct Config {
     pub bot: BotConfig,
     pub logs: LogsConfig,
+    pub db: DbConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -65,5 +66,26 @@ impl DiscordConfig {
         } else {
             None
         }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct DbConfig {
+    url: String,
+    username: String,
+    password: String,
+}
+
+impl DbConfig {
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+
+    pub fn password(&self) -> &str {
+        &self.password
     }
 }

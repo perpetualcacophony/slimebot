@@ -1,7 +1,7 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{CacheHttp, Channel, Member, User};
+use poise::serenity_prelude::{Channel, Member, User};
 use tracing::{error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -16,7 +16,7 @@ pub use watch_fic::watch_fic;
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     let channel = ctx
         .channel_id()
-        .name(ctx.cache().unwrap())
+        .name(ctx.cache())
         .await
         .map_or("dms".to_string(), |c| format!("#{c}"));
     info!(
@@ -40,7 +40,7 @@ pub async fn pfp(
 ) -> Result<(), Error> {
     let channel = ctx
         .channel_id()
-        .name(ctx.cache().unwrap())
+        .name(ctx.cache())
         .await
         .map_or("dms".to_string(), |c| format!("#{c}"));
     info!(

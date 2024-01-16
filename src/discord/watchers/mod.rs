@@ -1,9 +1,9 @@
-use chrono::Utc;
-use poise::serenity_prelude::{CacheHttp, Context, Message};
+use chrono::{Utc, DateTime};
+use mongodb::{bson::doc, options::FindOneOptions};
+use poise::serenity_prelude::{CacheHttp, Context, Message, UserId};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::info;
-
-use crate::MoreData;
 
 use super::framework::Handler;
 
@@ -15,8 +15,10 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         // this code sucks less ass.
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~'], " ")
         .split_ascii_whitespace()
-        .any(|w| w == "vore" || w == "voring")
+        .any(|w| w == "vore" || w == "voring" || w == "vores" )
     {
+        let recent = Utc::now();
+
         info!(
             "@{} (#{}): {}",
             new_message.author.name,
@@ -30,15 +32,25 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
             new_message.content
         );
 
-        let more_data: MoreData = serde_json::from_str(
-            &tokio::fs::read_to_string("slimebot_data.json")
-                .await
-                .unwrap(),
-        )
-        .unwrap();
+        #[derive(Debug, Deserialize, Serialize)]
+        struct VoreMention {
+            timestamp: DateTime<Utc>,
+            author: UserId
+        }
 
-        let recent = Utc::now();
-        let last = more_data.last_vore_mention;
+        let db = handler.data.db();
+        let vore_mentions = db.collection::<VoreMention>("vore_mentions");
+
+        let new_mention = VoreMention { timestamp: recent, author: new_message.author.id};
+        vore_mentions.insert_one(new_mention, None).await.unwrap();
+
+        let last = vore_mentions.find_one(
+            doc! { "timestamp": { "$ne": format!("{recent:?}") } },
+            FindOneOptions::builder().sort(doc! { "timestamp": -1 }).build()
+        ).await
+            .unwrap() // will fail if db connection fails
+            .unwrap() // will fail if collection is empty
+            .timestamp;
         let time = recent - last;
 
         let (d, h, m, s) = (
@@ -69,15 +81,6 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
             )
             .await
             .unwrap();
-
-        let mut more_data = handler.data.more_data.clone();
-        more_data.last_vore_mention = recent;
-        tokio::fs::write(
-            "slimebot_data.json",
-            &serde_json::to_string(&more_data).unwrap().as_bytes(),
-        )
-        .await
-        .unwrap();
     }
 }
 

@@ -7,11 +7,13 @@ use logging::DiscordSubscriber;
 mod discord;
 use discord::commands::*;
 use discord::framework::Handler;
+use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
 /// Config file parsing and option access.
 mod config;
-use crate::config::Config;
+
+mod db;
 
 use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
@@ -23,8 +25,35 @@ use tracing_unwrap::ResultExt;
 
 #[derive(Debug)]
 pub struct Data {
-    config: Config,
-    more_data: MoreData,
+    config: config::Config,
+    db: Database,
+}
+
+impl Data {
+    async fn new() -> Self {
+        let config: crate::config::Config = ::config::Config::builder()
+            .add_source(::config::File::with_name("slimebot.toml"))
+            .add_source(::config::Environment::with_prefix("SLIMEBOT"))
+            .build()
+            .expect_or_log("config file could not be loaded")
+            .try_deserialize()
+            .expect_or_log("configuration could not be parsed");
+
+        let db = db::connect(&config.db).await;
+
+        Self {
+            config,
+            db,
+        }
+    }
+
+    fn _config(&self) -> &crate::config::Config {
+        &self.config
+    }
+
+    fn db(&self) -> &Database {
+        &self.db
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -50,27 +79,11 @@ async fn main() {
     // now the first log can be sent!
     trace!("hi!");
 
-    //
-    let config: Config = ::config::Config::builder()
-        .add_source(::config::File::with_name("slimebot.toml"))
-        .add_source(::config::Environment::with_prefix("SLIMEBOT"))
-        .build()
-        .expect_or_log("config file could not be loaded")
-        .try_deserialize()
-        .expect_or_log("configuration could not be parsed");
-
-    let more_data: MoreData = ::config::Config::builder()
-        .add_source(::config::File::with_name("slimebot_data.json"))
-        .build()
-        .unwrap()
-        .try_deserialize()
-        .unwrap();
+    let data = Data::new().await;
+    let config = data.config.clone();
 
     let mut handler = Handler {
-        data: Data {
-            config: config.clone(),
-            more_data,
-        },
+        data,
         options: poise::FrameworkOptions {
             commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
             prefix_options: PrefixFrameworkOptions {

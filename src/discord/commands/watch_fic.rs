@@ -1,7 +1,7 @@
 use std::{fs, time::Duration};
 
 use anyhow::{anyhow, bail};
-use poise::serenity_prelude::{CacheHttp, Channel, Role};
+use poise::serenity_prelude::{Channel, Role};
 use scraper::{Html, Selector};
 use tracing::{error, info, instrument};
 

@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{AttachmentType, CacheHttp, Color, Embed, User, Webhook};
+use poise::serenity_prelude::{AttachmentType, Color, Embed, User, Webhook};
 use reqwest::Url;
 use serde_json::json;
 use tracing::warn;
