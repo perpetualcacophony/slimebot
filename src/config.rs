@@ -19,6 +19,8 @@ pub struct BotConfig {
     id: Option<UserId>,
     pub testing_server: Option<GuildId>,
     activity: Option<String>,
+    pub status: Option<String>,
+    prefix: String
 }
 
 impl BotConfig {
@@ -62,6 +64,10 @@ impl BotConfig {
             warn!("no bot.activity provided in config, defaulting to none");
             None
         }
+    }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
     }
 }
 
