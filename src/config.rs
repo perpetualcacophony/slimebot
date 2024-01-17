@@ -1,6 +1,6 @@
-use poise::serenity_prelude::{ChannelId, GuildId, UserId};
+use poise::serenity_prelude::{ChannelId, GuildId, UserId, Activity};
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
@@ -18,7 +18,7 @@ pub struct BotConfig {
     token: Option<DiscordToken>,
     id: Option<UserId>,
     pub testing_server: Option<GuildId>,
-    pub status: Option<String>,
+    activity: Option<String>,
 }
 
 impl BotConfig {
@@ -31,6 +31,30 @@ impl BotConfig {
     pub fn id(&self) -> UserId {
         self.id
             .expect_or_log("no user id in config or environment!")
+    }
+
+    pub fn activity(&self) -> Option<Activity> {
+        if let Some(activity) = &self.activity {
+            let (activity_type, name) = if activity.starts_with("listening to") {
+                ("listening to", activity.strip_prefix("listening to").unwrap())
+            } else {
+                activity.split_once(' ').unwrap()
+            };
+
+            match activity_type.to_lowercase().as_str() {
+                "playing" => Some(Activity::playing(name)),
+                "listening to" => Some(Activity::listening(name)),
+                "watching" => Some(Activity::watching(name)),
+                "competing" => Some(Activity::competing(name)),
+                _ => {
+                    error!("activity '{activity_type}' is unsupported - please use 'playing', 'listening to', 'watching' or 'competing'");
+                    warn!("disabling bot activity");
+                    None
+                }
+            }
+        } else {
+            None
+        }
     }
 }
 

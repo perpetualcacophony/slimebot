@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{self as serenity, Interaction};
+use poise::serenity_prelude::{self as serenity, Interaction, Ready};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 
@@ -59,6 +59,12 @@ impl serenity::EventHandler for Handler {
         )
         .await
         .ok();
+    }
+
+    async fn ready(&self, ctx: serenity::Context, _: Ready) {
+        if let Some(activity) = self.data.config().bot.activity() {
+            ctx.set_activity(activity).await
+        }
     }
 }
 
