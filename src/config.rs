@@ -18,6 +18,7 @@ pub struct BotConfig {
     id: Option<UserId>,
     pub testing_server: Option<GuildId>,
     pub status: Option<String>,
+    prefix: String
 }
 
 impl BotConfig {
@@ -30,6 +31,10 @@ impl BotConfig {
     pub fn id(&self) -> UserId {
         self.id
             .expect_or_log("no user id in config or environment!")
+    }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
     }
 }
 

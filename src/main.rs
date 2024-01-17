@@ -87,7 +87,7 @@ async fn main() {
         options: poise::FrameworkOptions {
             commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
             prefix_options: PrefixFrameworkOptions {
-                prefix: Some("..".to_string()),
+                prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
             },
             ..Default::default()
