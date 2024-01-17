@@ -22,7 +22,14 @@ impl serenity::EventHandler for Handler {
             shard_manager: &shard_manager,
         };
 
-        if new_message.author.id != framework_data.bot_id && !new_message.is_private() {
+        if new_message.author.id != framework_data.bot_id
+            && !new_message.is_private()
+            && self
+                .data
+                .config()
+                .watchers
+                .channel_allowed(new_message.channel_id)
+        {
             use super::watchers::*;
 
             vore(&ctx, self, &new_message).await;

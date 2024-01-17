@@ -10,6 +10,7 @@ pub struct Config {
     pub bot: BotConfig,
     pub logs: LogsConfig,
     pub db: DbConfig,
+    pub watchers: WatchersConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -88,4 +89,38 @@ impl DbConfig {
     pub fn password(&self) -> &str {
         &self.password
     }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WatchersConfig {
+    allow_by_default: bool,
+    channels: Option<Vec<WatchersChannelConfig>>,
+}
+
+impl WatchersConfig {
+    pub fn allow_by_default(&self) -> bool {
+        self.allow_by_default
+    }
+
+    pub fn channels(&self) -> Option<&Vec<WatchersChannelConfig>> {
+        self.channels.as_ref()
+    }
+
+    pub fn channel_allowed(&self, id: ChannelId) -> bool {
+        if let Some(channels) = self.channels() {
+            if let Some(channel) = channels.iter().find(|c| c.id == id) {
+                channel.allow
+            } else {
+                self.allow_by_default()
+            }
+        } else {
+            self.allow_by_default()
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WatchersChannelConfig {
+    id: ChannelId,
+    allow: bool,
 }

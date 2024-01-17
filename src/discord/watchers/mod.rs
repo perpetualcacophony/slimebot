@@ -1,4 +1,4 @@
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions};
 use poise::serenity_prelude::{CacheHttp, Context, Message, UserId};
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         // this code sucks less ass.
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~'], " ")
         .split_ascii_whitespace()
-        .any(|w| w == "vore" || w == "voring" || w == "vores" )
+        .any(|w| w == "vore" || w == "voring" || w == "vores")
     {
         let recent = Utc::now();
 
@@ -35,26 +35,35 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         #[derive(Debug, Deserialize, Serialize)]
         struct VoreMention {
             timestamp: DateTime<Utc>,
-            author: UserId
+            author: UserId,
         }
 
         let db = handler.data.db();
         let vore_mentions = db.collection::<VoreMention>("vore_mentions");
 
-        let new_mention = VoreMention { timestamp: recent, author: new_message.author.id};
+        let new_mention = VoreMention {
+            timestamp: recent,
+            author: new_message.author.id,
+        };
         vore_mentions.insert_one(new_mention, None).await.unwrap();
 
         // fixing bug where error happens if collection has 1 object and returns none
         let last = if vore_mentions.count_documents(None, None).await.unwrap() == 1 {
-            vore_mentions.find_one(None, None).await
+            vore_mentions
+                .find_one(None, None)
+                .await
                 .unwrap() // will fail if db connection fails
                 .unwrap() // will fail if collection is empty
                 .timestamp
         } else {
-            vore_mentions.find_one(
-                doc! { "timestamp": { "$ne": format!("{recent:?}") } },
-                FindOneOptions::builder().sort(doc! { "timestamp": -1 }).build()
-            ).await
+            vore_mentions
+                .find_one(
+                    doc! { "timestamp": { "$ne": format!("{recent:?}") } },
+                    FindOneOptions::builder()
+                        .sort(doc! { "timestamp": -1 })
+                        .build(),
+                )
+                .await
                 .unwrap() // will fail if db connection fails
                 .unwrap() // will fail if collection is empty
                 .timestamp
