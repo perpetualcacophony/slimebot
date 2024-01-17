@@ -44,13 +44,22 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         let new_mention = VoreMention { timestamp: recent, author: new_message.author.id};
         vore_mentions.insert_one(new_mention, None).await.unwrap();
 
-        let last = vore_mentions.find_one(
-            doc! { "timestamp": { "$ne": format!("{recent:?}") } },
-            FindOneOptions::builder().sort(doc! { "timestamp": -1 }).build()
-        ).await
-            .unwrap() // will fail if db connection fails
-            .unwrap() // will fail if collection is empty
-            .timestamp;
+        // fixing bug where error happens if collection has 1 object and returns none
+        let last = if vore_mentions.count_documents(None, None).await.unwrap() == 1 {
+            vore_mentions.find_one(None, None).await
+                .unwrap() // will fail if db connection fails
+                .unwrap() // will fail if collection is empty
+                .timestamp
+        } else {
+            vore_mentions.find_one(
+                doc! { "timestamp": { "$ne": format!("{recent:?}") } },
+                FindOneOptions::builder().sort(doc! { "timestamp": -1 }).build()
+            ).await
+                .unwrap() // will fail if db connection fails
+                .unwrap() // will fail if collection is empty
+                .timestamp
+        };
+
         let time = recent - last;
 
         let (d, h, m, s) = (
