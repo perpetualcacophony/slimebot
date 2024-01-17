@@ -41,13 +41,10 @@ impl Data {
 
         let db = db::connect(&config.db).await;
 
-        Self {
-            config,
-            db,
-        }
+        Self { config, db }
     }
 
-    fn _config(&self) -> &crate::config::Config {
+    fn config(&self) -> &crate::config::Config {
         &self.config
     }
 
