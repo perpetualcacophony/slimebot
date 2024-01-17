@@ -1,6 +1,6 @@
 [package]
 name = "slimebot"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 [profile.release]
@@ -20,6 +20,7 @@ hostname = "0.3.1"
 indoc = "2.0.4"
 #log = "0.4.20"
 mongodb = "2.8.0"
+openssl = { version = "0.10.62", features = ["vendored"] }
 poise = "0.5.5"
 reqwest = { version = "0.11.18", features = ["blocking"] }
 scraper = "0.17.1"
