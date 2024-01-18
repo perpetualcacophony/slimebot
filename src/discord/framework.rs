@@ -30,6 +30,7 @@ impl serenity::EventHandler for Handler {
                 .watchers
                 .channel_allowed(new_message.channel_id)
         {
+            #[allow(clippy::wildcard_imports)]
             use super::watchers::*;
 
             vore(&ctx, self, &new_message).await;
@@ -63,7 +64,7 @@ impl serenity::EventHandler for Handler {
 
     async fn ready(&self, ctx: serenity::Context, _: Ready) {
         if let Some(activity) = self.data.config().bot.activity() {
-            ctx.set_activity(activity).await
+            ctx.set_activity(activity).await;
         }
     }
 }

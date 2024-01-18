@@ -41,7 +41,7 @@ pub async fn watch_fic(
 
         if stored_chapter_count < chapter_ids.len() {
             info!("request made. update!");
-            store_chapter_count(id, chapter_ids.len()).await.unwrap();
+            store_chapter_count(id, chapter_ids.len()).unwrap();
 
             channel
                 .id()
@@ -85,7 +85,7 @@ fn _has_updated(work_id: usize, current_chapter_count: usize) -> Result<bool, Er
 // it's a little bit of runtime overhead but nbd
 #[instrument(level = "TRACE")]
 async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
-    let work_index = format!("https://archiveofourown.org/works/{}/navigate", work_id);
+    let work_index = format!("https://archiveofourown.org/works/{work_id}/navigate");
 
     let Ok(html) = reqwest::get(work_index).await else {
         error!("d");
@@ -125,7 +125,7 @@ async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
 // it's tied to, like, an explicit work right? why supply the chapter count?
 // if i could work with an api, i probably *would* have this func call ao3
 // but. i can't. i think i've minimized ao3 calls to, like, 1 every loop
-async fn store_chapter_count(work_id: usize, chapter_count: usize) -> Result<(), Error> {
+fn store_chapter_count(work_id: usize, chapter_count: usize) -> Result<(), Error> {
     fs::write(format!("works/{work_id}.len"), chapter_count.to_string())?;
 
     Ok(())

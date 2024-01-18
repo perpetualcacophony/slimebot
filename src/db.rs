@@ -5,7 +5,7 @@ use mongodb::{
 
 use crate::config::DbConfig;
 
-pub async fn connect(config: &DbConfig) -> Database {
+pub fn database(config: &DbConfig) -> Database {
     let credential = Credential::builder()
         .username(config.username().to_string())
         .password(config.password().to_string())

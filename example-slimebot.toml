@@ -5,6 +5,7 @@
 token = "your token here"
 id = 1111111111111111111 #bot id
 activity = "playing on YOUR SERVER" #activity options: 'playing', 'listening to', 'watching', 'competing'
+prefix = ".."
 
 [db]
 url = "localhost:27017" #mongodb host (without `mongodb://`)

@@ -5,6 +5,7 @@ use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
 mod discord;
+#[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use discord::framework::Handler;
 use mongodb::Database;
@@ -30,7 +31,7 @@ pub struct Data {
 }
 
 impl Data {
-    async fn new() -> Self {
+    fn new() -> Self {
         let config: crate::config::Config = ::config::Config::builder()
             .add_source(::config::File::with_name("slimebot.toml"))
             .add_source(::config::Environment::with_prefix("SLIMEBOT"))
@@ -39,16 +40,16 @@ impl Data {
             .try_deserialize()
             .expect_or_log("configuration could not be parsed");
 
-        let db = db::connect(&config.db).await;
+        let db = db::database(&config.db);
 
         Self { config, db }
     }
 
-    fn config(&self) -> &crate::config::Config {
+    const fn config(&self) -> &crate::config::Config {
         &self.config
     }
 
-    fn db(&self) -> &Database {
+    const fn db(&self) -> &Database {
         &self.db
     }
 }
@@ -76,7 +77,7 @@ async fn main() {
     // now the first log can be sent!
     trace!("hi!");
 
-    let data = Data::new().await;
+    let data = Data::new();
     let config = data.config.clone();
 
     let mut handler = Handler {
@@ -173,7 +174,7 @@ async fn main() {
     loop {
         let before = SystemTime::now();
         if http.get_bot_gateway().await.is_err() {
-            error!("failed to connect to discord!")
+            error!("failed to connect to discord!");
         }
         let ping = SystemTime::now()
             .duration_since(before)

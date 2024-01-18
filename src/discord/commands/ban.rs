@@ -12,9 +12,9 @@ pub async fn joke_ban(
     moderator_id: u64,
     reason: impl Into<Option<String>>,
 ) -> Result<(), Error> {
-    let reason = reason.into().unwrap_or("No reason".to_string());
+    let reason = reason.into().unwrap_or_else(|| "No reason".to_string());
 
-    let embed = ban_embed(&reason, &moderator_id, &user.name);
+    let embed = ban_embed(&reason, moderator_id, &user.name);
     let webhook = wick_webhook(ctx).await;
     webhook
         .execute(ctx.http(), false, |w| w.embeds(vec![embed]))
@@ -60,7 +60,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
     if &hook.name.clone().unwrap() != wick.display_name().as_ref() {
         hook.edit_name(ctx.http(), wick.display_name().as_ref())
             .await
-            .unwrap_or_log()
+            .unwrap_or_log();
     }
 
     if hook.avatar.clone().is_none() || hook.avatar.clone().unwrap() != wick.face() {
@@ -69,13 +69,13 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
             AttachmentType::Image(Url::parse(&wick.face()).unwrap()),
         )
         .await
-        .unwrap_or_log()
+        .unwrap_or_log();
     }
 
     hook
 }
 
-fn ban_embed(reason: &str, moderator_id: &u64, user: &str) -> serde_json::value::Value {
+fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> serde_json::value::Value {
     Embed::fake(|e| {
         e
         .title("Ban result:")

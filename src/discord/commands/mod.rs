@@ -53,7 +53,7 @@ pub async fn pfp(
     // debug!("{:?}", ctx.guild_id());
 
     if ctx.defer().await.is_err() {
-        error!("failed to defer - lag will cause errors!")
+        error!("failed to defer - lag will cause errors!");
     }
 
     let user = match user {
@@ -74,18 +74,19 @@ pub async fn pfp(
     // required args are ugly
     let global = global.map_or(false, |b| b);
 
-    let (pfp, pfp_type) = match global {
-        true => (
+    let (pfp, pfp_type) = if global {
+        (
             user.user.face(),
             user.avatar_url()
                 .map_or(PfpType::Unset, |_| PfpType::Global),
-        ),
-        false => (
+        )
+    } else {
+        (
             user.face(),
             user.user
                 .avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Guild),
-        ),
+                .map_or(PfpType::Unset, |_| PfpType::Guild)
+        )
     };
 
     let flavor_text = match pfp_type {
