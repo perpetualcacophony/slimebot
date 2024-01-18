@@ -2,6 +2,7 @@ mod ban;
 mod watch_fic;
 
 use poise::serenity_prelude::{Channel, Member, User};
+use tokio::join;
 use tracing::{error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -14,19 +15,49 @@ pub use watch_fic::watch_fic;
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    let channel = ctx
-        .channel_id()
-        .name(ctx.cache())
-        .await
-        .map_or("dms".to_string(), |c| format!("#{c}"));
+    let (channel, ping) = join!(
+        ctx.channel_id().name(ctx.cache()),
+        ctx.ping(),
+    );
+
     info!(
         "@{} ({}): {}",
         ctx.author().name,
-        channel,
+        channel.map_or("dms".to_string(), |c| format!("#{c}")),
         ctx.invocation_string()
     );
 
-    ctx.say("pong!").await?;
+    let ping = ping.as_millis();
+    if ping == 0 {
+        ctx.say("pong! (please try again later to display latency)").await?;
+    } else {
+        ctx.say(format!("pong! ({}ms)", ping)).await?;
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
+    let (channel, ping) = join!(
+        ctx.channel_id().name(ctx.cache()),
+        ctx.ping(),
+    );
+
+    info!(
+        "@{} ({}): {}",
+        ctx.author().name,
+        channel.map_or("dms".to_string(), |c| format!("#{c}")),
+        ctx.invocation_string()
+    );
+
+    let ping = ping.as_millis();
+    if ping == 0 {
+        ctx.say("ping! (please try again later to display latency)").await?;
+    } else {
+        ctx.say(format!("ping! ({}ms)", ping)).await?;
+    }
 
     Ok(())
 }

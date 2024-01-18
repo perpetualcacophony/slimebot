@@ -83,7 +83,7 @@ async fn main() {
     let mut handler = Handler {
         data,
         options: poise::FrameworkOptions {
-            commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
+            commands: vec![ping(), pong(), pfp(), watch_fic(), echo(), ban(), banban()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()

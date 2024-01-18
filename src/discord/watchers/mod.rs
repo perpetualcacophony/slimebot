@@ -3,11 +3,12 @@ use mongodb::{bson::doc, options::FindOneOptions};
 use poise::serenity_prelude::{CacheHttp, Context, Message, UserId};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::info;
+use tracing::{info, instrument};
 
 use super::framework::Handler;
 
 // watches all channels for a mention of vore and responds with time statistics
+#[instrument(skip_all, level = "trace")]
 pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
     if new_message
         .content
@@ -103,6 +104,7 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
 }
 
 // watches all channels for "L" and responds with the biden image
+#[instrument(skip_all, level = "trace")]
 pub async fn l_biden(ctx: &Context, new_message: &Message) {
     if new_message.content == "L" {
         info!(
@@ -128,6 +130,7 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
 }
 
 // watches all channels for "CL" and reponds with the Look CL copypasta
+#[instrument(skip_all, level = "trace")]
 pub async fn look_cl(ctx: &Context, new_message: &Message) {
     if new_message
         .content
