@@ -69,6 +69,10 @@ impl BotConfig {
     pub fn prefix(&self) -> &str {
         &self.prefix
     }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
