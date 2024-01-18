@@ -1,6 +1,6 @@
 use poise::serenity_prelude::{ChannelId, GuildId, UserId, Activity};
 use serde::Deserialize;
-use tracing::{info, warn, error};
+use tracing::{info, warn, error, debug};
 use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
@@ -35,24 +35,31 @@ impl BotConfig {
 
     pub fn activity(&self) -> Option<Activity> {
         if let Some(activity) = &self.activity {
-            let (activity_type, name) = if activity.starts_with("listening to") {
-                ("listening to", activity.strip_prefix("listening to").unwrap())
+            if activity.is_empty() {
+                warn!("bot.activity provided in config as empty string, defaulting to none");
+                return None;
+            }
+
+            let parsed_activity = if activity.starts_with("playing ") {
+                Activity::playing(activity.strip_prefix("playing ").unwrap())
+            } else if activity.starts_with("listening to ") {
+                Activity::playing(activity.strip_prefix("listening to ").unwrap())
+            } else if activity.starts_with("watching ") {
+                Activity::playing(activity.strip_prefix("watching ").unwrap())
+            } else if activity.starts_with("competing in ") {
+                Activity::playing(activity.strip_prefix("competing in ").unwrap())
             } else {
-                activity.split_once(' ').unwrap()
+                error!("bot.activity in config could not be parsed - must start with `playing`, `listening to`, `watching` or `competing in`");
+                warn!("disabling bot activity");
+                return None;
             };
 
-            match activity_type.to_lowercase().as_str() {
-                "playing" => Some(Activity::playing(name)),
-                "listening to" => Some(Activity::listening(name)),
-                "watching" => Some(Activity::watching(name)),
-                "competing" => Some(Activity::competing(name)),
-                _ => {
-                    error!("activity '{activity_type}' is unsupported - please use 'playing', 'listening to', 'watching' or 'competing'");
-                    warn!("disabling bot activity");
-                    None
-                }
-            }
+            debug!("bot.activity parsed as {:?}: {}", parsed_activity.kind, parsed_activity.name);
+            info!("successfully parsed bot activity from config");
+            
+            Some(parsed_activity)
         } else {
+            warn!("no bot.activity provided in config, defaulting to none");
             None
         }
     }
