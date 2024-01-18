@@ -121,7 +121,7 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
         ctx.http().send_message(
             new_message.channel_id.into(),
             &json!({
-                "content": "https://cdn.discordapp.com/attachments/1126687533900771429/1149042466327109814/IMG_3244.webp?ex=65b15130&is=659edc30&hm=189463085657b1bf66f7ea9daf5b341dc16a53c8485e6b1aa55705a2a22522c6&"
+                "content": "https://files.catbox.moe/v7itt0.webp"
             })
         ).await.unwrap();
     }
