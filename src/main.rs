@@ -1,6 +1,5 @@
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use chrono::{DateTime, Utc};
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
@@ -9,7 +8,6 @@ mod discord;
 use discord::commands::*;
 use discord::framework::Handler;
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
 
 /// Config file parsing and option access.
 mod config;
@@ -20,14 +18,18 @@ use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use std::time::{Duration, SystemTime};
-use tracing::{error, info, trace};
+use std::{time::Duration, thread};
+use tracing::trace;
 use tracing_unwrap::ResultExt;
+
+use chrono::Utc;
+type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug)]
 pub struct Data {
     config: config::Config,
     db: Database,
+    started: UtcDateTime
 }
 
 impl Data {
@@ -42,7 +44,9 @@ impl Data {
 
         let db = db::database(&config.db);
 
-        Self { config, db }
+        let started = Utc::now();
+
+        Self { config, db, started }
     }
 
     const fn config(&self) -> &crate::config::Config {
@@ -52,11 +56,6 @@ impl Data {
     const fn db(&self) -> &Database {
         &self.db
     }
-}
-
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct MoreData {
-    last_vore_mention: DateTime<Utc>,
 }
 
 // i should replace this with anyhow::Error
@@ -83,7 +82,7 @@ async fn main() {
     let mut handler = Handler {
         data,
         options: poise::FrameworkOptions {
-            commands: vec![ping(), pong(), pfp(), watch_fic(), echo(), ban(), banban()],
+            commands: vec![ping(), pong(), pfp(), watch_fic(), echo(), ban(), banban(), uptime()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
@@ -160,28 +159,31 @@ async fn main() {
         trace!("hi discord!");
     }
 
-    // i think this is an okay pattern?
-    // it's probably a bad idea for *all* of the bot's
-    // functionality to be defined by command responses.
-    // right now it's silly though. the ao3 pinger
-    // *should* be a command handler.
     tokio::spawn(async move { client.start().await });
-
     trace!("discord framework started");
 
-    let mut keep_alive = tokio::time::interval(Duration::from_secs(600));
-    keep_alive.tick().await;
     loop {
-        let before = SystemTime::now();
-        if http.get_bot_gateway().await.is_err() {
-            error!("failed to connect to discord!");
-        }
-        let ping = SystemTime::now()
-            .duration_since(before)
-            .unwrap()
-            .as_millis();
-        info!("discord connection active! ({ping}ms)");
+        thread::sleep(Duration::from_millis(1000));
+    }
+}
 
-        keep_alive.tick().await;
+fn format_time(time: chrono::Duration) -> String {
+    let (d, h, m, s) = (
+        time.num_days(),
+        time.num_hours(),
+        time.num_minutes(),
+        time.num_seconds(),
+    );
+
+    match (d, h, m, s) {
+        (1, _, _, _) => ("1 day").to_string(),
+        (2.., _, _, _) => format!("{d} days"),
+        (_, 1, _, _) => ("1 hour").to_string(),
+        (_, 2.., _, _) => format!("{h} hours"),
+        (_, _, 1, _) => ("1 minute").to_string(),
+        (_, _, 2.., _) => format!("{m} minutes"),
+        (_, _, _, 1) => ("1 second").to_string(),
+        (_, _, _, 2..) => format!("{s} seconds"),
+        (_, _, _, _) => "less than a second".to_string(),
     }
 }

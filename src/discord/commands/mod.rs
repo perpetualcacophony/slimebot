@@ -10,15 +10,14 @@ type Context<'a> = poise::Context<'a, crate::Data, Error>;
 
 pub use watch_fic::watch_fic;
 
+use crate::format_time;
+
 /// Responds on successful execution.
 
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(
-        ctx.channel_id().name(ctx.cache()),
-        ctx.ping(),
-    );
+    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
     info!(
         "@{} ({}): {}",
@@ -29,7 +28,8 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 
     let ping = ping.as_millis();
     if ping == 0 {
-        ctx.say("pong! (please try again later to display latency)").await?;
+        ctx.say("pong! (please try again later to display latency)")
+            .await?;
     } else {
         ctx.say(format!("pong! ({}ms)", ping)).await?;
     }
@@ -40,10 +40,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
 pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(
-        ctx.channel_id().name(ctx.cache()),
-        ctx.ping(),
-    );
+    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
     info!(
         "@{} ({}): {}",
@@ -54,7 +51,8 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
 
     let ping = ping.as_millis();
     if ping == 0 {
-        ctx.say("ping! (please try again later to display latency)").await?;
+        ctx.say("ping! (please try again later to display latency)")
+            .await?;
     } else {
         ctx.say(format!("ping! ({}ms)", ping)).await?;
     }
@@ -116,7 +114,7 @@ pub async fn pfp(
             user.face(),
             user.user
                 .avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Guild)
+                .map_or(PfpType::Unset, |_| PfpType::Guild),
         )
     };
 
@@ -219,6 +217,29 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
             .await
             .ok();
     }
+
+    Ok(())
+}
+
+#[instrument(skip(ctx))]
+#[poise::command(prefix_command)]
+pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
+    let channel = ctx
+        .channel_id()
+        .name(ctx.cache())
+        .await
+        .map_or("dms".to_string(), |c| format!("#{c}"));
+    info!(
+        "@{} ({}): {}",
+        ctx.author().name,
+        channel,
+        ctx.invocation_string()
+    );
+
+    let started = ctx.data().started;
+    let uptime = chrono::Utc::now() - started;
+
+    ctx.say(format_time(uptime)).await.unwrap();
 
     Ok(())
 }

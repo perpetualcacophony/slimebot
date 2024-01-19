@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{info, instrument};
 
+use crate::format_time;
+
 use super::framework::Handler;
 
 // watches all channels for a mention of vore and responds with time statistics
@@ -71,25 +73,7 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         };
 
         let time = recent - last;
-
-        let (d, h, m, s) = (
-            time.num_days(),
-            time.num_hours(),
-            time.num_minutes(),
-            time.num_seconds(),
-        );
-
-        let time_text = match (d, h, m, s) {
-            (1, _, _, _) => ("1 day").to_string(),
-            (2.., _, _, _) => format!("{d} days"),
-            (_, 1, _, _) => ("1 hour").to_string(),
-            (_, 2.., _, _) => format!("{h} hours"),
-            (_, _, 1, _) => ("1 minute").to_string(),
-            (_, _, 2.., _) => format!("{m} minutes"),
-            (_, _, _, 1) => ("1 second").to_string(),
-            (_, _, _, 2..) => format!("{s} seconds"),
-            (_, _, _, _) => "less than a second".to_string(),
-        };
+        let time_text = format_time(time);
 
         ctx.http()
             .send_message(
@@ -120,12 +104,15 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
             new_message.content
         );
 
-        ctx.http().send_message(
-            new_message.channel_id.into(),
-            &json!({
-                "content": "https://files.catbox.moe/v7itt0.webp"
-            })
-        ).await.unwrap();
+        ctx.http()
+            .send_message(
+                new_message.channel_id.into(),
+                &json!({
+                    "content": "https://files.catbox.moe/v7itt0.webp"
+                }),
+            )
+            .await
+            .unwrap();
     }
 }
 
