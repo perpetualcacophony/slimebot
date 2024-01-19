@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{info, instrument};
 
-use crate::format_time;
+use crate::FormatDuration;
 
 use super::framework::Handler;
 
@@ -73,7 +73,7 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
         };
 
         let time = recent - last;
-        let time_text = format_time(time);
+        let time_text = time.format_largest();
 
         ctx.http()
             .send_message(

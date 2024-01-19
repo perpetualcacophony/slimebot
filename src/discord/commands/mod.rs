@@ -10,7 +10,7 @@ type Context<'a> = poise::Context<'a, crate::Data, Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::format_time;
+use crate::FormatDuration;
 
 /// Responds on successful execution.
 
@@ -239,7 +239,11 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
     let started = ctx.data().started;
     let uptime = chrono::Utc::now() - started;
 
-    ctx.say(format_time(uptime)).await.unwrap();
+    ctx.say(format!(
+        "uptime: {} (since {})",
+        uptime.format_full(),
+        started.format("%Y-%m-%d %H:%M UTC")
+    )).await.unwrap();
 
     Ok(())
 }
