@@ -64,7 +64,7 @@ impl DiscordSender {
                 .await
                 .is_err()
             {
-                error!(no_discord = true, "log failed to reach discord")
+                error!(no_discord = true, "log failed to reach discord");
             }
         }
     }
@@ -79,7 +79,7 @@ struct DiscordLayer {
 }
 
 impl DiscordLayer {
-    pub fn new(tx: UnboundedSender<String>) -> Self {
+    pub const fn new(tx: UnboundedSender<String>) -> Self {
         Self { tx }
     }
 }
@@ -96,7 +96,7 @@ impl<S: Subscriber> Layer<S> for DiscordLayer {
         let message = format!("`[{}] {}`", event.metadata().level(), visitor.message);
 
         if event.metadata().fields().field("no_discord").is_none() {
-            self.tx.send(message).expect("subscriber threading failed")
+            self.tx.send(message).expect("subscriber threading failed");
         }
     }
 }
@@ -108,6 +108,6 @@ struct DiscordVisitor {
 
 impl tracing::field::Visit for DiscordVisitor {
     fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        write!(self.message, "{:?}", value).unwrap();
+        write!(self.message, "{value:?}").unwrap();
     }
 }

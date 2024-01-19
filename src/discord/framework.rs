@@ -1,4 +1,5 @@
-use poise::serenity_prelude::{self as serenity, Interaction};
+use poise::serenity_prelude::{self as serenity, Interaction, Ready, CacheHttp};
+use tracing::trace;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 
@@ -30,6 +31,7 @@ impl serenity::EventHandler for Handler {
                 .watchers
                 .channel_allowed(new_message.channel_id)
         {
+            #[allow(clippy::wildcard_imports)]
             use super::watchers::*;
 
             vore(&ctx, self, &new_message).await;
@@ -59,6 +61,30 @@ impl serenity::EventHandler for Handler {
         )
         .await
         .ok();
+    }
+
+    async fn ready(&self, ctx: serenity::Context, _: Ready) {
+        trace!("Ready event received from discord!");
+
+        if let Some(activity) = self.data.config().bot.activity() {
+            ctx.set_activity(activity).await;
+        }
+
+        let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(600));
+        keep_alive.tick().await;
+        loop {
+            let before = std::time::SystemTime::now();
+            if ctx.http().get_bot_gateway().await.is_err() {
+                tracing::error!("failed to connect to discord!");
+            }
+            let ping = std::time::SystemTime::now()
+                .duration_since(before)
+                .unwrap()
+                .as_millis();
+            tracing::info!("discord connection active! ({ping}ms)");
+    
+            keep_alive.tick().await;
+        }
     }
 }
 

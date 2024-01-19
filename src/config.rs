@@ -1,6 +1,6 @@
-use poise::serenity_prelude::{ChannelId, GuildId, UserId};
+use poise::serenity_prelude::{Activity, ChannelId, GuildId, UserId};
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
@@ -18,7 +18,8 @@ pub struct BotConfig {
     token: Option<DiscordToken>,
     id: Option<UserId>,
     pub testing_server: Option<GuildId>,
-    pub status: Option<String>,
+    activity: Option<String>,
+    prefix: String,
 }
 
 impl BotConfig {
@@ -31,6 +32,44 @@ impl BotConfig {
     pub fn id(&self) -> UserId {
         self.id
             .expect_or_log("no user id in config or environment!")
+    }
+
+    pub fn activity(&self) -> Option<Activity> {
+        if let Some(activity) = &self.activity {
+            if activity.is_empty() {
+                warn!("bot.activity provided in config as empty string, defaulting to none");
+                return None;
+            }
+
+            let parsed_activity = if activity.starts_with("playing ") {
+                Activity::playing(activity.strip_prefix("playing ").unwrap())
+            } else if activity.starts_with("listening to ") {
+                Activity::playing(activity.strip_prefix("listening to ").unwrap())
+            } else if activity.starts_with("watching ") {
+                Activity::playing(activity.strip_prefix("watching ").unwrap())
+            } else if activity.starts_with("competing in ") {
+                Activity::playing(activity.strip_prefix("competing in ").unwrap())
+            } else {
+                error!("bot.activity in config could not be parsed - must start with `playing`, `listening to`, `watching` or `competing in`");
+                warn!("disabling bot activity");
+                return None;
+            };
+
+            debug!(
+                "bot.activity parsed as {:?}: {}",
+                parsed_activity.kind, parsed_activity.name
+            );
+            info!("successfully parsed bot activity from config");
+
+            Some(parsed_activity)
+        } else {
+            warn!("no bot.activity provided in config, defaulting to none");
+            None
+        }
+    }
+
+    pub fn prefix(&self) -> &str {
+        &self.prefix
     }
 }
 
@@ -57,12 +96,11 @@ impl DiscordConfig {
 
     pub fn channel(&self) -> Option<ChannelId> {
         if self.enabled {
-            match self.channel {
-                Some(_) => Some(self.channel.unwrap()),
-                None => {
-                    warn!("no channel configured for discord logger");
-                    None
-                }
+            if let Some(channel) = self.channel {
+                Some(channel)
+            } else {
+                warn!("no channel configured for discord logger");
+                None
             }
         } else {
             None
@@ -98,24 +136,24 @@ pub struct WatchersConfig {
 }
 
 impl WatchersConfig {
-    pub fn allow_by_default(&self) -> bool {
+    pub const fn allow_by_default(&self) -> bool {
         self.allow_by_default
     }
 
-    pub fn channels(&self) -> Option<&Vec<WatchersChannelConfig>> {
+    pub const fn channels(&self) -> Option<&Vec<WatchersChannelConfig>> {
         self.channels.as_ref()
     }
 
     pub fn channel_allowed(&self, id: ChannelId) -> bool {
-        if let Some(channels) = self.channels() {
-            if let Some(channel) = channels.iter().find(|c| c.id == id) {
-                channel.allow
-            } else {
-                self.allow_by_default()
-            }
-        } else {
-            self.allow_by_default()
-        }
+        self.channels().map_or_else(
+            || self.allow_by_default(),
+            |channels| {
+                channels
+                    .iter()
+                    .find(|c| c.id == id)
+                    .map_or_else(|| self.allow_by_default(), |channel| channel.allow)
+            },
+        )
     }
 }
 

@@ -1,0 +1,20 @@
+# example slimebot.toml
+# IMPORTANT: slimebot will accept `slimebot.toml`, NOT `example-slimebot.toml`
+
+[bot]
+token = "your token here"
+id = 1111111111111111111 #bot id
+activity = "playing on YOUR SERVER" #activity options: 'playing', 'listening to', 'watching', 'competing'
+prefix = ".."
+
+[db]
+url = "localhost:27017" #mongodb host (without `mongodb://`)
+username = "mongodb username"
+password = "mongodb password"
+
+[watchers]
+allow_by_default = true #enables watchers for all channels not specifically disallowed
+
+[[watchers.channels]]
+id = 1111111111111111111 #channel id
+allow = false #disables watchers for this channel
