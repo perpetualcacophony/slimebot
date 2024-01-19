@@ -1,12 +1,12 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{Channel, Member, User};
+use poise::serenity_prelude::{Channel, Member, User, self};
 use tokio::join;
 use tracing::{error, info, instrument};
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, crate::Data, Error>;
+use crate::BotError;
+type Context<'a> = poise::Context<'a, crate::Data, BotError>;
 
 pub use watch_fic::watch_fic;
 
@@ -16,7 +16,7 @@ use crate::format_time;
 
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
-pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn ping(ctx: Context<'_>) -> Result<(), BotError> {
     let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
     info!(
@@ -27,11 +27,18 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     );
 
     let ping = ping.as_millis();
-    if ping == 0 {
-        ctx.say("pong! (please try again later to display latency)")
-            .await?;
+    let ping_message = if ping == 0 {
+        "pong! (please try again later to display latency)".to_string()
     } else {
-        ctx.say(format!("pong! ({}ms)", ping)).await?;
+        format!("pong! ({ping}ms)")
+    };
+
+    if let Err(
+        serenity_prelude::Error::Model(
+            serenity_prelude::ModelError::InvalidPermissions(p)
+        )
+    ) = ctx.say(ping_message).await {
+        return Err(BotError::Permissions(p));
     }
 
     Ok(())
@@ -39,7 +46,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
-pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn pong(ctx: Context<'_>) -> Result<(), BotError> {
     let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
     info!(
@@ -66,7 +73,7 @@ pub async fn pfp(
     ctx: Context<'_>,
     user: Option<Member>,
     global: Option<bool>,
-) -> Result<(), Error> {
+) -> Result<(), BotError> {
     let channel = ctx
         .channel_id()
         .name(ctx.cache())
@@ -139,7 +146,7 @@ pub async fn echo(
     ctx: Context<'_>,
     channel: Option<Channel>,
     message: String,
-) -> Result<(), Error> {
+) -> Result<(), BotError> {
     let id = match channel {
         Some(channel) => channel.id(),
         None => ctx.channel_id(),
@@ -191,7 +198,7 @@ pub async fn audio(
 
 #[instrument(skip(ctx, user))]
 #[poise::command(prefix_command)]
-pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<(), Error> {
+pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<(), BotError> {
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
         ban::joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
     } else {
@@ -203,7 +210,7 @@ pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
-pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn banban(ctx: Context<'_>) -> Result<(), BotError> {
     if ctx.author().id == 497014954935713802 {
         ban::joke_ban(
             ctx,
@@ -223,7 +230,7 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
-pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn uptime(ctx: Context<'_>) -> Result<(), BotError> {
     let channel = ctx
         .channel_id()
         .name(ctx.cache())

@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
 use logging::DiscordSubscriber;
@@ -15,15 +17,57 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
+    serenity_prelude::{self as serenity, GatewayIntents, Permissions},
     PrefixFrameworkOptions,
 };
-use std::{time::Duration, thread};
+use std::{time::Duration, thread, io};
 use tracing::trace;
 use tracing_unwrap::ResultExt;
 
+use thiserror::Error;
+
 use chrono::Utc;
 type UtcDateTime = chrono::DateTime<Utc>;
+
+#[derive(Error, Debug)]
+pub enum BotError {
+    #[error("anyhow error")]
+    Anyhow(#[from] anyhow::Error),
+
+    #[error("io error")]
+    Io(#[from] io::Error),
+
+    #[error("missing permissions: {0}")]
+    Permissions(Permissions),
+
+    #[error(transparent)]
+    Serenity(serenity::Error),
+
+    #[error("unknown error")]
+    Unknown
+}
+
+impl From<serenity::Error> for BotError {
+    fn from(value: serenity::Error) -> Self {
+        use serenity::Error as E;
+        
+        match value {
+            E::Model(err) => err.into(),
+            _ => Self::Serenity(value)
+        }
+    }
+}
+
+impl From<serenity::ModelError> for BotError {
+    fn from(value: serenity::ModelError) -> Self {
+        use serenity::ModelError as E;
+
+        match value {
+            E::InvalidPermissions(p) => Self::Permissions(p),
+            _ => Self::Unknown
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Data {
@@ -57,9 +101,6 @@ impl Data {
         &self.db
     }
 }
-
-// i should replace this with anyhow::Error
-type Error = Box<dyn std::error::Error + Send + Sync>;
 
 type DiscordToken = String;
 

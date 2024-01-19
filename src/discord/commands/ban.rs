@@ -4,14 +4,14 @@ use serde_json::json;
 use tracing::warn;
 use tracing_unwrap::ResultExt;
 
-use super::{Context, Error};
+use super::{Context, BotError};
 
 pub async fn joke_ban(
     ctx: Context<'_>,
     user: &User,
     moderator_id: u64,
     reason: impl Into<Option<String>>,
-) -> Result<(), Error> {
+) -> Result<(), BotError> {
     let reason = reason.into().unwrap_or_else(|| "No reason".to_string());
 
     let embed = ban_embed(&reason, moderator_id, &user.name);
