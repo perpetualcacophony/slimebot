@@ -33,10 +33,11 @@ impl serenity::EventHandler for Handler {
         {
             #[allow(clippy::wildcard_imports)]
             use super::watchers::*;
-
-            vore(&ctx, self, &new_message).await;
-            look_cl(&ctx, &new_message).await;
-            l_biden(&ctx, &new_message).await;
+            tokio::join!(
+                vore(&ctx, self.data.db(), &new_message),
+                look_cl(&ctx, &new_message),
+                l_biden(&ctx, &new_message),
+            );
         }
 
         poise::dispatch_event(framework_data, &ctx, &poise::Event::Message { new_message }).await;

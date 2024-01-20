@@ -198,15 +198,82 @@ impl FormatDuration for chrono::Duration {
         let mut formatted = String::new();
 
         if self.num_days() > 0 {
-            formatted += &format!("{}d", self.num_days());
-        } else if self.num_hours() > 0 {
-            formatted += &format!("{}h", self.num_hours());
-        } else if self.num_minutes() > 0 {
-            formatted += &format!("{}m", self.num_minutes());
+            formatted += &format!("{}d ", self.num_days());
+        }
+        
+        if self.num_hours() > 0 {
+            formatted += &format!("{}h ", self.num_hours() - (self.num_days() * 24));
+        }
+        
+        if self.num_minutes() > 0 {
+            formatted += &format!("{}m", self.num_minutes() - (self.num_hours() * 60));
         } else {
             formatted = "less than a minute".to_string();
         }
 
         formatted
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use super::*;
+
+    #[test]
+    fn format_full() {
+        let start = DateTime::parse_from_rfc3339(
+            "2024-01-19T20:00:00.000Z"
+        ).unwrap();
+
+        let end = DateTime::parse_from_rfc3339(
+            "2024-01-21T21:19:00.000Z"
+        ).unwrap();
+
+        let duration = end - start;
+
+        assert_eq!(
+            "2d 1h 19m",
+            duration.format_full(),
+        )
+    }
+
+    #[test]
+    fn format_largest() {
+        let start = DateTime::parse_from_rfc3339(
+            "2024-01-19T20:00:00.000Z"
+        ).unwrap();
+        let end = DateTime::parse_from_rfc3339(
+            "2024-01-21T21:19:00.000Z"
+        ).unwrap();
+        let duration = end - start;
+        assert_eq!(
+            "2 days",
+            duration.format_largest(),
+        );
+
+        let start = DateTime::parse_from_rfc3339(
+            "2024-01-19T20:00:00.000Z"
+        ).unwrap();
+        let end = DateTime::parse_from_rfc3339(
+            "2024-01-19T21:19:00.000Z"
+        ).unwrap();
+        let duration = end - start;
+        assert_eq!(
+            "1 hour",
+            duration.format_largest(),
+        );
+
+        let start = DateTime::parse_from_rfc3339(
+            "2024-01-19T20:00:00.000Z"
+        ).unwrap();
+        let end = DateTime::parse_from_rfc3339(
+            "2024-01-19T20:19:00.000Z"
+        ).unwrap();
+        let duration = end - start;
+        assert_eq!(
+            "19 minutes",
+            duration.format_largest(),
+        );
     }
 }
