@@ -1,3 +1,5 @@
+#![warn(clippy::perf)]
+
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
 use logging::DiscordSubscriber;
