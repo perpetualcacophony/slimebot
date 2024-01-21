@@ -1,10 +1,13 @@
 use poise::{
     samples::register_in_guild,
-    serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready, UserId},
+    serenity_prelude::{
+        self as serenity, CacheHttp, Context, Interaction, Reaction, ReactionType,
+        Ready, UserId, CreateEmbed, Color, futures::future::join_all,
+    },
 };
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
-use tracing::trace;
+use tracing::{trace, debug};
 
 use crate::{Data, Error};
 
@@ -96,23 +99,69 @@ impl serenity::EventHandler for Handler {
             keep_alive.tick().await;
         }
     }
+
+    async fn reaction_add(&self, ctx: Context, add_reaction: Reaction) {
+        if add_reaction.emoji == ReactionType::Unicode("🐞".to_string()) {
+            let messages = add_reaction
+                .channel_id
+                .messages(ctx.http(), |get| {
+                    get.around(add_reaction.message_id).limit(5)
+                })
+                .await
+                .unwrap();
+
+            let http = ctx.http();
+
+            let messages = messages.into_iter()
+                .rev()
+                .enumerate()
+                .map(|(n, m)| async move {
+                    let content = if m.content.is_empty() {
+                        "*empty message*"
+                    } else {
+                        &m.content
+                    };
+
+                    let name = m.author_nick(http).await.unwrap_or(m.author.name);
+
+                    if n == 2 {
+                        (
+                            format!(
+                                "{name} << bug occurred here {}",
+                                add_reaction.message_id.link(add_reaction.channel_id, add_reaction.guild_id)),
+                            format!("**{}**", content),
+                            false
+                        )
+                    } else {
+                        (name, content.to_string(), false)
+                    }
+                });
+
+            let messages = join_all(messages).await;
+
+            debug!("{:#?}", messages);
+
+            let mut embed = CreateEmbed::default();
+
+            embed
+                .title("bug report")
+                .description("react to a message with 🐞 to generate one of these reports!
+
+                report context:")
+                .thumbnail("https://em-content.zobj.net/source/twitter/376/lady-beetle_1f41e.png")
+                .color(Color::from_rgb(221, 46, 68))
+                .fields(messages)
+                .footer(|footer| { 
+                    footer.icon_url("https://media.discordapp.net/attachments/1159320580823191672/1198721314802896996/9e1275360c072b9ad0c31d07d24f7257.webp?ex=65bfef38&is=65ad7a38&hm=2b4ab0cbd9b6497bc6e7cc96c4b537a197cef6fb30a22a4fc99432d8cd988aa0&=&format=webp&width=770&height=770")
+                        .text("slimebot")
+                })
+                .timestamp(add_reaction.message_id.created_at());
+
+            add_reaction
+                .channel_id
+                .send_message(ctx.http, |msg| msg.set_embed(embed.clone()))
+                .await
+                .unwrap();
+        }
+    }
 }
-
-/*pub async fn manual_dispatch(token: String) {
-    let intents = GatewayIntents::all();
-    let mut handler = Handler {
-        options: FrameworkOptions {
-            commands: vec![ping()],
-            ..Default::default()
-        },
-        shard_manager: Mutex::new(None)
-    };
-    poise::set_qualified_names(&mut handler.options.commands);
-
-    let handler = Arc::new(handler);
-    let mut client = Client::builder(token, intents)
-        .event_handler_arc(handler.clone())
-        .register_songbird()
-        .await
-        .unwrap();
-}*/
