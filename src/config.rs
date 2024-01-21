@@ -1,4 +1,5 @@
-use poise::serenity_prelude::{Activity, ChannelId, GuildId, UserId};
+use poise::serenity_prelude::{Activity, ChannelId, GuildId};
+use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 use tracing_unwrap::OptionExt;
@@ -16,7 +17,6 @@ pub struct Config {
 #[derive(Deserialize, Debug, Clone)]
 pub struct BotConfig {
     token: Option<DiscordToken>,
-    id: Option<UserId>,
     testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
@@ -27,11 +27,6 @@ impl BotConfig {
         self.token
             .as_ref()
             .expect_or_log("no token in config or environment!")
-    }
-
-    pub fn id(&self) -> UserId {
-        self.id
-            .expect_or_log("no user id in config or environment!")
     }
 
     pub fn testing_server(&self) -> Option<&GuildId> {
@@ -83,7 +78,22 @@ impl BotConfig {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
+    flavor_texts: Vec<String>,
     pub discord: DiscordConfig,
+}
+
+impl LogsConfig {
+    pub fn flavor_text(&self) -> Option<&str> {        
+        let flavor_text = self.flavor_texts.iter()
+            .choose(&mut rand::thread_rng())
+            .map(|s| s.as_str());
+
+        if flavor_text.is_none() {
+            warn!("no flavor texts provided in config :(");
+        }
+
+        flavor_text
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -2088,6 +2088,7 @@ dependencies = [
  "mongodb",
  "openssl",
  "poise",
+ "rand",
  "reqwest",
  "scraper",
  "serde",

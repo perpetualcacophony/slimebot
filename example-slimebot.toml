@@ -2,10 +2,16 @@
 # IMPORTANT: slimebot will accept `slimebot.toml`, NOT `example-slimebot.toml`
 
 [bot]
-token = "your token here"
-id = 1111111111111111111 #bot id
+token = "your bot token here"
 activity = "playing on YOUR SERVER" #activity options: 'playing', 'listening to', 'watching', 'competing'
 prefix = ".."
+
+[logs]
+flavor_texts = [
+    "a random one of these",
+    "will show up in",
+    "the console on startup",
+]
 
 [db]
 url = "localhost:27017" #mongodb host (without `mongodb://`)

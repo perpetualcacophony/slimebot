@@ -25,6 +25,7 @@ dotenv = "0.15.0"
 mongodb = "2.8.0"
 openssl = "0.10.62"
 poise = "0.5.5"
+rand = "0.8.5"
 reqwest = { version = "0.11.18", default-features = true }
 scraper = { version = "0.17.1", default-features = false }
 serde = { version = "1.0.188", default-features = false }

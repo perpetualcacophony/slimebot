@@ -20,7 +20,7 @@ use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use tracing::trace;
+use tracing::{trace, info};
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
@@ -42,6 +42,8 @@ impl Data {
             .expect_or_log("config file could not be loaded")
             .try_deserialize()
             .expect_or_log("configuration could not be parsed");
+
+        trace!("config loaded");
 
         let db = db::database(&config.db);
 
@@ -78,11 +80,13 @@ async fn main() {
     // receiver for initializing the discord logger later.
     // because that can't be done until we get the http from the framework
     let discord_receiver = DiscordSubscriber::init_stdout();
-    // now the first log can be sent!
-    trace!("hi!");
 
     let data = Data::new();
     let config = data.config.clone();
+
+    if let Some(flavor_text) = config.logs.flavor_text() {
+        info!("{flavor_text}")
+    }
 
     let mut handler = Handler {
         data,

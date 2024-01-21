@@ -1,6 +1,6 @@
 use poise::{
     samples::register_in_guild,
-    serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready},
+    serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready, UserId},
 };
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
@@ -20,7 +20,7 @@ impl serenity::EventHandler for Handler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework_data = poise::FrameworkContext {
-            bot_id: self.data.config.bot.id(),
+            bot_id: UserId(ctx.http().http().application_id().unwrap()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
@@ -49,7 +49,7 @@ impl serenity::EventHandler for Handler {
     async fn interaction_create(&self, ctx: serenity::Context, interaction: Interaction) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework = poise::FrameworkContext {
-            bot_id: serenity::UserId(846453852164587620),
+            bot_id: UserId(ctx.http().http().application_id().unwrap()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
