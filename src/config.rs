@@ -83,8 +83,10 @@ pub struct LogsConfig {
 }
 
 impl LogsConfig {
-    pub fn flavor_text(&self) -> Option<&str> {        
-        let flavor_text = self.flavor_texts.iter()
+    pub fn flavor_text(&self) -> Option<&str> {
+        let flavor_text = self
+            .flavor_texts
+            .iter()
             .choose(&mut rand::thread_rng())
             .map(|s| s.as_str());
 
