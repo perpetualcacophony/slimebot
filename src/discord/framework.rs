@@ -1,4 +1,7 @@
-use poise::serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready};
+use poise::{
+    samples::register_in_guild,
+    serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready},
+};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 use tracing::trace;
@@ -69,6 +72,12 @@ impl serenity::EventHandler for Handler {
 
         if let Some(activity) = self.data.config().bot.activity() {
             ctx.set_activity(activity).await;
+        }
+
+        if let Some(guild) = self.data.config.bot.testing_server() {
+            register_in_guild(ctx.http(), self.options.commands.as_ref(), *guild)
+                .await
+                .unwrap();
         }
 
         let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(600));

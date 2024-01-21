@@ -17,7 +17,7 @@ pub struct Config {
 pub struct BotConfig {
     token: Option<DiscordToken>,
     id: Option<UserId>,
-    pub testing_server: Option<GuildId>,
+    testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
 }
@@ -32,6 +32,14 @@ impl BotConfig {
     pub fn id(&self) -> UserId {
         self.id
             .expect_or_log("no user id in config or environment!")
+    }
+
+    pub fn testing_server(&self) -> Option<&GuildId> {
+        if self.testing_server.is_none() {
+            warn!("no testing server set in config, slash commands will not be registered");
+        }
+
+        self.testing_server.as_ref()
     }
 
     pub fn activity(&self) -> Option<Activity> {

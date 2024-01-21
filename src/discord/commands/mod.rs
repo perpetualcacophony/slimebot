@@ -1,7 +1,7 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{Channel, Member, User};
+use poise::serenity_prelude::{Channel, User, Member};
 use tokio::join;
 use tracing::{error, info, instrument};
 
@@ -59,13 +59,18 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// displays the specified user's profile picture - defaults to yours
+/// display a user's profile picture
 #[instrument(skip_all)]
-#[poise::command(prefix_command, slash_command, discard_spare_arguments)]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    discard_spare_arguments,
+    rename = "pfp"
+)]
 pub async fn pfp(
     ctx: Context<'_>,
-    user: Option<Member>,
-    #[flag] global: bool,
+    #[description = "the user to display the profile picture of - defaults to you"] user: Option<User>,
+    #[flag] #[description = "show the user's global profile picture, ignoring if they have a server one set"] global: bool,
 ) -> Result<(), Error> {
     let channel = ctx
         .channel_id()
@@ -83,54 +88,126 @@ pub async fn pfp(
         error!("failed to defer - lag will cause errors!");
     }
 
-    let member = match user {
-        Some(user) => user,
-        None => ctx.author_member().await.unwrap().into_owned(),
-    };
+    if let Some(guild) = ctx.guild() {
+        let member = if let Some(user) = user {
+            guild.member(ctx.http(), user.id).await.unwrap()
+        } else {
+            ctx.author_member().await.unwrap().into_owned()
+        };
 
-    enum PfpType {
-        Guild,
-        GlobalOnly,
-        Global,
-        Unset,
-    }
-    use PfpType as P;
-
-    let (pfp, pfp_type) = if global {
-        (
-            member.user.face(),
-            member.user.avatar_url()
-                .map_or_else(
+        enum PfpType {
+            Guild,
+            GlobalOnly,
+            Global,
+            Unset,
+        }
+        use PfpType as P;
+    
+        let (pfp, pfp_type) = if global {
+            (
+                member.user.face(),
+                member.user.avatar_url().map_or_else(
                     || PfpType::Unset,
-                    |_| member.avatar_url().map_or(PfpType::GlobalOnly, |_| PfpType::Global)
-                )
-        )
+                    |_| {
+                        member
+                            .avatar_url()
+                            .map_or(PfpType::GlobalOnly, |_| PfpType::Global)
+                    },
+                ),
+            )
+        } else {
+            (
+                member.face(),
+                member.avatar_url().map_or_else(
+                    || {
+                        member
+                            .user
+                            .avatar_url()
+                            .map_or(PfpType::Unset, |_| PfpType::Global)
+                    },
+                    |_| PfpType::Guild,
+                ),
+            )
+        };
+
+        fn author_response(pfp_type: PfpType, global: bool) -> String {
+            match pfp_type {
+                P::Guild => "**your profile picture in this server:**",
+                P::GlobalOnly => "**your profile picture:**",
+                P::Global if global => "**your global profile picture:**",
+                P::Global => "**your profile picture:**",
+                P::Unset if global => "**you don't have a profile picture set!**",
+                P::Unset => "**you don't have a profile picture set!**",
+            }.to_string()
+        }
+
+        fn other_response(member: &Member, pfp_type: PfpType, global: bool) -> String {
+            match pfp_type {
+                P::Guild => format!(
+                    "**{}'s profile picture in this server:**",
+                    member.display_name()
+                ),
+                P::GlobalOnly => format!("**`{}`'s profile picture:**", member.user.name),
+                P::Global if global => format!("**`{}`'s global profile picture:**", member.user.name),
+                P::Global => format!("**{}'s profile picture:**", member.display_name()),
+                P::Unset if global => format!(
+                    "**`{}` does not have a profile picture set!**",
+                    member.user.name
+                ),
+                P::Unset => format!(
+                    "**{} does not have a profile picture set!**",
+                    member.display_name()
+                ),
+            }
+        }
+    
+        let response_text = if &member.user == ctx.author() {
+            author_response(pfp_type, global)
+        } else {
+            other_response(&member, pfp_type, global)
+        };
+    
+        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
+            .await?;
     } else {
-        (
-            member.face(),
-            member
-                .avatar_url()
-                .map_or_else(
-                    || member.user.avatar_url().map_or(PfpType::Unset, |_| PfpType::Global),
-                    |_| PfpType::Guild
-                )
-        )
-    };
+        fn author_response(author: &User) -> (String, String) {
+            let response_text = if author.avatar_url().is_some() {
+                "**your profile picture:**"
+            } else {
+                "**you don't have a profile picture set!**"
+            }.to_string();
 
-    let response_text = match pfp_type {
-        P::Guild => format!("**{}'s profile picture in this server:**", member.display_name()),
-        P::GlobalOnly => format!("**`{}`'s profile picture:**", member.user.name),
-        P::Global if global => format!("**`{}`'s global profile picture:**", member.user.name),
-        P::Global => format!("**{}'s profile picture:**", member.display_name()),
-        P::Unset if global => format!("**{}'s does not have a profile picture set!**", member.user.name),
-        P::Unset => format!("**{} does not have a profile picture set!**", member.display_name()),
-    };
+            (author.face(), response_text)
+        }
 
-    ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
-        .await?;
+        fn other_response(user: &User) -> (String, String) {
+            let response_text = if user.avatar_url().is_some() {
+                format!("**`{}`'s profile picture:**", user.name)
+            } else {
+                format!("**`{}` does not have a profile picture set!**", user.name)
+            };
+
+            (user.face(), response_text)
+        }
+
+        let (pfp, response_text) = if let Some(user) = user {
+            if &user == ctx.author() {
+                author_response(ctx.author())
+            } else {
+                other_response(&user)
+            }
+        } else {
+            author_response(ctx.author())
+        };
+        
+        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
+            .await?;
+    }
 
     Ok(())
 }
+
+
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]

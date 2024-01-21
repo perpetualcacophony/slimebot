@@ -20,7 +20,6 @@ use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use std::{thread, time::Duration};
 use tracing::trace;
 use tracing_unwrap::ResultExt;
 
@@ -174,12 +173,8 @@ async fn main() {
         trace!("hi discord!");
     }
 
-    tokio::spawn(async move { client.start().await });
     trace!("discord framework started");
-
-    loop {
-        thread::sleep(Duration::from_millis(1000));
-    }
+    client.start().await.unwrap();
 }
 
 trait FormatDuration {
