@@ -1,13 +1,9 @@
 mod ban;
 mod watch_fic;
 
-use std::str::FromStr;
-
-use poise::serenity_prelude::{AttachmentType, Channel, Member, User};
-use reqwest::{IntoUrl, Url};
-use serde_json::json;
+use poise::serenity_prelude::{Channel, Member, User};
 use tokio::join;
-use tracing::{error, info, instrument, trace};
+use tracing::{error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
@@ -18,7 +14,7 @@ use crate::FormatDuration;
 
 /// bot will respond on successful execution
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, discard_spare_arguments)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
@@ -41,7 +37,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command, hide_in_help)]
+#[poise::command(slash_command, prefix_command, hide_in_help, discard_spare_arguments)]
 pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
     let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
@@ -65,7 +61,7 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
 
 /// displays the specified user's profile picture - defaults to yours
 #[instrument(skip_all)]
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, discard_spare_arguments)]
 pub async fn pfp(
     ctx: Context<'_>,
     user: Option<Member>,
@@ -87,46 +83,50 @@ pub async fn pfp(
         error!("failed to defer - lag will cause errors!");
     }
 
-    let user = match user {
+    let member = match user {
         Some(user) => user,
         None => ctx.author_member().await.unwrap().into_owned(),
     };
 
-    //debug!("target nickname: {}, username: {}", target.display_name(), target.user.name);
-
     enum PfpType {
         Guild,
+        GlobalOnly,
         Global,
         Unset,
     }
-
-    //let member = ctx.guild().unwrap().member(ctx.http(), user.user.id);
+    use PfpType as P;
 
     let (pfp, pfp_type) = if global {
         (
-            user.user.face(),
-            user.avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Global),
+            member.user.face(),
+            member.user.avatar_url()
+                .map_or_else(
+                    || PfpType::Unset,
+                    |_| member.avatar_url().map_or(PfpType::GlobalOnly, |_| PfpType::Global)
+                )
         )
     } else {
         (
-            user.face(),
-            user.user
+            member.face(),
+            member
                 .avatar_url()
-                .map_or(PfpType::Unset, |_| PfpType::Guild),
+                .map_or_else(
+                    || member.user.avatar_url().map_or(PfpType::Unset, |_| PfpType::Global),
+                    |_| PfpType::Guild
+                )
         )
     };
 
-    let flavor_text = match pfp_type {
-        PfpType::Guild => format!("**{}'s profile picture:**", user.display_name()),
-        PfpType::Global => format!("**`{}`'s global profile picture:**", user.user.name),
-        PfpType::Unset => format!(
-            "**{} does not have a profile picture set!**",
-            user.display_name()
-        ),
+    let response_text = match pfp_type {
+        P::Guild => format!("**{}'s profile picture in this server:**", member.display_name()),
+        P::GlobalOnly => format!("**`{}`'s profile picture:**", member.user.name),
+        P::Global if global => format!("**`{}`'s global profile picture:**", member.user.name),
+        P::Global => format!("**{}'s profile picture:**", member.display_name()),
+        P::Unset if global => format!("**{}'s does not have a profile picture set!**", member.user.name),
+        P::Unset => format!("**{} does not have a profile picture set!**", member.display_name()),
     };
 
-    ctx.send(|f| f.content(flavor_text).attachment((*pfp).into()))
+    ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
         .await?;
 
     Ok(())
