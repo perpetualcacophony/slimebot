@@ -1,7 +1,7 @@
-use poise::serenity_prelude::{self as serenity, Interaction, Ready, CacheHttp};
-use tracing::trace;
+use poise::serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
+use tracing::trace;
 
 use crate::{Data, Error};
 
@@ -83,7 +83,7 @@ impl serenity::EventHandler for Handler {
                 .unwrap()
                 .as_millis();
             tracing::info!("discord connection active! ({ping}ms)");
-    
+
             keep_alive.tick().await;
         }
     }

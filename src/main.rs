@@ -20,7 +20,7 @@ use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use std::{time::Duration, thread};
+use std::{thread, time::Duration};
 use tracing::trace;
 use tracing_unwrap::ResultExt;
 
@@ -31,7 +31,7 @@ type UtcDateTime = chrono::DateTime<Utc>;
 pub struct Data {
     config: config::Config,
     db: Database,
-    started: UtcDateTime
+    started: UtcDateTime,
 }
 
 impl Data {
@@ -48,7 +48,11 @@ impl Data {
 
         let started = Utc::now();
 
-        Self { config, db, started }
+        Self {
+            config,
+            db,
+            started,
+        }
     }
 
     const fn config(&self) -> &crate::config::Config {
@@ -84,7 +88,16 @@ async fn main() {
     let mut handler = Handler {
         data,
         options: poise::FrameworkOptions {
-            commands: vec![ping(), pong(), pfp(), watch_fic(), echo(), ban(), banban(), uptime()],
+            commands: vec![
+                ping(),
+                pong(),
+                pfp(),
+                watch_fic(),
+                echo(),
+                ban(),
+                banban(),
+                uptime(),
+            ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
@@ -182,7 +195,7 @@ impl FormatDuration for chrono::Duration {
             self.num_minutes(),
             self.num_seconds(),
         );
-    
+
         match (d, h, m, s) {
             (1, _, _, _) => ("1 day").to_string(),
             (2.., _, _, _) => format!("{d} days"),
@@ -202,11 +215,11 @@ impl FormatDuration for chrono::Duration {
         if self.num_days() > 0 {
             formatted += &format!("{}d ", self.num_days());
         }
-        
+
         if self.num_hours() > 0 {
             formatted += &format!("{}h ", self.num_hours() - (self.num_days() * 24));
         }
-        
+
         if self.num_minutes() > 0 {
             formatted += &format!("{}m", self.num_minutes() - (self.num_hours() * 60));
         } else {
@@ -219,63 +232,35 @@ impl FormatDuration for chrono::Duration {
 
 #[cfg(test)]
 mod tests {
-    use chrono::DateTime;
     use super::*;
+    use chrono::DateTime;
 
     #[test]
     fn format_full() {
-        let start = DateTime::parse_from_rfc3339(
-            "2024-01-19T20:00:00.000Z"
-        ).unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
 
-        let end = DateTime::parse_from_rfc3339(
-            "2024-01-21T21:19:00.000Z"
-        ).unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
 
         let duration = end - start;
 
-        assert_eq!(
-            "2d 1h 19m",
-            duration.format_full(),
-        )
+        assert_eq!("2d 1h 19m", duration.format_full(),)
     }
 
     #[test]
     fn format_largest() {
-        let start = DateTime::parse_from_rfc3339(
-            "2024-01-19T20:00:00.000Z"
-        ).unwrap();
-        let end = DateTime::parse_from_rfc3339(
-            "2024-01-21T21:19:00.000Z"
-        ).unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
-        assert_eq!(
-            "2 days",
-            duration.format_largest(),
-        );
+        assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339(
-            "2024-01-19T20:00:00.000Z"
-        ).unwrap();
-        let end = DateTime::parse_from_rfc3339(
-            "2024-01-19T21:19:00.000Z"
-        ).unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
         let duration = end - start;
-        assert_eq!(
-            "1 hour",
-            duration.format_largest(),
-        );
+        assert_eq!("1 hour", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339(
-            "2024-01-19T20:00:00.000Z"
-        ).unwrap();
-        let end = DateTime::parse_from_rfc3339(
-            "2024-01-19T20:19:00.000Z"
-        ).unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
         let duration = end - start;
-        assert_eq!(
-            "19 minutes",
-            duration.format_largest(),
-        );
+        assert_eq!("19 minutes", duration.format_largest(),);
     }
 }

@@ -1,9 +1,13 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{Channel, Member, User};
+use std::str::FromStr;
+
+use poise::serenity_prelude::{AttachmentType, Channel, Member, User};
+use reqwest::{IntoUrl, Url};
+use serde_json::json;
 use tokio::join;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, trace};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
@@ -12,8 +16,7 @@ pub use watch_fic::watch_fic;
 
 use crate::FormatDuration;
 
-/// Responds on successful execution.
-
+/// bot will respond on successful execution
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
@@ -38,7 +41,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, prefix_command, hide_in_help)]
 pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
     let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
 
@@ -60,12 +63,13 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// displays the specified user's profile picture - defaults to yours
 #[instrument(skip_all)]
 #[poise::command(prefix_command, slash_command)]
 pub async fn pfp(
     ctx: Context<'_>,
     user: Option<Member>,
-    global: Option<bool>,
+    #[flag] global: bool,
 ) -> Result<(), Error> {
     let channel = ctx
         .channel_id()
@@ -78,8 +82,6 @@ pub async fn pfp(
         channel,
         ctx.invocation_string()
     );
-
-    // debug!("{:?}", ctx.guild_id());
 
     if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!");
@@ -99,9 +101,6 @@ pub async fn pfp(
     }
 
     //let member = ctx.guild().unwrap().member(ctx.http(), user.user.id);
-
-    // required args are ugly
-    let global = global.map_or(false, |b| b);
 
     let (pfp, pfp_type) = if global {
         (
@@ -213,9 +212,9 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
         )
         .await?;
     } else {
-        ctx.send(|m| m.attachment("https://files.catbox.moe/jm6sr9.png".into()))
+        ctx.send(|m| m.content("https://files.catbox.moe/jm6sr9.png"))
             .await
-            .ok();
+            .unwrap();
     }
 
     Ok(())
@@ -243,7 +242,9 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
         "uptime: {} (since {})",
         uptime.format_full(),
         started.format("%Y-%m-%d %H:%M UTC")
-    )).await.unwrap();
+    ))
+    .await
+    .unwrap();
 
     Ok(())
 }
