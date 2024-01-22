@@ -1,18 +1,21 @@
 use poise::serenity_prelude::{AttachmentType, Color, Embed, User, Webhook};
 use reqwest::Url;
-use serde_json::json;
+use serde_json::{json, Value};
 use tracing::warn;
 use tracing_unwrap::ResultExt;
 
 use super::{Context, Error};
 
-pub async fn joke_ban(
+pub async fn joke_ban<R>(
     ctx: Context<'_>,
     user: &User,
     moderator_id: u64,
-    reason: impl Into<Option<String>>,
-) -> Result<(), Error> {
-    let reason = reason.into().unwrap_or_else(|| "No reason".to_string());
+    reason: R,
+) -> Result<(), Error>
+where
+    R: Into<Option<String>> + Send,
+{
+    let reason = reason.into().unwrap_or_else(|| "No reason".to_owned());
 
     let embed = ban_embed(&reason, moderator_id, &user.name);
     let webhook = wick_webhook(ctx).await;
@@ -36,7 +39,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
         .await
         .unwrap()
         .into_iter()
-        .find(|wh| wh.name == Some("Wick".to_string()))
+        .find(|wh| wh.name == Some("Wick".to_owned()))
         .unwrap_or(
             async {
                 warn!(
@@ -75,7 +78,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
     hook
 }
 
-fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> serde_json::value::Value {
+fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> Value {
     Embed::fake(|e| {
         e
         .title("Ban result:")
@@ -102,7 +105,7 @@ fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> serde_json::value::
             (
                 "",
                 "<:fail:1167852407028461648> **Unsuccessful bans**
-                All users were banned!".to_string(),
+                All users were banned!".to_owned(),
                 false
             )
         ])

@@ -1,7 +1,26 @@
-#![warn(clippy::perf)]
+#![warn(
+    clippy::complexity,
+    clippy::correctness,
+    clippy::nursery,
+    clippy::perf,
+    clippy::restriction,
+    clippy::style,
+    clippy::suspicious
+)]
+#![allow(
+    clippy::blanket_clippy_restriction_lints,
+    clippy::missing_docs_in_private_items,
+    clippy::single_call_fn,
+    clippy::implicit_return
+)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
+use std::{
+    fmt::Write,
+    sync::{Arc, Mutex},
+};
+
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
@@ -56,6 +75,7 @@ impl Data {
         }
     }
 
+    #[allow(clippy::absolute_paths)]
     const fn config(&self) -> &crate::config::Config {
         &self.config
     }
@@ -65,6 +85,7 @@ impl Data {
     }
 }
 
+#[allow(clippy::absolute_paths)]
 // i should replace this with anyhow::Error
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -102,16 +123,17 @@ async fn main() {
                 uptime(),
             ],
             prefix_options: PrefixFrameworkOptions {
-                prefix: Some(config.bot.prefix().to_string()),
+                prefix: Some(config.bot.prefix().to_owned()),
                 ..Default::default()
             },
             ..Default::default()
         },
-        shard_manager: std::sync::Mutex::new(None),
+        shard_manager: Mutex::new(None),
     };
     poise::set_qualified_names(&mut handler.options.commands);
 
-    let handler = std::sync::Arc::new(handler);
+    #[allow(clippy::shadow_reuse)]
+    let handler = Arc::new(handler);
     let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
         .event_handler_arc(handler.clone())
         .await
@@ -169,7 +191,7 @@ async fn main() {
 
     if config.logs.discord.enabled() {
         DiscordSubscriber::init_discord(
-            http.clone(),
+            http,
             config.logs.discord.channel().unwrap().into(),
             discord_receiver,
         )
@@ -188,6 +210,7 @@ trait FormatDuration {
 
 impl FormatDuration for chrono::Duration {
     fn format_largest(&self) -> String {
+        #[allow(clippy::min_ident_chars)]
         let (d, h, m, s) = (
             self.num_days(),
             self.num_hours(),
@@ -196,15 +219,15 @@ impl FormatDuration for chrono::Duration {
         );
 
         match (d, h, m, s) {
-            (1, _, _, _) => ("1 day").to_string(),
+            (1, _, _, _) => ("1 day").to_owned(),
             (2.., _, _, _) => format!("{d} days"),
-            (_, 1, _, _) => ("1 hour").to_string(),
+            (_, 1, _, _) => ("1 hour").to_owned(),
             (_, 2.., _, _) => format!("{h} hours"),
-            (_, _, 1, _) => ("1 minute").to_string(),
+            (_, _, 1, _) => ("1 minute").to_owned(),
             (_, _, 2.., _) => format!("{m} minutes"),
-            (_, _, _, 1) => ("1 second").to_string(),
+            (_, _, _, 1) => ("1 second").to_owned(),
             (_, _, _, 2..) => format!("{s} seconds"),
-            (_, _, _, _) => "less than a second".to_string(),
+            (_, _, _, _) => "less than a second".to_owned(),
         }
     }
 
@@ -212,17 +235,27 @@ impl FormatDuration for chrono::Duration {
         let mut formatted = String::new();
 
         if self.num_days() > 0 {
-            formatted += &format!("{}d ", self.num_days());
+            write!(&mut formatted, "{}d ", self.num_days()).unwrap();
         }
 
         if self.num_hours() > 0 {
-            formatted += &format!("{}h ", self.num_hours() - (self.num_days() * 24));
+            write!(
+                &mut formatted,
+                "{}h ",
+                self.num_hours() - (self.num_days() * 24)
+            )
+            .unwrap();
         }
 
         if self.num_minutes() > 0 {
-            formatted += &format!("{}m", self.num_minutes() - (self.num_hours() * 60));
+            write!(
+                &mut formatted,
+                "{}m",
+                self.num_minutes() - (self.num_hours() * 60)
+            )
+            .unwrap();
         } else {
-            formatted = "less than a minute".to_string();
+            formatted = "less than a minute".to_owned();
         }
 
         formatted
@@ -236,6 +269,7 @@ mod tests {
 
     #[test]
     fn format_full() {
+        #![allow(clippy::unwrap_used)]
         let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
 
         let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
@@ -247,19 +281,20 @@ mod tests {
 
     #[test]
     fn format_largest() {
+        #![allow(clippy::unwrap_used)]
         let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
         let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
-        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
-        let duration = end - start;
-        assert_eq!("1 hour", duration.format_largest(),);
+        let start2 = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end2 = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
+        let duration2 = end2 - start2;
+        assert_eq!("1 hour", duration2.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
-        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
-        let duration = end - start;
-        assert_eq!("19 minutes", duration.format_largest(),);
+        let start3 = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end3 = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
+        let duration3 = end3 - start3;
+        assert_eq!("19 minutes", duration3.format_largest(),);
     }
 }
