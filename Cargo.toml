@@ -23,7 +23,7 @@ chrono = { version = "0.4.31", default-features = false }
 config = { version = "0.13.3", default-features = false, features = ["toml"] }
 dotenv = "0.15.0"
 mongodb = "2.8.0"
-openssl = "0.10.62"
+openssl = { version = "0.10.62", features = ["vendored"] }
 poise = "0.5.5"
 rand = "0.8.5"
 regex = "1.10.3"
