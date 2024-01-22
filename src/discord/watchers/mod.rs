@@ -1,24 +1,20 @@
 use chrono::{DateTime, Utc};
-use mongodb::{bson::doc, options::FindOneOptions};
+use mongodb::{bson::doc, options::FindOneOptions, Database};
 use poise::serenity_prelude::{CacheHttp, Context, Message, UserId};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{info, instrument};
 
 use crate::FormatDuration;
 
-use super::framework::Handler;
-
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
-pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
-    if new_message
-        .content
-        .to_lowercase()
-        // this code sucks less ass.
-        .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~'], " ")
-        .split_ascii_whitespace()
-        .any(|w| w == "vore" || w == "voring" || w == "vores")
+pub async fn vore(ctx: &Context, db: &Database, new_message: &Message) {
+    if Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
+        .unwrap()
+        .captures(&new_message.content)
+        .is_some()
     {
         let recent = Utc::now();
 
@@ -41,7 +37,6 @@ pub async fn vore(ctx: &Context, handler: &Handler, new_message: &Message) {
             author: UserId,
         }
 
-        let db = handler.data.db();
         let vore_mentions = db.collection::<VoreMention>("vore_mentions");
 
         let new_mention = VoreMention {
@@ -121,7 +116,7 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
 pub async fn look_cl(ctx: &Context, new_message: &Message) {
     if new_message
         .content
-        .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~'], " ")
+        .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~', '#', '^'], " ")
         .split_ascii_whitespace()
         .any(|w| w == "CL")
     {

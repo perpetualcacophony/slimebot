@@ -1,9 +1,17 @@
-use poise::serenity_prelude::{self as serenity, Interaction, Ready, CacheHttp};
-use tracing::trace;
+use poise::{
+    samples::register_in_guild,
+    serenity_prelude::{
+        self as serenity, CacheHttp, Context,
+        Interaction, Reaction, Ready, UserId,
+    },
+};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
+use tracing::trace;
 
 use crate::{Data, Error};
+
+use super::bug_reports::bug_reports;
 
 pub struct Handler {
     pub data: Data,
@@ -17,7 +25,7 @@ impl serenity::EventHandler for Handler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework_data = poise::FrameworkContext {
-            bot_id: self.data.config.bot.id(),
+            bot_id: UserId(ctx.http().http().application_id().unwrap()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
@@ -33,10 +41,11 @@ impl serenity::EventHandler for Handler {
         {
             #[allow(clippy::wildcard_imports)]
             use super::watchers::*;
-
-            vore(&ctx, self, &new_message).await;
-            look_cl(&ctx, &new_message).await;
-            l_biden(&ctx, &new_message).await;
+            tokio::join!(
+                vore(&ctx, self.data.db(), &new_message),
+                look_cl(&ctx, &new_message),
+                l_biden(&ctx, &new_message),
+            );
         }
 
         poise::dispatch_event(framework_data, &ctx, &poise::Event::Message { new_message }).await;
@@ -45,7 +54,7 @@ impl serenity::EventHandler for Handler {
     async fn interaction_create(&self, ctx: serenity::Context, interaction: Interaction) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework = poise::FrameworkContext {
-            bot_id: serenity::UserId(846453852164587620),
+            bot_id: UserId(ctx.http().http().application_id().unwrap()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
@@ -70,6 +79,12 @@ impl serenity::EventHandler for Handler {
             ctx.set_activity(activity).await;
         }
 
+        if let Some(guild) = self.data.config.bot.testing_server() {
+            register_in_guild(ctx.http(), self.options.commands.as_ref(), *guild)
+                .await
+                .unwrap();
+        }
+
         let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(600));
         keep_alive.tick().await;
         loop {
@@ -82,27 +97,14 @@ impl serenity::EventHandler for Handler {
                 .unwrap()
                 .as_millis();
             tracing::info!("discord connection active! ({ping}ms)");
-    
+
             keep_alive.tick().await;
         }
     }
+
+    async fn reaction_add(&self, ctx: Context, add_reaction: Reaction) {
+        if let Some(channel_id) = self.data.config().bug_reports_channel() {
+            bug_reports(&ctx, add_reaction, channel_id).await;
+        }
+    }
 }
-
-/*pub async fn manual_dispatch(token: String) {
-    let intents = GatewayIntents::all();
-    let mut handler = Handler {
-        options: FrameworkOptions {
-            commands: vec![ping()],
-            ..Default::default()
-        },
-        shard_manager: Mutex::new(None)
-    };
-    poise::set_qualified_names(&mut handler.options.commands);
-
-    let handler = Arc::new(handler);
-    let mut client = Client::builder(token, intents)
-        .event_handler_arc(handler.clone())
-        .register_songbird()
-        .await
-        .unwrap();
-}*/

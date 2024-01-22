@@ -1,4 +1,5 @@
-use poise::serenity_prelude::{Activity, ChannelId, GuildId, UserId};
+use poise::serenity_prelude::{Activity, ChannelId, GuildId};
+use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 use tracing_unwrap::OptionExt;
@@ -11,13 +12,24 @@ pub struct Config {
     pub logs: LogsConfig,
     pub db: DbConfig,
     pub watchers: WatchersConfig,
+    pub bug_reports: Option<BugReportsConfig>,
+}
+
+impl Config {
+    pub fn bug_reports_channel(&self) -> Option<&ChannelId> {
+        if let Some(bug_reports_config) = &self.bug_reports {
+            Some(bug_reports_config.channel())
+        } else {
+            warn!("bug reports not configured");
+            None
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BotConfig {
     token: Option<DiscordToken>,
-    id: Option<UserId>,
-    pub testing_server: Option<GuildId>,
+    testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
 }
@@ -29,9 +41,12 @@ impl BotConfig {
             .expect_or_log("no token in config or environment!")
     }
 
-    pub fn id(&self) -> UserId {
-        self.id
-            .expect_or_log("no user id in config or environment!")
+    pub fn testing_server(&self) -> Option<&GuildId> {
+        if self.testing_server.is_none() {
+            warn!("no testing server set in config, slash commands will not be registered");
+        }
+
+        self.testing_server.as_ref()
     }
 
     pub fn activity(&self) -> Option<Activity> {
@@ -75,7 +90,24 @@ impl BotConfig {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
+    flavor_texts: Vec<String>,
     pub discord: DiscordConfig,
+}
+
+impl LogsConfig {
+    pub fn flavor_text(&self) -> Option<&str> {
+        let flavor_text = self
+            .flavor_texts
+            .iter()
+            .choose(&mut rand::thread_rng())
+            .map(|s| s.as_str());
+
+        if flavor_text.is_none() {
+            warn!("no flavor texts provided in config :(");
+        }
+
+        flavor_text
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -161,4 +193,15 @@ impl WatchersConfig {
 pub struct WatchersChannelConfig {
     id: ChannelId,
     allow: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct BugReportsConfig {
+    channel: ChannelId,
+}
+
+impl BugReportsConfig {
+    fn channel(&self) -> &ChannelId {
+        &self.channel
+    }
 }
