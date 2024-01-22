@@ -4,3 +4,4 @@
 slimebot.toml
 slimebot_data.json
 compose.yaml
+.cargo/config.toml
