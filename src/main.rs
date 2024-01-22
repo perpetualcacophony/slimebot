@@ -20,7 +20,7 @@ use poise::{
     serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use tracing::{trace, info};
+use tracing::{info, trace};
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;

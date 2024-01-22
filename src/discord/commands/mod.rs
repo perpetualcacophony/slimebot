@@ -1,7 +1,7 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{Channel, User, Member};
+use poise::serenity_prelude::{Channel, Member, User};
 use tokio::join;
 use tracing::{error, info, instrument};
 
@@ -61,16 +61,15 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
 
 /// display a user's profile picture
 #[instrument(skip_all)]
-#[poise::command(
-    prefix_command,
-    slash_command,
-    discard_spare_arguments,
-    rename = "pfp"
-)]
+#[poise::command(prefix_command, slash_command, discard_spare_arguments, rename = "pfp")]
 pub async fn pfp(
     ctx: Context<'_>,
-    #[description = "the user to display the profile picture of - defaults to you"] user: Option<User>,
-    #[flag] #[description = "show the user's global profile picture, ignoring if they have a server one set"] global: bool,
+    #[description = "the user to display the profile picture of - defaults to you"] user: Option<
+        User,
+    >,
+    #[flag]
+    #[description = "show the user's global profile picture, ignoring if they have a server one set"]
+    global: bool,
 ) -> Result<(), Error> {
     let channel = ctx
         .channel_id()
@@ -102,7 +101,7 @@ pub async fn pfp(
             Unset,
         }
         use PfpType as P;
-    
+
         let (pfp, pfp_type) = if global {
             (
                 member.user.face(),
@@ -138,7 +137,8 @@ pub async fn pfp(
                 P::Global => "**your profile picture:**",
                 P::Unset if global => "**you don't have a profile picture set!**",
                 P::Unset => "**you don't have a profile picture set!**",
-            }.to_string()
+            }
+            .to_string()
         }
 
         fn other_response(member: &Member, pfp_type: PfpType, global: bool) -> String {
@@ -148,7 +148,9 @@ pub async fn pfp(
                     member.display_name()
                 ),
                 P::GlobalOnly => format!("**`{}`'s profile picture:**", member.user.name),
-                P::Global if global => format!("**`{}`'s global profile picture:**", member.user.name),
+                P::Global if global => {
+                    format!("**`{}`'s global profile picture:**", member.user.name)
+                }
                 P::Global => format!("**{}'s profile picture:**", member.display_name()),
                 P::Unset if global => format!(
                     "**`{}` does not have a profile picture set!**",
@@ -160,13 +162,13 @@ pub async fn pfp(
                 ),
             }
         }
-    
+
         let response_text = if &member.user == ctx.author() {
             author_response(pfp_type, global)
         } else {
             other_response(&member, pfp_type, global)
         };
-    
+
         ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
             .await?;
     } else {
@@ -175,7 +177,8 @@ pub async fn pfp(
                 "**your profile picture:**"
             } else {
                 "**you don't have a profile picture set!**"
-            }.to_string();
+            }
+            .to_string();
 
             (author.face(), response_text)
         }
@@ -199,15 +202,13 @@ pub async fn pfp(
         } else {
             author_response(ctx.author())
         };
-        
+
         ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
             .await?;
     }
 
     Ok(())
 }
-
-
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]

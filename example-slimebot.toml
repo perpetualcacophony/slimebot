@@ -24,3 +24,7 @@ allow_by_default = true #enables watchers for all channels not specifically disa
 [[watchers.channels]]
 id = 1111111111111111111 #channel id
 allow = false #disables watchers for this channel
+
+[bug_reports]
+enabled = true
+channel = 1111111111111111111

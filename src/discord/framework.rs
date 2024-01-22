@@ -1,15 +1,17 @@
 use poise::{
     samples::register_in_guild,
     serenity_prelude::{
-        self as serenity, CacheHttp, Context, Interaction, Reaction, ReactionType,
-        Ready, UserId, CreateEmbed, Color, futures::future::join_all,
+        self as serenity, CacheHttp, Context,
+        Interaction, Reaction, Ready, UserId,
     },
 };
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
-use tracing::{trace, debug};
+use tracing::trace;
 
 use crate::{Data, Error};
+
+use super::bug_reports::bug_reports;
 
 pub struct Handler {
     pub data: Data,
@@ -101,67 +103,8 @@ impl serenity::EventHandler for Handler {
     }
 
     async fn reaction_add(&self, ctx: Context, add_reaction: Reaction) {
-        if add_reaction.emoji == ReactionType::Unicode("🐞".to_string()) {
-            let messages = add_reaction
-                .channel_id
-                .messages(ctx.http(), |get| {
-                    get.around(add_reaction.message_id).limit(5)
-                })
-                .await
-                .unwrap();
-
-            let http = ctx.http();
-
-            let messages = messages.into_iter()
-                .rev()
-                .enumerate()
-                .map(|(n, m)| async move {
-                    let content = if m.content.is_empty() {
-                        "*empty message*"
-                    } else {
-                        &m.content
-                    };
-
-                    let name = m.author_nick(http).await.unwrap_or(m.author.name);
-
-                    if n == 2 {
-                        (
-                            format!(
-                                "{name} << bug occurred here {}",
-                                add_reaction.message_id.link(add_reaction.channel_id, add_reaction.guild_id)),
-                            format!("**{}**", content),
-                            false
-                        )
-                    } else {
-                        (name, content.to_string(), false)
-                    }
-                });
-
-            let messages = join_all(messages).await;
-
-            debug!("{:#?}", messages);
-
-            let mut embed = CreateEmbed::default();
-
-            embed
-                .title("bug report")
-                .description("react to a message with 🐞 to generate one of these reports!
-
-                report context:")
-                .thumbnail("https://em-content.zobj.net/source/twitter/376/lady-beetle_1f41e.png")
-                .color(Color::from_rgb(221, 46, 68))
-                .fields(messages)
-                .footer(|footer| { 
-                    footer.icon_url("https://media.discordapp.net/attachments/1159320580823191672/1198721314802896996/9e1275360c072b9ad0c31d07d24f7257.webp?ex=65bfef38&is=65ad7a38&hm=2b4ab0cbd9b6497bc6e7cc96c4b537a197cef6fb30a22a4fc99432d8cd988aa0&=&format=webp&width=770&height=770")
-                        .text("slimebot")
-                })
-                .timestamp(add_reaction.message_id.created_at());
-
-            add_reaction
-                .channel_id
-                .send_message(ctx.http, |msg| msg.set_embed(embed.clone()))
-                .await
-                .unwrap();
+        if let Some(channel_id) = self.data.config().bug_reports_channel() {
+            bug_reports(&ctx, add_reaction, channel_id).await;
         }
     }
 }
