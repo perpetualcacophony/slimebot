@@ -12,6 +12,18 @@ pub struct Config {
     pub logs: LogsConfig,
     pub db: DbConfig,
     pub watchers: WatchersConfig,
+    pub bug_reports: Option<BugReportsConfig>,
+}
+
+impl Config {
+    pub fn bug_reports_channel(&self) -> Option<&ChannelId> {
+        if let Some(bug_reports_config) = &self.bug_reports {
+            Some(bug_reports_config.channel())
+        } else {
+            warn!("bug reports not configured");
+            None
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -181,4 +193,15 @@ impl WatchersConfig {
 pub struct WatchersChannelConfig {
     id: ChannelId,
     allow: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct BugReportsConfig {
+    channel: ChannelId,
+}
+
+impl BugReportsConfig {
+    fn channel(&self) -> &ChannelId {
+        &self.channel
+    }
 }

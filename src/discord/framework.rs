@@ -1,12 +1,17 @@
 use poise::{
     samples::register_in_guild,
-    serenity_prelude::{self as serenity, CacheHttp, Interaction, Ready, UserId},
+    serenity_prelude::{
+        self as serenity, CacheHttp, Context,
+        Interaction, Reaction, Ready, UserId,
+    },
 };
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 use tracing::trace;
 
 use crate::{Data, Error};
+
+use super::bug_reports::bug_reports;
 
 pub struct Handler {
     pub data: Data,
@@ -96,23 +101,10 @@ impl serenity::EventHandler for Handler {
             keep_alive.tick().await;
         }
     }
+
+    async fn reaction_add(&self, ctx: Context, add_reaction: Reaction) {
+        if let Some(channel_id) = self.data.config().bug_reports_channel() {
+            bug_reports(&ctx, add_reaction, channel_id).await;
+        }
+    }
 }
-
-/*pub async fn manual_dispatch(token: String) {
-    let intents = GatewayIntents::all();
-    let mut handler = Handler {
-        options: FrameworkOptions {
-            commands: vec![ping()],
-            ..Default::default()
-        },
-        shard_manager: Mutex::new(None)
-    };
-    poise::set_qualified_names(&mut handler.options.commands);
-
-    let handler = Arc::new(handler);
-    let mut client = Client::builder(token, intents)
-        .event_handler_arc(handler.clone())
-        .register_songbird()
-        .await
-        .unwrap();
-}*/
