@@ -72,10 +72,6 @@ type DiscordToken = String;
 
 #[tokio::main]
 async fn main() {
-    // this *should* only need to happen during the config loading,
-    // but init_stdout has a sneaky env var call
-    dotenv::dotenv().unwrap();
-
     // the stdout logger is started, and returns the
     // receiver for initializing the discord logger later.
     // because that can't be done until we get the http from the framework

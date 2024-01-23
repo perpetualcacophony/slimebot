@@ -2,7 +2,6 @@ mod ban;
 mod watch_fic;
 
 use poise::serenity_prelude::{Channel, Member, User};
-use tokio::join;
 use tracing::{error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -12,20 +11,33 @@ pub use watch_fic::watch_fic;
 
 use crate::FormatDuration;
 
+trait LogCommand {
+    async fn log_command(&self);
+}
+
+impl LogCommand for Context<'_> {
+    async fn log_command(&self) {
+        let channel = self
+            .channel_id()
+            .name(self.cache())
+            .await
+            .map_or("dms".to_string(), |c| format!("#{c}"));
+        info!(
+            "@{} ({}): {}",
+            self.author().name,
+            channel,
+            self.invocation_string()
+        );
+    }
+}
+
 /// bot will respond on successful execution
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command, discard_spare_arguments)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
+    ctx.log_command().await;
 
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel.map_or("dms".to_string(), |c| format!("#{c}")),
-        ctx.invocation_string()
-    );
-
-    let ping = ping.as_millis();
+    let ping = ctx.ping().await.as_millis();
     if ping == 0 {
         ctx.say("pong! (please try again later to display latency)")
             .await?;
@@ -39,16 +51,9 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command, hide_in_help, discard_spare_arguments)]
 pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
+    ctx.log_command().await;
 
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel.map_or("dms".to_string(), |c| format!("#{c}")),
-        ctx.invocation_string()
-    );
-
-    let ping = ping.as_millis();
+    let ping = ctx.ping().await.as_millis();
     if ping == 0 {
         ctx.say("ping! (please try again later to display latency)")
             .await?;
@@ -71,17 +76,7 @@ pub async fn pfp(
     #[description = "show the user's global profile picture, ignoring if they have a server one set"]
     global: bool,
 ) -> Result<(), Error> {
-    let channel = ctx
-        .channel_id()
-        .name(ctx.cache())
-        .await
-        .map_or("dms".to_string(), |c| format!("#{c}"));
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel,
-        ctx.invocation_string()
-    );
+    ctx.log_command().await;
 
     if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!");
@@ -301,17 +296,7 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
-    let channel = ctx
-        .channel_id()
-        .name(ctx.cache())
-        .await
-        .map_or("dms".to_string(), |c| format!("#{c}"));
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel,
-        ctx.invocation_string()
-    );
+    ctx.log_command().await;
 
     let started = ctx.data().started;
     let uptime = chrono::Utc::now() - started;

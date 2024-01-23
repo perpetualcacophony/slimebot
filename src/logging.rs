@@ -19,7 +19,7 @@ impl DiscordSubscriber {
         tracing_subscriber::registry()
             .with(DiscordLayer::new(tx))
             .with(tracing_subscriber::fmt::layer())
-            .with(EnvFilter::from_default_env())
+            .with(EnvFilter::try_new("slimebot,tracing_unwrap").unwrap())
             .init();
 
         let span = tracing::info_span!("init_stdout");
