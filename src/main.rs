@@ -229,6 +229,7 @@ impl FormatDuration for chrono::Duration {
 mod tests {
     use super::*;
     use chrono::DateTime;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn format_full() {
