@@ -1,8 +1,7 @@
 use poise::{
     samples::register_in_guild,
     serenity_prelude::{
-        self as serenity, CacheHttp, Context,
-        Interaction, Reaction, Ready, UserId,
+        self as serenity, CacheHttp, Context, Interaction, Reaction, Ready, UserId,
     },
 };
 use std::sync::atomic::AtomicBool;

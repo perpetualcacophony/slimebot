@@ -1,4 +1,7 @@
-use poise::serenity_prelude::{ReactionType, Reaction, Context, CacheHttp, futures::future::join_all, UserId, CreateEmbed, Color, ChannelId};
+use poise::serenity_prelude::{
+    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed, Reaction,
+    ReactionType, UserId,
+};
 
 #[allow(unused_imports)]
 use tracing::debug;
@@ -7,10 +10,18 @@ use tracing::info;
 pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &ChannelId) {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
-    let ladybugs = add_reaction.message(ctx.http()).await.unwrap().reactions.iter().find(|r| r.reaction_type == ladybug_reaction).unwrap().count;
-    
+    let ladybugs = add_reaction
+        .message(ctx.http())
+        .await
+        .unwrap()
+        .reactions
+        .iter()
+        .find(|r| r.reaction_type == ladybug_reaction)
+        .unwrap()
+        .count;
+
     let add_after = add_reaction.clone();
-    
+
     if add_reaction.emoji == ladybug_reaction && ladybugs == 1 {
         let messages = add_reaction
             .channel_id
@@ -92,12 +103,12 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             add_after.user(ctx.http()).await.unwrap().name,
             add_after.message_id,
             add_after
-            .channel(ctx.http())
-            .await
-            .unwrap() // todo: handle the http request failing
-            .guild()
-            .unwrap() // this is ok - the report will not be outside a guild
-            .name(),
+                .channel(ctx.http())
+                .await
+                .unwrap() // todo: handle the http request failing
+                .guild()
+                .unwrap() // this is ok - the report will not be outside a guild
+                .name(),
         );
     }
 }
