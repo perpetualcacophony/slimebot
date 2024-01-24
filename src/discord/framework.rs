@@ -8,13 +8,13 @@ use std::sync::atomic::AtomicBool;
 use tokio::sync::Mutex;
 use tracing::trace;
 
-use crate::{Data, Error};
+use crate::{BotError, Data};
 
 use super::bug_reports::bug_reports;
 
 pub struct Handler {
     pub data: Data,
-    pub options: poise::FrameworkOptions<Data, Error>,
+    pub options: poise::FrameworkOptions<Data, BotError>,
     pub shard_manager:
         std::sync::Mutex<Option<std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>>>,
 }

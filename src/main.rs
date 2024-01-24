@@ -17,7 +17,7 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
+    serenity_prelude::{self as serenity, GatewayIntents, HttpError, ModelError, Permissions, SerenityError},
     PrefixFrameworkOptions,
 };
 use tracing::{info, trace};
@@ -31,6 +31,31 @@ pub struct Data {
     config: config::Config,
     db: Database,
     started: UtcDateTime,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum BotError {
+    #[error("model error")]
+    Model(ModelError),
+    #[error("permissions error")]
+    Permissions(Permissions),
+    #[error("serenity error {0}")]
+    Serenity(#[from] SerenityError),
+    #[error("http error")]
+    Http(#[from] HttpError),
+    #[error("anyhow error")]
+    Anyhow(#[from] anyhow::Error),
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+}
+
+impl From<ModelError> for BotError {
+    fn from(value: ModelError) -> Self {
+        match value {
+            ModelError::InvalidPermissions(p) => Self::Permissions(p),
+            e => Self::Model(e)
+        }
+    }
 }
 
 impl Data {
@@ -66,7 +91,7 @@ impl Data {
 }
 
 // i should replace this with anyhow::Error
-type Error = Box<dyn std::error::Error + Send + Sync>;
+//type Error = Box<dyn std::error::Error + Send + Sync>;
 
 type DiscordToken = String;
 

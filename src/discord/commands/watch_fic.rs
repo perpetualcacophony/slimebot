@@ -5,9 +5,9 @@ use poise::serenity_prelude::{Channel, Role};
 use scraper::{Html, Selector};
 use tracing::{error, info, instrument};
 
-use crate::{Data, Error};
+use crate::{Data, BotError};
 
-type Context<'a> = poise::Context<'a, Data, Error>;
+type Context<'a> = poise::Context<'a, Data, BotError>;
 
 #[poise::command(slash_command)]
 pub async fn watch_fic(
@@ -15,7 +15,7 @@ pub async fn watch_fic(
     id: usize,
     channel: Channel,
     role: Role,
-) -> Result<(), Error> {
+) -> Result<(), BotError> {
     /*let reply = ctx
         .send(|f| {
             f.content("boop").components(|f| {
@@ -68,7 +68,7 @@ pub async fn watch_fic(
     //Ok(())
 }
 
-fn _has_updated(work_id: usize, current_chapter_count: usize) -> Result<bool, Error> {
+fn _has_updated(work_id: usize, current_chapter_count: usize) -> Result<bool, BotError> {
     let stored_chapter_count: usize = read_chapter_count(work_id)?;
 
     //let current_chapter_count = get_chapter_count(work_id)?;
@@ -125,12 +125,12 @@ async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
 // it's tied to, like, an explicit work right? why supply the chapter count?
 // if i could work with an api, i probably *would* have this func call ao3
 // but. i can't. i think i've minimized ao3 calls to, like, 1 every loop
-fn store_chapter_count(work_id: usize, chapter_count: usize) -> Result<(), Error> {
+fn store_chapter_count(work_id: usize, chapter_count: usize) -> Result<(), BotError> {
     fs::write(format!("works/{work_id}.len"), chapter_count.to_string())?;
 
     Ok(())
 }
 
-fn read_chapter_count(work_id: usize) -> Result<usize, Error> {
-    Ok(fs::read_to_string(format!("works/{}.len", work_id))?.parse()?)
+fn read_chapter_count(work_id: usize) -> Result<usize, BotError> {
+    Ok(fs::read_to_string(format!("works/{}.len", work_id))?.parse().unwrap())
 }
