@@ -1,6 +1,7 @@
 mod ban;
 mod watch_fic;
 
+use chrono::Utc;
 use poise::serenity_prelude::{Channel, Member, User};
 use tracing::{error, info, instrument};
 
@@ -8,7 +9,7 @@ type Context<'a> = poise::Context<'a, crate::Data, BotError>;
 
 pub use watch_fic::watch_fic;
 
-use crate::{BotError, FormatDuration};
+use crate::{BotError, FormatDuration, UtcDateTime};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -37,34 +38,16 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), BotError> {
     ctx.log_command().await;
 
     let ping = ctx.ping().await.as_millis();
-    ctx.say(ping_message(ping)).await?;
+    ctx.say(ping_message(ping, "pong")).await?;
 
     Ok(())
 }
 
-fn ping_message(ping: u128) -> String {
+fn ping_message(ping: u128, reply: &str) -> String {
     if ping == 0 {
-        "pong! (please try again later to display latency)".to_owned()
+        format!("{reply}! (please try again later to display latency)")
     } else {
-        format!("pong! ({ping}ms)")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn ping_message() {
-        assert_eq!(
-            super::ping_message(0),
-            "pong! (please try again later to display latency)"
-        );
-
-        assert_eq!(
-            super::ping_message(128),
-            "pong! (128ms)"
-        );
+        format!("{reply}! ({ping}ms)")
     }
 }
 
@@ -74,12 +57,7 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), BotError> {
     ctx.log_command().await;
 
     let ping = ctx.ping().await.as_millis();
-    if ping == 0 {
-        ctx.say("ping! (please try again later to display latency)")
-            .await?;
-    } else {
-        ctx.say(format!("ping! ({}ms)", ping)).await?;
-    }
+    ctx.say(ping_message(ping, "ping")).await?;
 
     Ok(())
 }
@@ -318,16 +296,58 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), BotError> {
 pub async fn uptime(ctx: Context<'_>) -> Result<(), BotError> {
     ctx.log_command().await;
 
-    let started = ctx.data().started;
-    let uptime = chrono::Utc::now() - started;
-
-    ctx.say(format!(
-        "uptime: {} (since {})",
-        uptime.format_full(),
-        started.format("%Y-%m-%d %H:%M UTC")
-    ))
+    ctx.say(format_uptime(ctx.data().started, Utc::now()))
     .await
     .unwrap();
 
     Ok(())
+}
+
+fn format_uptime(started: UtcDateTime, current: UtcDateTime) -> String {
+    let uptime = current - started;
+
+    format!(
+        "uptime: {} (since {})",
+        uptime.format_full(),
+        started.format("%Y-%m-%d %H:%M UTC")
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    
+    #[test]
+    fn ping_message() {
+        assert_eq!(
+            super::ping_message(0, "pong"),
+            "pong! (please try again later to display latency)"
+        );
+
+        assert_eq!(
+            super::ping_message(128, "pong"),
+            "pong! (128ms)"
+        );
+
+        assert_eq!(
+            super::ping_message(0, "ping"),
+            "ping! (please try again later to display latency)"
+        );
+
+        assert_eq!(
+            super::ping_message(128, "ping"),
+            "ping! (128ms)"
+        );
+    }
+
+    #[test]
+    fn format_uptime() {
+        assert_eq!(
+            super::format_uptime(
+                "2024-01-24 07:55:55.457121090Z".parse().unwrap(),
+                "2024-01-26 09:05:55.457121090Z".parse().unwrap()
+            ),
+            "uptime: 2d 1h 10m (since 2024-01-24 07:55 UTC)"
+        )
+    }
 }

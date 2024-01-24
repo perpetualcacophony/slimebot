@@ -2,6 +2,8 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
+use std::pin::Pin;
+
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
@@ -17,10 +19,10 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents, HttpError, ModelError, Permissions, SerenityError},
-    PrefixFrameworkOptions,
+    serenity_prelude::{self as serenity, futures::future, GatewayIntents, HttpError, ModelError, Permissions, SerenityError}, FrameworkError, PrefixFrameworkOptions
 };
-use tracing::{info, trace};
+use tokio::join;
+use tracing::{info, trace, error};
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
@@ -57,6 +59,20 @@ impl From<ModelError> for BotError {
         }
     }
 }
+
+fn handle_error<'a>(error: FrameworkError<'_, Data, BotError>) -> std::pin::Pin<std::boxed::Box<(dyn std::future::Future<Output = ()> + std::marker::Send + 'a)>> {
+    if let FrameworkError::Command { error, ctx: _ } = error {
+        if let BotError::Permissions(p) = error {
+            error!("invalid permissions: {p}")
+        }
+    } else {
+        error!("unknown error")
+    }
+
+    Box::pin( dummy() )
+}
+
+async fn dummy() {}
 
 impl Data {
     fn new() -> Self {
@@ -126,6 +142,7 @@ async fn main() {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
             },
+            on_error: handle_error,
             ..Default::default()
         },
         shard_manager: std::sync::Mutex::new(None),
