@@ -11,11 +11,11 @@ pub use watch_fic::watch_fic;
 
 use crate::FormatDuration;
 
-trait LogCommand {
+trait LogCommands {
     async fn log_command(&self);
 }
 
-impl LogCommand for Context<'_> {
+impl LogCommands for Context<'_> {
     async fn log_command(&self) {
         let channel = self
             .channel_id()

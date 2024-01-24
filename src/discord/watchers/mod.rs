@@ -8,28 +8,36 @@ use tracing::{info, instrument};
 
 use crate::FormatDuration;
 
+#[instrument(skip_all, level = "trace")]
+async fn check_vore(content: &str) -> bool {
+    Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
+        .unwrap()
+        .captures(content)
+        .is_some()
+}
+
+async fn log_watcher(ctx: &Context, new_message: &Message) {
+    info!(
+        "@{} (#{}): {}",
+        new_message.author.name,
+        new_message
+            .channel(ctx.http())
+            .await
+            .unwrap() // todo: handle the http request failing
+            .guild()
+            .unwrap() // this is ok - the message will not be outside a guild
+            .name(),
+        new_message.content
+    );
+}
+
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
 pub async fn vore(ctx: &Context, db: &Database, new_message: &Message) {
-    if Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
-        .unwrap()
-        .captures(&new_message.content)
-        .is_some()
-    {
+    if check_vore(&new_message.content).await {
         let recent = Utc::now();
 
-        info!(
-            "@{} (#{}): {}",
-            new_message.author.name,
-            new_message
-                .channel(ctx.http())
-                .await
-                .unwrap() // todo: handle the http request failing
-                .guild()
-                .unwrap() // this is ok - the message will not be outside a guild
-                .name(),
-            new_message.content
-        );
+        log_watcher(ctx, new_message).await;
 
         #[derive(Debug, Deserialize, Serialize)]
         struct VoreMention {
