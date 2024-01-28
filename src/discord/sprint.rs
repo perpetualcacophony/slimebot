@@ -2,31 +2,45 @@ use chrono::Duration;
 use mongodb::{bson::doc, Collection, Database};
 use poise::serenity_prelude::{Member, UserId};
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 struct Sprint {
-    duration: Duration,
+    duration: Option<Duration>,
     members: Vec<Member>,
     words_receiver: Receiver<u32>,
+    words_sender: Sender<u32>,
 }
 
 impl Sprint {
-    fn new(rx: Receiver<u32>, minutes: i64) -> Self {
-        let duration = Duration::minutes(minutes);
-        
+    fn new() -> Self {
+        let (tx, rx) = mpsc::channel(128);
+
         Self {
-            duration,
+            duration: None,
             members: Vec::new(),
             words_receiver: rx,
+            words_sender: tx,
         }
+    }
+
+    fn setup(&mut self, minutes: i64) {
+        self.duration = Some(Duration::minutes(minutes))
     }
 
     fn add_member(&mut self, member: Member) {
         self.members.push(member);
     }
 
+    fn start() {
+        
+    }
+
     fn finish(&self) {
 
+    }
+
+    pub fn words_sender(&self) -> Sender<u32> {
+        self.words_sender.clone()
     }
 }
 
