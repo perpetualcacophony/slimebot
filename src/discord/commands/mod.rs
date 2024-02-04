@@ -311,3 +311,28 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 
     Ok(())
 }
+
+#[instrument(skip_all)]
+#[poise::command(prefix_command, subcommands("create", "join"))]
+pub async fn sprint(ctx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(prefix_command)]
+pub async fn create(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.log_command().await;
+
+    let sprint = ctx.data().sprint();
+    sprint.words_sender().send(value);
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(prefix_command)]
+pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("join").await.unwrap();
+
+    Ok(())
+}

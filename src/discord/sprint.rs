@@ -4,7 +4,8 @@ use poise::serenity_prelude::{Member, UserId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-struct Sprint {
+#[derive(Debug)]
+pub struct Sprint {
     duration: Option<Duration>,
     members: Vec<Member>,
     words_receiver: Receiver<u32>,
@@ -12,7 +13,7 @@ struct Sprint {
 }
 
 impl Sprint {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(128);
 
         Self {
@@ -32,7 +33,7 @@ impl Sprint {
     }
 
     fn start() {
-        
+
     }
 
     fn finish(&self) {
@@ -42,6 +43,11 @@ impl Sprint {
     pub fn words_sender(&self) -> Sender<u32> {
         self.words_sender.clone()
     }
+}
+
+enum SprintPacket {
+    Create(i64),
+    
 }
 
 #[derive(Default, Serialize, Deserialize)]

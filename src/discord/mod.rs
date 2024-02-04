@@ -5,4 +5,4 @@ pub mod framework;
 mod bug_reports;
 mod watchers;
 
-mod sprint;
+pub mod sprint;
