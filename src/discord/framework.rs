@@ -4,7 +4,7 @@ use poise::{
         self as serenity, CacheHttp, Context, Interaction, Reaction, Ready, UserId,
     },
 };
-use std::sync::atomic::AtomicBool;
+use std::sync::{atomic::AtomicBool, Arc};
 use tokio::sync::Mutex;
 use tracing::trace;
 
@@ -15,8 +15,7 @@ use super::bug_reports::bug_reports;
 pub struct Handler {
     pub data: Data,
     pub options: poise::FrameworkOptions<Data, Error>,
-    pub shard_manager:
-        std::sync::Mutex<Option<std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>>>,
+    pub shard_manager: std::sync::Mutex<Option<std::sync::Arc<serenity::ShardManager>>>
 }
 
 #[serenity::async_trait]
@@ -24,7 +23,7 @@ impl serenity::EventHandler for Handler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework_data = poise::FrameworkContext {
-            bot_id: UserId(ctx.http().http().application_id().unwrap()),
+            bot_id: UserId::new(ctx.http().http().application_id().unwrap().into()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
@@ -47,13 +46,13 @@ impl serenity::EventHandler for Handler {
             );
         }
 
-        poise::dispatch_event(framework_data, &ctx, &poise::Event::Message { new_message }).await;
+        poise::dispatch_event(framework_data, &ctx, poise::serenity_prelude::FullEvent::Message { new_message }).await;
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: Interaction) {
         let shard_manager = (*self.shard_manager.lock().unwrap()).clone().unwrap();
         let framework = poise::FrameworkContext {
-            bot_id: UserId(ctx.http().http().application_id().unwrap()),
+            bot_id: UserId::new(ctx.http().http().application_id().unwrap().get()),
             options: &self.options,
             user_data: &self.data,
             shard_manager: &shard_manager,
@@ -62,9 +61,10 @@ impl serenity::EventHandler for Handler {
         poise::dispatch_interaction(
             framework,
             &ctx,
-            interaction.as_application_command().unwrap(),
+            interaction.as_command().unwrap(),
             &AtomicBool::new(false),
             &Mutex::new(Box::new(())), // literally no idea what `invocation_data` is supposed to be LOL
+            &[],
             &mut self.options.commands.iter().collect(),
         )
         .await
@@ -74,9 +74,7 @@ impl serenity::EventHandler for Handler {
     async fn ready(&self, ctx: serenity::Context, _: Ready) {
         trace!("Ready event received from discord!");
 
-        if let Some(activity) = self.data.config().bot.activity() {
-            ctx.set_activity(activity).await;
-        }
+        ctx.set_activity(self.data.config().bot.activity());
 
         if let Some(guild) = self.data.config.bot.testing_server() {
             register_in_guild(ctx.http(), self.options.commands.as_ref(), *guild)

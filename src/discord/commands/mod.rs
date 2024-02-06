@@ -1,7 +1,7 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{futures::StreamExt, Channel, CreateEmbed, Embed, Member, MessageId, User};
+use poise::{serenity_prelude::{futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateEmbed, Embed, Member, MessageId, User}, CreateReply};
 use serde::Deserialize;
 use tracing::{debug, error, info, instrument};
 
@@ -22,7 +22,7 @@ impl LogCommands for Context<'_> {
     async fn log_command(&self) {
         let channel = self
             .channel_id()
-            .name(self.cache())
+            .name(self.http())
             .await
             .map_or("dms".to_string(), |c| format!("#{c}"));
         info!(
@@ -67,9 +67,10 @@ pub async fn pong(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
+/*
 /// display a user's profile picture
 #[instrument(skip_all)]
-#[poise::command(prefix_command, slash_command, discard_spare_arguments, rename = "pfp")]
+#[poise::command(prefix_command, slash_command, discard_spare_arguments)]
 pub async fn pfp(
     ctx: Context<'_>,
     #[description = "the user to display the profile picture of - defaults to you"] user: Option<
@@ -87,9 +88,9 @@ pub async fn pfp(
 
     if let Some(guild) = ctx.guild() {
         let member = if let Some(user) = user {
-            guild.member(ctx.http(), user.id).await.unwrap()
+            guild.members.get(&user.id).unwrap()
         } else {
-            ctx.author_member().await.unwrap().into_owned()
+            guild.members.get(&ctx.author().id).unwrap()
         };
 
         enum PfpType {
@@ -167,7 +168,7 @@ pub async fn pfp(
             other_response(&member, pfp_type, global)
         };
 
-        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
+        ctx.send(CreateReply::default().content(response_text).attachment(CreateAttachment::url(ctx.http(), &pfp).await?))
             .await?;
     } else {
         fn author_response(author: &User) -> (String, String) {
@@ -201,12 +202,13 @@ pub async fn pfp(
             author_response(ctx.author())
         };
 
-        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
+        ctx.send(CreateReply::default().content(response_text).attachment(CreateAttachment::url(ctx.http(), &pfp).await?))
             .await?;
     }
 
     Ok(())
 }
+*/
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
@@ -270,7 +272,7 @@ pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Comman
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
         ban::joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
     } else {
-        ban::joke_ban(ctx, &user, ctx.author().id.0, reason).await?;
+        ban::joke_ban(ctx, &user, ctx.author().id.get(), reason).await?;
     }
 
     Ok(())
@@ -288,7 +290,7 @@ pub async fn banban(ctx: Context<'_>) -> CommandResult {
         )
         .await?;
     } else {
-        ctx.send(|m| m.content("https://files.catbox.moe/jm6sr9.png"))
+        ctx.send(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
             .await
             .unwrap();
     }
@@ -377,7 +379,7 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
 
 pub use minecraft::minecraft;
 mod minecraft {
-    use poise::serenity_prelude::CreateEmbed;
+    use poise::{serenity_prelude::CreateEmbed, CreateReply};
     use serde::Deserialize;
     use tracing::{debug, instrument};
     use super::{CommandResult, Context, LogCommands};
@@ -435,16 +437,16 @@ mod minecraft {
             .map(|p| p.list.into_iter().map(|p|(p.name_clean, "", false)));
 
         let mut embed = CreateEmbed::default();
-        embed.title(address);
+        embed = embed.title(address);
 
         if response.online {
             let players_online = response.players().online;
-            embed.description(format!("players online: {players_online}"));
+            embed = embed.description(format!("players online: {players_online}"));
         
-            embed.fields(response.players().list.iter().map(|p|(&p.name_clean, "", false)));
+            embed = embed.fields(response.players().list.iter().map(|p|(&p.name_clean, "", false)));
         }
 
-        ctx.send(|msg| { msg }).await?;
+        ctx.send(CreateReply::default().embed(embed)).await?;
         
         Ok(())
     }

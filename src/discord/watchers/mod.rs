@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, Context, Message, UserId};
+use poise::serenity_prelude::{CacheHttp, Context, CreateMessage, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -81,6 +81,7 @@ pub async fn vore(ctx: &Context, db: &Database, new_message: &Message) {
         ctx.http()
             .send_message(
                 new_message.channel_id.into(),
+                Vec::new(),
                 &json!({
                     "content": format!("~~{time_text}~~ 0 days without mentioning vore")
                 }),
@@ -107,15 +108,11 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
             new_message.content
         );
 
-        ctx.http()
-            .send_message(
-                new_message.channel_id.into(),
-                &json!({
-                    "content": "https://files.catbox.moe/v7itt0.webp"
-                }),
-            )
-            .await
-            .unwrap();
+        new_message.channel_id.send_message(ctx.http(),
+            CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp")
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -143,22 +140,16 @@ pub async fn look_cl(ctx: &Context, new_message: &Message) {
 
         if new_message.content.starts_with("Look CL") || new_message.content.starts_with("look CL")
         {
-            ctx.http()
-            .send_message(
-                new_message.channel_id.into(),
-                &json!({
-                    "content": "I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
-                }),
+            new_message.channel_id.send_message(ctx.http(), CreateMessage::new()
+                .content("I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
+                .reference_message(new_message)
             )
             .await
             .unwrap();
         } else {
-            ctx.http()
-            .send_message(
-                new_message.channel_id.into(),
-                &json!({
-                    "content": "Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
-                }),
+            new_message.channel_id.send_message(ctx.http(), CreateMessage::new()
+                .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
+                .reference_message(new_message)
             )
             .await
             .unwrap();

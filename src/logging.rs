@@ -59,7 +59,7 @@ impl DiscordSender {
         oneshot.send(true).unwrap();
 
         while let Some(message) = self.rx.recv().await {
-            if ChannelId(self.channel)
+            if ChannelId::new(self.channel)
                 .say(&self.http, &message)
                 .await
                 .is_err()

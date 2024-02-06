@@ -25,7 +25,7 @@ openssl = { version = "0.10.62", features = ["vendored"] }
 poise = "0.6.1"
 rand = "0.8.5"
 regex = "1.10.3"
-reqwest = { version = "0.11.18", default-features = true }
+reqwest = { version = "0.11.18", default-features = true, features = ["json"] }
 scraper = { version = "0.17.1", default-features = false }
 serde = { version = "1.0.188", default-features = false }
 serde_json = { version = "1.0.107", default-features = false }

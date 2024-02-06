@@ -2,6 +2,8 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
+use std::sync::Arc;
+
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
@@ -26,7 +28,7 @@ use tracing_unwrap::ResultExt;
 use chrono::Utc;
 type UtcDateTime = chrono::DateTime<Utc>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Data {
     config: config::Config,
     db: Database,
@@ -90,7 +92,7 @@ async fn main() {
             commands: vec![
                 ping(),
                 pong(),
-                pfp(),
+                //pfp(),
                 watch_fic(),
                 echo(),
                 ban(),
@@ -106,7 +108,7 @@ async fn main() {
             },
             ..Default::default()
         },
-        shard_manager: std::sync::Mutex::new(None),
+        shard_manager: None.into(),
     };
     poise::set_qualified_names(&mut handler.options.commands);
 
@@ -163,8 +165,7 @@ async fn main() {
 
     trace!("discord framework set up");
 
-    // i don't like how far in you have to go to access this :<
-    let http = client.cache_and_http.http.clone();
+    let http = client.http.clone();
 
     if config.logs.discord.enabled() {
         DiscordSubscriber::init_discord(

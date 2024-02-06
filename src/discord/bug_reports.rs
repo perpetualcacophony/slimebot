@@ -1,6 +1,5 @@
 use poise::serenity_prelude::{
-    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed, Reaction,
-    ReactionType, UserId,
+    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Reaction, ReactionType, UserId
 };
 
 #[allow(unused_imports)]
@@ -25,9 +24,7 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
     if add_reaction.emoji == ladybug_reaction && ladybugs == 1 {
         let messages = add_reaction
             .channel_id
-            .messages(ctx.http(), |get| {
-                get.around(add_reaction.message_id).limit(5)
-            })
+            .messages(ctx.http(), GetMessages::new().around(add_reaction.message_id).limit(5))
             .await
             .unwrap();
 
@@ -63,7 +60,7 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             });
 
         let messages = join_all(messages).await;
-        let footer_icon = UserId(ctx.http().http().application_id().unwrap())
+        let footer_icon = UserId::new(ctx.http().http().application_id().unwrap().get())
             .to_user(ctx.http())
             .await
             .unwrap()
@@ -72,16 +69,15 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             .member
             .unwrap()
             .guild_id
-            .unwrap()
             .member(ctx.http(), add_reaction.user_id.unwrap())
             .await
             .unwrap();
 
         let mut embed = CreateEmbed::default();
 
-        embed
+        embed = embed
             .title("bug report!")
-            .author(|author| author.icon_url(member.face()).name(member.display_name()))
+            .author(CreateEmbedAuthor::new(member.display_name()).icon_url(member.face()))
             .description(
                 "react to a message with 🐞 to generate one of these reports!
 
@@ -90,11 +86,11 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             .thumbnail("https://files.catbox.moe/0v4p11.png")
             .color(Color::from_rgb(221, 46, 68))
             .fields(messages)
-            .footer(|footer| footer.icon_url(footer_icon).text("slimebot"))
+            .footer(CreateEmbedFooter::new("slimebot").icon_url(footer_icon))
             .timestamp(add_reaction.message_id.created_at());
 
         channel
-            .send_message(ctx.http(), |msg| msg.set_embed(embed.clone()))
+            .send_message(ctx.http(), CreateMessage::new().embed(embed.clone()))
             .await
             .unwrap();
 
