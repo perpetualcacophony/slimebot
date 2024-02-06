@@ -1,7 +1,13 @@
 mod ban;
 mod watch_fic;
 
-use poise::{serenity_prelude::{futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateEmbed, Embed, Member, MessageId, User}, CreateReply};
+use poise::{
+    serenity_prelude::{
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateEmbed, Embed, Member,
+        MessageId, User,
+    },
+    CreateReply,
+};
 use serde::Deserialize;
 use tracing::{debug, error, info, instrument};
 
@@ -212,11 +218,7 @@ pub async fn pfp(
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
-pub async fn echo(
-    ctx: Context<'_>,
-    channel: Option<Channel>,
-    message: String,
-) -> CommandResult {
+pub async fn echo(ctx: Context<'_>, channel: Option<Channel>, message: String) -> CommandResult {
     let id = match channel {
         Some(channel) => channel.id(),
         None => ctx.channel_id(),
@@ -338,22 +340,24 @@ pub async fn purge_after(ctx: Context<'_>, id: MessageId) -> CommandResult {
 
     //println!("{:?}", Box::pin(messages).next().await);
 
-    targeted.for_each(|msg| async move {
-        msg.delete(ctx.http()).await.unwrap();
-        info!("deleted message {}: {}", msg.id, msg.content);
-    }).await;
+    targeted
+        .for_each(|msg| async move {
+            msg.delete(ctx.http()).await.unwrap();
+            info!("deleted message {}: {}", msg.id, msg.content);
+        })
+        .await;
 
     info!("done!");
 
     /*let content = messages.try_fold(
         String::new(),
-        |acc, m| async move { Ok(acc + "\n" + &m.content) } 
+        |acc, m| async move { Ok(acc + "\n" + &m.content) }
     ).await.unwrap();
 
     println!("{content}");
 
     ctx.say(content).await.unwrap();*/
-    
+
     Ok(())
 }
 
@@ -364,12 +368,13 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
 
     #[derive(Deserialize)]
     struct DogApiResponse {
-        message: String
+        message: String,
     }
-    
+
     let image_url = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random")
         .await?
-        .json::<DogApiResponse>().await?
+        .json::<DogApiResponse>()
+        .await?
         .message;
 
     ctx.reply(image_url).await?;
@@ -379,10 +384,10 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
 
 pub use minecraft::minecraft;
 mod minecraft {
+    use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};
     use serde::Deserialize;
     use tracing::{debug, instrument};
-    use super::{CommandResult, Context, LogCommands};
 
     #[derive(Deserialize, Clone, Debug)]
     struct ApiResponse {
@@ -393,11 +398,15 @@ mod minecraft {
 
     impl ApiResponse {
         fn version(&self) -> &ApiResponseVersion {
-            self.version.as_ref().expect("online api response should have version")
+            self.version
+                .as_ref()
+                .expect("online api response should have version")
         }
 
         fn players(&self) -> &ApiResponsePlayers {
-            self.players.as_ref().expect("online api response should have players")
+            self.players
+                .as_ref()
+                .expect("online api response should have players")
         }
     }
 
@@ -416,7 +425,7 @@ mod minecraft {
 
     #[derive(Deserialize, Clone, Debug)]
     struct ApiResponsePlayer {
-        name_clean: String
+        name_clean: String,
     }
 
     #[instrument(skip_all)]
@@ -429,12 +438,15 @@ mod minecraft {
 
         let response = reqwest::get(request_url)
             .await?
-            .json::<ApiResponse>().await?;
+            .json::<ApiResponse>()
+            .await?;
 
         debug!("{:#?}", response);
 
-        let players = response.players.clone()
-            .map(|p| p.list.into_iter().map(|p|(p.name_clean, "", false)));
+        let players = response
+            .players
+            .clone()
+            .map(|p| p.list.into_iter().map(|p| (p.name_clean, "", false)));
 
         let mut embed = CreateEmbed::default();
         embed = embed.title(address);
@@ -442,12 +454,18 @@ mod minecraft {
         if response.online {
             let players_online = response.players().online;
             embed = embed.description(format!("players online: {players_online}"));
-        
-            embed = embed.fields(response.players().list.iter().map(|p|(&p.name_clean, "", false)));
+
+            embed = embed.fields(
+                response
+                    .players()
+                    .list
+                    .iter()
+                    .map(|p| (&p.name_clean, "", false)),
+            );
         }
 
         ctx.send(CreateReply::default().embed(embed)).await?;
-        
+
         Ok(())
     }
 }

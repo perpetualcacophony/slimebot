@@ -108,11 +108,14 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
             new_message.content
         );
 
-        new_message.channel_id.send_message(ctx.http(),
-            CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp")
-        )
-        .await
-        .unwrap();
+        new_message
+            .channel_id
+            .send_message(
+                ctx.http(),
+                CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
+            )
+            .await
+            .unwrap();
     }
 }
 

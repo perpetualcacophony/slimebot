@@ -1,5 +1,7 @@
 use poise::serenity_prelude::{
-    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Reaction, ReactionType, UserId
+    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed,
+    CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Reaction, ReactionType,
+    UserId,
 };
 
 #[allow(unused_imports)]
@@ -24,7 +26,10 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
     if add_reaction.emoji == ladybug_reaction && ladybugs == 1 {
         let messages = add_reaction
             .channel_id
-            .messages(ctx.http(), GetMessages::new().around(add_reaction.message_id).limit(5))
+            .messages(
+                ctx.http(),
+                GetMessages::new().around(add_reaction.message_id).limit(5),
+            )
             .await
             .unwrap();
 

@@ -15,7 +15,7 @@ use super::bug_reports::bug_reports;
 pub struct Handler {
     pub data: Data,
     pub options: poise::FrameworkOptions<Data, Error>,
-    pub shard_manager: std::sync::Mutex<Option<std::sync::Arc<serenity::ShardManager>>>
+    pub shard_manager: std::sync::Mutex<Option<std::sync::Arc<serenity::ShardManager>>>,
 }
 
 #[serenity::async_trait]
@@ -46,7 +46,12 @@ impl serenity::EventHandler for Handler {
             );
         }
 
-        poise::dispatch_event(framework_data, &ctx, poise::serenity_prelude::FullEvent::Message { new_message }).await;
+        poise::dispatch_event(
+            framework_data,
+            &ctx,
+            poise::serenity_prelude::FullEvent::Message { new_message },
+        )
+        .await;
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: Interaction) {
