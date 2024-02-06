@@ -96,6 +96,9 @@ async fn main() {
                 ban(),
                 banban(),
                 uptime(),
+                //purge_after(),
+                borzoi(),
+                minecraft(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
