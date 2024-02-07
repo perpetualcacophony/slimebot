@@ -8,14 +8,6 @@ use tracing::{info, instrument};
 
 use crate::FormatDuration;
 
-#[instrument(skip_all, level = "trace")]
-async fn check_vore(content: &str) -> bool {
-    Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
-        .unwrap()
-        .captures(content)
-        .is_some()
-}
-
 async fn log_watcher(ctx: &Context, new_message: &Message) {
     info!(
         "@{} (#{}): {}",
@@ -29,6 +21,14 @@ async fn log_watcher(ctx: &Context, new_message: &Message) {
             .name(),
         new_message.content
     );
+}
+
+#[instrument(skip_all, level = "trace")]
+async fn check_vore(content: &str) -> bool {
+    Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
+        .unwrap()
+        .captures(content)
+        .is_some()
 }
 
 // watches all channels for a mention of vore and responds with time statistics

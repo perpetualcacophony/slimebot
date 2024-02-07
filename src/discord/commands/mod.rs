@@ -174,7 +174,9 @@ pub async fn pfp(
             other_response(&member, pfp_type, global)
         };
 
-        ctx.send(CreateReply::default().content(response_text).attachment(CreateAttachment::url(ctx.http(), &pfp).await?))
+        let attachment = CreateAttachment::url(ctx.http(), &pfp).await?;
+
+        ctx.send(CreateReply::default().content(response_text).attachment(attachment))
             .await?;
     } else {
         fn author_response(author: &User) -> (String, String) {
@@ -442,11 +444,6 @@ mod minecraft {
             .await?;
 
         debug!("{:#?}", response);
-
-        let players = response
-            .players
-            .clone()
-            .map(|p| p.list.into_iter().map(|p| (p.name_clean, "", false)));
 
         let mut embed = CreateEmbed::default();
         embed = embed.title(address);

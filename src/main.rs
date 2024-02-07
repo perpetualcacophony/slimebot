@@ -86,9 +86,8 @@ async fn main() {
         info!("{flavor_text}")
     }
 
-    let mut handler = Handler {
-        data,
-        options: poise::FrameworkOptions {
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
             commands: vec![
                 ping(),
                 pong(),
@@ -107,61 +106,18 @@ async fn main() {
                 ..Default::default()
             },
             ..Default::default()
-        },
-        shard_manager: None.into(),
-    };
-    poise::set_qualified_names(&mut handler.options.commands);
-
-    let handler = std::sync::Arc::new(handler);
-    let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
-        .event_handler_arc(handler.clone())
-        .await
-        .unwrap();
-
-    *handler.shard_manager.lock().unwrap() = Some(client.shard_manager.clone());
-
-    /*
-    let framework = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
-            prefix_options: PrefixFrameworkOptions {
-                prefix: Some("..".to_string()),
-                ..Default::default()
-            },
-            ..Default::default()
         })
-        .token(conf.bot.token())
-        .intents(serenity::GatewayIntents::all())
-        .client_settings(|client| client.register_songbird())
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_in_guild(
-                    ctx,
-                    &framework.options().commands,
-                    GuildId(testing_server),
-                )
-                .await?;
-
-                if let Some(status) = conf.bot.status {
-                    let (kind, state) = status.split_once(" ").unwrap();
-                    let activity = match kind {
-                        "playing" => Activity::playing(state),
-                        _ => {
-                            error!("unknown activity \"{}\" in config", kind);
-                            panic!()
-                        }
-                    };
-
-                    ctx.set_activity(activity).await;
-                }
-
-                Ok(Data {})
+        .setup(|_, _, _| {
+            Box::pin( async move {
+                Ok(Data::new())
             })
         })
-        .build()
+        .build();
+
+    let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
+        .framework(framework)
         .await
         .unwrap();
-    */
 
     trace!("discord framework set up");
 
