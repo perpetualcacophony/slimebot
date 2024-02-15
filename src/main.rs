@@ -19,10 +19,10 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
+    serenity_prelude::{self as serenity, futures::StreamExt, ConnectionStage, GatewayIntents, Message, MessageCollector, ShardId},
     PrefixFrameworkOptions,
 };
-use tracing::{info, trace};
+use tracing::{debug, info, trace};
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
@@ -107,7 +107,7 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|_, _, _| {
+        .setup(|_ctx, _ready, _framework| {
             Box::pin( async move {
                 Ok(Data::new())
             })
@@ -132,6 +132,35 @@ async fn main() {
         .await;
         trace!("hi discord!");
     }
+
+    let shards = client.shard_manager.clone();
+
+    tokio::spawn(async move {
+        loop { 
+            let runners = shards.runners.clone();
+            let guard = runners.lock().await;    
+
+            let shard = guard.get(&ShardId(0));
+            //debug!(?shard);
+
+            if let Some(shard) = shard {
+                if shard.stage == ConnectionStage::Connected {
+
+                    let messages = MessageCollector::new(shard);
+
+                    messages.stream().for_each(|msg| {
+
+                        let http = http.clone();
+                        let db = data.db.clone();
+
+                        async move {
+                            discord::watchers::vore(&http, &db, &msg).await;
+                        }   
+                    }).await
+                }
+            }
+        }
+    });
 
     trace!("discord framework started");
     client.start().await.unwrap();

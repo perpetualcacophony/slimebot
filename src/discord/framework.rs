@@ -40,7 +40,7 @@ impl serenity::EventHandler for Handler {
             #[allow(clippy::wildcard_imports)]
             use super::watchers::*;
             tokio::join!(
-                vore(&ctx, self.data.db(), &new_message),
+                //vore(&ctx, self.data.db(), &new_message),
                 look_cl(&ctx, &new_message),
                 l_biden(&ctx, &new_message),
             );
