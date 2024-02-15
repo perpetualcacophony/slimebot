@@ -1,12 +1,14 @@
+use std::{future::Future, pin::Pin, sync::Arc};
+
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, Context, CreateMessage, Message, UserId};
+use poise::serenity_prelude::{collect, futures::{future, Stream, StreamExt}, CacheHttp, Context, CreateMessage, Event, Message, MessageCollector, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{info, instrument};
 
-use crate::FormatDuration;
+use crate::{Data, FormatDuration};
 
 async fn log_watcher(ctx: &Context, new_message: &Message) {
     info!(
@@ -21,6 +23,84 @@ async fn log_watcher(ctx: &Context, new_message: &Message) {
             .name(),
         new_message.content
     );
+}
+
+trait Callback: Fn(&Context, &Data, Message) -> Self::Future {
+    type Future: Future<Output = ()>;
+}
+impl<F, Fut> Callback for F
+where 
+    F: Fn(&Context, &Data, Message) -> Self::Future,
+    Fut: Future<Output = ()>,
+{
+    type Future = Fut;
+}
+
+#[derive(Clone)]
+struct MessageWatcher {
+    regex: Regex,
+    callback: Box<dyn Callback,
+}
+
+impl MessageWatcher {
+    fn new(regex: &str, callback: Callback) -> Self {
+        let regex = Regex::new(regex).unwrap();
+
+        Self { regex, callback }
+    }
+}
+
+pub struct Registry {
+    ctx: Context,
+    data: Data,
+    collector: MessageCollector,
+    watchers: Vec<MessageWatcher>,
+}
+
+impl Registry {
+    pub fn new(ctx: Context, data: Data) -> Self {
+        let collector = MessageCollector::new(ctx.shard.clone());
+
+        Self { ctx, data, collector, watchers: Vec::new() }
+    }
+
+    pub fn add_watcher(mut self, regex: &str, callback: Callback) -> Self {
+        self.watchers.push(MessageWatcher::new(regex, callback));
+
+        self
+    }
+
+    pub fn run(self) {
+        let messages = self.collector.stream(); 
+
+        let watchers = self.watchers;
+        let arc = Arc::new(watchers);
+
+        let data_arc = Arc::new((self.ctx, self.data));
+
+        tokio::spawn({
+            messages.for_each(move |msg| {
+                let data = data_arc.clone();
+                let watchers = arc.clone();
+
+                async move {
+                    for watcher in watchers.iter() {
+                        let callback = watcher.callback;
+
+                        callback(&data.0, &data.1, msg.clone()).await;
+                    }
+                }
+            })
+        });
+    }
+
+
+    async fn call_watchers(self: Arc<Self>, msg: Message) {
+        for watcher in &self.watchers {
+            let callback = watcher.callback;
+            callback(&self.ctx, &self.data, msg.clone()).await;
+        }
+    }
 }
 
 #[instrument(skip_all, level = "trace")]
