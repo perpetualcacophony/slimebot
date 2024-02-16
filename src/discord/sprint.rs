@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::Duration;
 use mongodb::{bson::doc, Collection, Database};
 use poise::serenity_prelude::{Member, UserId};
@@ -22,6 +24,12 @@ impl Sprint {
             words_receiver: rx,
             words_sender: tx,
         }
+    }
+
+    pub fn arc() -> Arc<Self> {
+        Arc::new(
+            Self::new()
+        )
     }
 
     fn setup(&mut self, minutes: i64) {
