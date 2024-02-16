@@ -10,7 +10,6 @@ use logging::DiscordSubscriber;
 mod discord;
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
-use discord::framework::Handler;
 use mongodb::Database;
 
 /// Config file parsing and option access.
