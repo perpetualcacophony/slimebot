@@ -93,13 +93,13 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
 
 // watches all channels for "L" and responds with the biden image
 #[instrument(skip_all, level = "trace")]
-pub async fn l_biden(ctx: &Context, new_message: &Message) {
+pub async fn l_biden(http: &Http, new_message: &Message) {
     if new_message.content == "L" {
         info!(
             "@{} (#{}): {}",
             new_message.author.name,
             new_message
-                .channel(ctx.http())
+                .channel(http)
                 .await
                 .unwrap() // todo: handle the http request failing
                 .guild()
@@ -111,7 +111,7 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
         new_message
             .channel_id
             .send_message(
-                ctx.http(),
+                http,
                 CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
             )
             .await
@@ -121,7 +121,7 @@ pub async fn l_biden(ctx: &Context, new_message: &Message) {
 
 // watches all channels for "CL" and reponds with the Look CL copypasta
 #[instrument(skip_all, level = "trace")]
-pub async fn look_cl(ctx: &Context, new_message: &Message) {
+pub async fn look_cl(http: &Http, new_message: &Message) {
     if new_message
         .content
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~', '#', '^'], " ")
@@ -132,7 +132,7 @@ pub async fn look_cl(ctx: &Context, new_message: &Message) {
             "@{} (#{}): {}",
             new_message.author.name,
             new_message
-                .channel(ctx.http())
+                .channel(http)
                 .await
                 .unwrap() // todo: handle the http request failing
                 .guild()
@@ -143,14 +143,14 @@ pub async fn look_cl(ctx: &Context, new_message: &Message) {
 
         if new_message.content.starts_with("Look CL") || new_message.content.starts_with("look CL")
         {
-            new_message.channel_id.send_message(ctx.http(), CreateMessage::new()
+            new_message.channel_id.send_message(http, CreateMessage::new()
                 .content("I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
                 .reference_message(new_message)
             )
             .await
             .unwrap();
         } else {
-            new_message.channel_id.send_message(ctx.http(), CreateMessage::new()
+            new_message.channel_id.send_message(http, CreateMessage::new()
                 .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
                 .reference_message(new_message)
             )

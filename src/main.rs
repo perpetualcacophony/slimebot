@@ -139,7 +139,13 @@ async fn main() {
                     let http = http.clone();
 
                     async move {
-                        discord::watchers::vore(&http, &arc.db, &msg).await;
+                        use discord::watchers::*;
+
+                        tokio::join!(
+                            vore(&http, &arc.db, &msg),
+                            l_biden(&http, &msg),
+                            look_cl(&http, &msg),
+                        );
                     }
                 });
                 tokio::spawn(fut);
