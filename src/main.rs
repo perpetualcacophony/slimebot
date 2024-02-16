@@ -109,7 +109,7 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|ctx, ready, _framework| {
+        .setup(|ctx, ready, framework| {
             Box::pin( async move {
                 let data = Data::new();
                 let arc = Arc::new(data.clone());
@@ -119,6 +119,16 @@ async fn main() {
                 let http = ctx.http.clone();
 
                 let bot_id = ready.user.id;
+
+                let commands = &framework.options().commands;
+                poise::builtins::register_in_guild(
+                    &http,
+                    commands.as_ref(),
+                    *data.config.bot.testing_server().unwrap()
+                ).await.unwrap();
+
+                let activity = data.config.bot.activity();
+                ctx.set_activity(activity);
 
                 let messages = collect(&shard, |event| {
                     match event {
@@ -138,16 +148,17 @@ async fn main() {
                 );
                 
                 let messages_http = http.clone();
+                let messages_arc = arc.clone();
                 let messages_task = messages.for_each(move |msg| {
                     //let http = _ctx.clone().http();
-                    let arc = arc.clone();
+                    let data = messages_arc.clone();
                     let http = messages_http.clone();
 
                     async move {
                         use discord::watchers::*;
 
                         tokio::join!(
-                            vore(&http, &arc.db, &msg),
+                            vore(&http, &data.db, &msg),
                             l_biden(&http, &msg),
                             look_cl(&http, &msg),
                         );
@@ -163,10 +174,14 @@ async fn main() {
                 }).filter(
                     move |reaction| {
                         let reaction = reaction.clone();
+                        let data = arc.clone();
+                        let config = &data.config.watchers;
+                        let channel_allowed = config.channel_allowed(reaction.channel_id);
 
                         async move {
                             reaction.user_id == Some(bot_id)
                             && reaction.guild_id.is_some()
+                            && channel_allowed
                         }
                     }
                 );
