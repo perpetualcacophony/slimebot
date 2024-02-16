@@ -2,7 +2,7 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::sync::Arc;
+use std::{fs::read, sync::Arc};
 
 use logging::DiscordSubscriber;
 
@@ -19,7 +19,7 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, futures::StreamExt, ConnectionStage, GatewayIntents, Message, MessageCollector, ShardId},
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, CacheHttp, ConnectionStage, Event, GatewayIntents, Message, MessageCollector, ShardId},
     PrefixFrameworkOptions,
 };
 use tracing::{debug, info, trace};
@@ -107,9 +107,44 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|_ctx, _ready, _framework| {
+        .setup(|ctx, _ready, _framework| {
             Box::pin( async move {
-                Ok(Data::new())
+                let data = Data::new();
+                let arc = Arc::new(data.clone());
+
+                let ctx = ctx.clone();
+                let shard = ctx.shard.clone();
+                let http = ctx.http.clone();
+
+                let messages = collect(&shard, |event| {
+                    match event {
+                        Event::MessageCreate(event) => Some(event.message.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |msg| {
+                            let msg = msg.clone();
+                            let cache = ctx.cache.clone();
+
+                            async move {
+                                !msg.is_own(cache)
+                                && !msg.is_private()
+                            }
+                    }
+                );
+                
+                let fut = messages.for_each(move |msg| {
+                    //let http = _ctx.clone().http();
+                    let arc = arc.clone();
+                    let http = http.clone();
+
+                    async move {
+                        discord::watchers::vore(&http, &arc.db, &msg).await;
+                    }
+                });
+                tokio::spawn(fut);
+
+                Ok(data)
             })
         })
         .build();
@@ -133,7 +168,7 @@ async fn main() {
         trace!("hi discord!");
     }
 
-    let shards = client.shard_manager.clone();
+    /*let shards = client.shard_manager.clone();
 
     tokio::spawn(async move {
         loop { 
@@ -160,7 +195,7 @@ async fn main() {
                 }
             }
         }
-    });
+    });*/
 
     trace!("discord framework started");
     client.start().await.unwrap();
