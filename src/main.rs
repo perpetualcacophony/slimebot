@@ -4,13 +4,10 @@
 mod logging;
 use std::sync::Arc;
 
-use logging::DiscordSubscriber;
-
 /// Functionality called from Discord.
 mod discord;
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
-use discord::framework::Handler;
 use mongodb::Database;
 
 /// Config file parsing and option access.
@@ -19,10 +16,13 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use tracing::{info, trace};
+
+#[allow(unused_imports)]
+use tracing::{debug, info, trace};
+
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
@@ -74,10 +74,7 @@ type DiscordToken = String;
 
 #[tokio::main]
 async fn main() {
-    // the stdout logger is started, and returns the
-    // receiver for initializing the discord logger later.
-    // because that can't be done until we get the http from the framework
-    let discord_receiver = DiscordSubscriber::init_stdout();
+    logging::init_tracing();
 
     let data = Data::new();
     let config = data.config.clone();
@@ -91,7 +88,7 @@ async fn main() {
             commands: vec![
                 ping(),
                 pong(),
-                //pfp(),
+                pfp(),
                 watch_fic(),
                 echo(),
                 ban(),
@@ -107,9 +104,101 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|_, _, _| {
+        .setup(|ctx, ready, framework| {
             Box::pin( async move {
-                Ok(Data::new())
+                let data = Data::new();
+                let arc = Arc::new(data.clone());
+
+                let ctx = ctx.clone();
+                let shard = ctx.shard.clone();
+                let http = ctx.http.clone();
+
+                let bot_id = ready.user.id;
+
+                let commands = &framework.options().commands;
+                poise::builtins::register_in_guild(
+                    &http,
+                    commands.as_ref(),
+                    *data.config.bot.testing_server().unwrap()
+                ).await.unwrap();
+
+                let activity = data.config.bot.activity();
+                ctx.set_activity(activity);
+
+                let messages = collect(&shard, |event| {
+                    match event {
+                        Event::MessageCreate(event) => Some(event.message.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |msg| {
+                            let msg = msg.clone();
+                            let cache = ctx.cache.clone();
+
+                            async move {
+                                !msg.is_own(cache)
+                                && !msg.is_private()
+                            }
+                    }
+                );
+                
+                let messages_http = http.clone();
+                let messages_arc = arc.clone();
+                let messages_task = messages.for_each(move |msg| {
+                    //let http = _ctx.clone().http();
+                    let data = messages_arc.clone();
+                    let http = messages_http.clone();
+
+                    async move {
+                        use discord::watchers::*;
+
+                        tokio::join!(
+                            vore(&http, &data.db, &msg),
+                            l_biden(&http, &msg),
+                            look_cl(&http, &msg),
+                        );
+                    }
+                });
+                tokio::spawn(messages_task);
+
+                let reactions = collect(&shard, |event| {
+                    match event {
+                        Event::ReactionAdd(event) => Some(event.reaction.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |reaction| {
+                        let reaction = reaction.clone();
+                        let data = arc.clone();
+                        let config = &data.config.watchers;
+                        let channel_allowed = config.channel_allowed(reaction.channel_id);
+
+                        async move {
+                            reaction.user_id == Some(bot_id)
+                            && reaction.guild_id.is_some()
+                            && channel_allowed
+                        }
+                    }
+                );
+
+                let config = data.config().clone();
+                let channel = config.bug_reports_channel().copied();
+
+                if let Some(channel) = channel {
+                    let reactions_task = reactions.for_each(move |reaction| {
+                        let http = http.clone();
+    
+                        async move {
+                            use discord::bug_reports::bug_reports;
+    
+                            bug_reports(&http, reaction, &channel).await;
+                        }
+                    });
+
+                    tokio::spawn(reactions_task);
+                }
+
+                Ok(data)
             })
         })
         .build();
@@ -121,17 +210,34 @@ async fn main() {
 
     trace!("discord framework set up");
 
-    let http = client.http.clone();
+    /*let shards = client.shard_manager.clone();
 
-    if config.logs.discord.enabled() {
-        DiscordSubscriber::init_discord(
-            http.clone(),
-            config.logs.discord.channel().unwrap().into(),
-            discord_receiver,
-        )
-        .await;
-        trace!("hi discord!");
-    }
+    tokio::spawn(async move {
+        loop { 
+            let runners = shards.runners.clone();
+            let guard = runners.lock().await;    
+
+            let shard = guard.get(&ShardId(0));
+            //debug!(?shard);
+
+            if let Some(shard) = shard {
+                if shard.stage == ConnectionStage::Connected {
+
+                    let messages = MessageCollector::new(shard);
+
+                    messages.stream().for_each(|msg| {
+
+                        let http = http.clone();
+                        let db = data.db.clone();
+
+                        async move {
+                            discord::watchers::vore(&http, &db, &msg).await;
+                        }   
+                    }).await
+                }
+            }
+        }
+    });*/
 
     trace!("discord framework started");
     client.start().await.unwrap();

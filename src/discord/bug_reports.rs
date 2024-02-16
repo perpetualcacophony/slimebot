@@ -1,18 +1,16 @@
 use poise::serenity_prelude::{
-    futures::future::join_all, CacheHttp, ChannelId, Color, Context, CreateEmbed,
-    CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Reaction, ReactionType,
-    UserId,
+    futures::future::join_all, ChannelId, Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Http, Reaction, ReactionType, UserId
 };
 
 #[allow(unused_imports)]
 use tracing::debug;
 use tracing::info;
 
-pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &ChannelId) {
+pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelId) {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
     let ladybugs = add_reaction
-        .message(ctx.http())
+        .message(http)
         .await
         .unwrap()
         .reactions
@@ -27,13 +25,11 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
         let messages = add_reaction
             .channel_id
             .messages(
-                ctx.http(),
+                http,
                 GetMessages::new().around(add_reaction.message_id).limit(5),
             )
             .await
             .unwrap();
-
-        let http = ctx.http();
 
         let messages = messages
             .into_iter()
@@ -65,8 +61,8 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             });
 
         let messages = join_all(messages).await;
-        let footer_icon = UserId::new(ctx.http().http().application_id().unwrap().get())
-            .to_user(ctx.http())
+        let footer_icon = UserId::new(http.application_id().unwrap().get())
+            .to_user(http)
             .await
             .unwrap()
             .face();
@@ -74,7 +70,7 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             .member
             .unwrap()
             .guild_id
-            .member(ctx.http(), add_reaction.user_id.unwrap())
+            .member(http, add_reaction.user_id.unwrap())
             .await
             .unwrap();
 
@@ -95,16 +91,16 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             .timestamp(add_reaction.message_id.created_at());
 
         channel
-            .send_message(ctx.http(), CreateMessage::new().embed(embed.clone()))
+            .send_message(http, CreateMessage::new().embed(embed.clone()))
             .await
             .unwrap();
 
         info!(
             "@{} reported a bug: {} (#{})",
-            add_after.user(ctx.http()).await.unwrap().name,
+            add_after.user(http).await.unwrap().name,
             add_after.message_id,
             add_after
-                .channel(ctx.http())
+                .channel(http)
                 .await
                 .unwrap() // todo: handle the http request failing
                 .guild()

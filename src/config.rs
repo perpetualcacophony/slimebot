@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{Activity, ActivityData, ChannelId, GuildId};
+use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
@@ -91,7 +91,6 @@ impl BotConfig {
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
     flavor_texts: Vec<String>,
-    pub discord: DiscordConfig,
 }
 
 impl LogsConfig {
@@ -107,36 +106,6 @@ impl LogsConfig {
         }
 
         flavor_text
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct DiscordConfig {
-    enabled: bool,
-    channel: Option<ChannelId>,
-}
-
-impl DiscordConfig {
-    pub fn enabled(&self) -> bool {
-        if self.enabled {
-            info!("discord logger enabled");
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn channel(&self) -> Option<ChannelId> {
-        if self.enabled {
-            if let Some(channel) = self.channel {
-                Some(channel)
-            } else {
-                warn!("no channel configured for discord logger");
-                None
-            }
-        } else {
-            None
-        }
     }
 }
 

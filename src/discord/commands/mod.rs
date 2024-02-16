@@ -3,12 +3,13 @@ mod watch_fic;
 
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateEmbed, Embed, Member,
-        MessageId, User,
+        futures::StreamExt,CacheHttp, Channel, CreateAttachment, Member, MessageId, User
     },
     CreateReply,
 };
 use serde::Deserialize;
+
+#[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -73,7 +74,6 @@ pub async fn pong(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-/*
 /// display a user's profile picture
 #[instrument(skip_all)]
 #[poise::command(prefix_command, slash_command, discard_spare_arguments)]
@@ -92,12 +92,16 @@ pub async fn pfp(
         error!("failed to defer - lag will cause errors!");
     }
 
-    if let Some(guild) = ctx.guild() {
+    if ctx.guild().is_some() {
+        let guild = ctx.guild().unwrap().clone();
+        let members = guild.members.clone();
+
         let member = if let Some(user) = user {
-            guild.members.get(&user.id).unwrap()
+            members.get(&user.id).unwrap()
         } else {
-            guild.members.get(&ctx.author().id).unwrap()
+            members.get(&ctx.author().id).unwrap()
         };
+
 
         enum PfpType {
             Guild,
@@ -216,7 +220,6 @@ pub async fn pfp(
 
     Ok(())
 }
-*/
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
