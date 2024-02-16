@@ -2,7 +2,7 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::{fs::read, sync::Arc};
+use std::sync::Arc;
 
 use logging::DiscordSubscriber;
 
@@ -18,10 +18,13 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, CacheHttp, ConnectionStage, Event, GatewayIntents, Message, MessageCollector, ShardId},
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
+
+#[allow(unused_imports)]
 use tracing::{debug, info, trace};
+
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;

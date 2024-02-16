@@ -1,8 +1,7 @@
 use poise::serenity_prelude::{
-    AttachmentType, CacheHttp, Color, CreateAttachment, CreateEmbed, EditWebhook, Embed,
+    Color, CreateAttachment, CreateEmbed, EditWebhook,
     ExecuteWebhook, User, Webhook,
 };
-use reqwest::Url;
 use serde_json::json;
 use tracing::warn;
 use tracing_unwrap::ResultExt;
@@ -60,7 +59,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
             .await,
         );
 
-    if &hook.name.clone().unwrap() != wick.display_name() {
+    if hook.name.clone().unwrap() != wick.display_name() {
         hook.edit(ctx.http(), EditWebhook::new().name(wick.display_name()))
             .await
             .unwrap_or_log();

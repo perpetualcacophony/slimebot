@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, Context, CreateMessage, Http, Message, UserId};
+use poise::serenity_prelude::{CacheHttp, CreateMessage, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -80,7 +80,7 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
 
         http
             .send_message(
-                new_message.channel_id.into(),
+                new_message.channel_id,
                 Vec::new(),
                 &json!({
                     "content": format!("~~{time_text}~~ 0 days without mentioning vore")

@@ -3,12 +3,14 @@ mod watch_fic;
 
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateEmbed, Embed, Member,
+        futures::StreamExt, CacheHttp, Channel,
         MessageId, User,
     },
     CreateReply,
 };
 use serde::Deserialize;
+
+#[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;

@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{Activity, ActivityData, ChannelId, GuildId};
+use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
