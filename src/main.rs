@@ -109,7 +109,7 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|ctx, _ready, _framework| {
+        .setup(|ctx, ready, _framework| {
             Box::pin( async move {
                 let data = Data::new();
                 let arc = Arc::new(data.clone());
@@ -117,6 +117,8 @@ async fn main() {
                 let ctx = ctx.clone();
                 let shard = ctx.shard.clone();
                 let http = ctx.http.clone();
+
+                let bot_id = ready.user.id;
 
                 let messages = collect(&shard, |event| {
                     match event {
@@ -135,10 +137,11 @@ async fn main() {
                     }
                 );
                 
-                let fut = messages.for_each(move |msg| {
+                let messages_http = http.clone();
+                let messages_task = messages.for_each(move |msg| {
                     //let http = _ctx.clone().http();
                     let arc = arc.clone();
-                    let http = http.clone();
+                    let http = messages_http.clone();
 
                     async move {
                         use discord::watchers::*;
@@ -150,7 +153,40 @@ async fn main() {
                         );
                     }
                 });
-                tokio::spawn(fut);
+                tokio::spawn(messages_task);
+
+                let reactions = collect(&shard, |event| {
+                    match event {
+                        Event::ReactionAdd(event) => Some(event.reaction.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |reaction| {
+                        let reaction = reaction.clone();
+
+                        async move {
+                            reaction.user_id == Some(bot_id)
+                            && reaction.guild_id.is_some()
+                        }
+                    }
+                );
+
+                let config = data.config().clone();
+                let channel = config.bug_reports_channel().copied();
+
+                if let Some(channel) = channel {
+                    let reactions_task = reactions.for_each(move |reaction| {
+                        let http = http.clone();
+    
+                        async move {
+                            use discord::bug_reports::bug_reports;
+    
+                            bug_reports(&http, reaction, &channel).await;
+                        }
+                    });
+
+                    tokio::spawn(reactions_task);
+                }
 
                 Ok(data)
             })
