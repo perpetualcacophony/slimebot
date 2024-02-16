@@ -4,8 +4,6 @@
 mod logging;
 use std::sync::Arc;
 
-use logging::DiscordSubscriber;
-
 /// Functionality called from Discord.
 mod discord;
 #[allow(clippy::wildcard_imports)]
@@ -76,10 +74,7 @@ type DiscordToken = String;
 
 #[tokio::main]
 async fn main() {
-    // the stdout logger is started, and returns the
-    // receiver for initializing the discord logger later.
-    // because that can't be done until we get the http from the framework
-    let discord_receiver = DiscordSubscriber::init_stdout();
+    logging::init_tracing();
 
     let data = Data::new();
     let config = data.config.clone();
@@ -214,19 +209,7 @@ async fn main() {
         .unwrap();
 
     trace!("discord framework set up");
-
-    let http = client.http.clone();
-
-    if config.logs.discord.enabled() {
-        DiscordSubscriber::init_discord(
-            http.clone(),
-            config.logs.discord.channel().unwrap().into(),
-            discord_receiver,
-        )
-        .await;
-        trace!("hi discord!");
-    }
-
+    
     /*let shards = client.shard_manager.clone();
 
     tokio::spawn(async move {
