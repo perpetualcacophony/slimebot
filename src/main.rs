@@ -88,7 +88,7 @@ async fn main() {
             commands: vec![
                 ping(),
                 pong(),
-                //pfp(),
+                pfp(),
                 watch_fic(),
                 echo(),
                 ban(),
@@ -209,7 +209,7 @@ async fn main() {
         .unwrap();
 
     trace!("discord framework set up");
-    
+
     /*let shards = client.shard_manager.clone();
 
     tokio::spawn(async move {
