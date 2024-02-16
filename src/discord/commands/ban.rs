@@ -1,5 +1,7 @@
-use poise::serenity_prelude::{AttachmentType, Color, Embed, User, Webhook};
-use reqwest::Url;
+use poise::serenity_prelude::{
+    Color, CreateAttachment, CreateEmbed, EditWebhook,
+    ExecuteWebhook, User, Webhook,
+};
 use serde_json::json;
 use tracing::warn;
 use tracing_unwrap::ResultExt;
@@ -17,7 +19,7 @@ pub async fn joke_ban(
     let embed = ban_embed(&reason, moderator_id, &user.name);
     let webhook = wick_webhook(ctx).await;
     webhook
-        .execute(ctx.http(), false, |w| w.embeds(vec![embed]))
+        .execute(ctx.http(), false, ExecuteWebhook::new().embeds(vec![embed]))
         .await?;
 
     Ok(())
@@ -26,13 +28,13 @@ pub async fn joke_ban(
 async fn wick_webhook(ctx: Context<'_>) -> Webhook {
     let wick = ctx
         .http()
-        .get_member(1098746787050836100, 536991182035746816)
+        .get_member(1098746787050836100.into(), 536991182035746816.into())
         .await
         .unwrap_or_log();
 
     let mut hook = ctx
         .http()
-        .get_channel_webhooks(ctx.channel_id().0)
+        .get_channel_webhooks(ctx.channel_id())
         .await
         .unwrap()
         .into_iter()
@@ -45,9 +47,9 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
                 );
                 ctx.http()
                     .create_webhook(
-                        *ctx.channel_id().as_u64(),
+                        ctx.channel_id(),
                         &json!({
-                            "name": wick.display_name().as_ref()
+                            "name": wick.display_name()
                         }),
                         None,
                     )
@@ -57,16 +59,20 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
             .await,
         );
 
-    if &hook.name.clone().unwrap() != wick.display_name().as_ref() {
-        hook.edit_name(ctx.http(), wick.display_name().as_ref())
+    if hook.name.clone().unwrap() != wick.display_name() {
+        hook.edit(ctx.http(), EditWebhook::new().name(wick.display_name()))
             .await
             .unwrap_or_log();
     }
 
-    if hook.avatar.clone().is_none() || hook.avatar.clone().unwrap() != wick.face() {
-        hook.edit_avatar(
+    if hook.avatar.clone().is_none() || hook.avatar != wick.avatar {
+        hook.edit(
             ctx.http(),
-            AttachmentType::Image(Url::parse(&wick.face()).unwrap()),
+            EditWebhook::new().avatar(
+                &CreateAttachment::url(ctx.http(), &wick.face())
+                    .await
+                    .unwrap(),
+            ),
         )
         .await
         .unwrap_or_log();
@@ -75,9 +81,8 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
     hook
 }
 
-fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> serde_json::value::Value {
-    Embed::fake(|e| {
-        e
+fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> CreateEmbed {
+    CreateEmbed::default()
         .title("Ban result:")
         .fields([
             (
@@ -107,5 +112,4 @@ fn ban_embed(reason: &str, moderator_id: u64, user: &str) -> serde_json::value::
             )
         ])
         .color(Color::from_rgb(47, 49, 54))
-    })
 }

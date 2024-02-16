@@ -2,14 +2,14 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use logging::DiscordSubscriber;
+use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
-use discord::framework::Handler;
 use discord::sprint::Sprint;
+
 use mongodb::Database;
 
 /// Config file parsing and option access.
@@ -18,21 +18,24 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
-use tracing::{info, trace};
+
+#[allow(unused_imports)]
+use tracing::{debug, info, trace};
+
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
 type UtcDateTime = chrono::DateTime<Utc>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Data {
     config: config::Config,
     db: Database,
     started: UtcDateTime,
-    sprint: Sprint,
+    sprint: Arc<Sprint>,
 }
 
 impl Data {
@@ -51,7 +54,7 @@ impl Data {
 
         let started = Utc::now();
 
-        let sprint = Sprint::new();
+        let sprint = Sprint::arc();
 
         Self {
             config,
@@ -69,8 +72,8 @@ impl Data {
         &self.db
     }
 
-    const fn sprint(&self) -> &Sprint {
-        &self.sprint
+    fn sprint(&self) -> Arc<Sprint> {
+        self.sprint.clone()
     }
 }
 
@@ -81,10 +84,7 @@ type DiscordToken = String;
 
 #[tokio::main]
 async fn main() {
-    // the stdout logger is started, and returns the
-    // receiver for initializing the discord logger later.
-    // because that can't be done until we get the http from the framework
-    let discord_receiver = DiscordSubscriber::init_stdout();
+    logging::init_tracing();
 
     let data = Data::new();
     let config = data.config.clone();
@@ -93,9 +93,8 @@ async fn main() {
         info!("{flavor_text}")
     }
 
-    let mut handler = Handler {
-        data,
-        options: poise::FrameworkOptions {
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
             commands: vec![
                 ping(),
                 pong(),
@@ -106,82 +105,149 @@ async fn main() {
                 banban(),
                 uptime(),
                 sprint(),
+                borzoi(),
+                minecraft(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
             },
             ..Default::default()
-        },
-        shard_manager: std::sync::Mutex::new(None),
-    };
-    poise::set_qualified_names(&mut handler.options.commands);
-
-    let handler = std::sync::Arc::new(handler);
-    let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
-        .event_handler_arc(handler.clone())
-        .await
-        .unwrap();
-
-    *handler.shard_manager.lock().unwrap() = Some(client.shard_manager.clone());
-
-    /*
-    let framework = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: vec![ping(), pfp(), watch_fic(), echo(), ban(), banban()],
-            prefix_options: PrefixFrameworkOptions {
-                prefix: Some("..".to_string()),
-                ..Default::default()
-            },
-            ..Default::default()
         })
-        .token(conf.bot.token())
-        .intents(serenity::GatewayIntents::all())
-        .client_settings(|client| client.register_songbird())
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
+        .setup(|ctx, ready, framework| {
+            Box::pin( async move {
+                let data = Data::new();
+                let arc = Arc::new(data.clone());
+
+                let ctx = ctx.clone();
+                let shard = ctx.shard.clone();
+                let http = ctx.http.clone();
+
+                let bot_id = ready.user.id;
+
+                let commands = &framework.options().commands;
                 poise::builtins::register_in_guild(
-                    ctx,
-                    &framework.options().commands,
-                    GuildId(testing_server),
-                )
-                .await?;
+                    &http,
+                    commands.as_ref(),
+                    *data.config.bot.testing_server().unwrap()
+                ).await.unwrap();
 
-                if let Some(status) = conf.bot.status {
-                    let (kind, state) = status.split_once(" ").unwrap();
-                    let activity = match kind {
-                        "playing" => Activity::playing(state),
-                        _ => {
-                            error!("unknown activity \"{}\" in config", kind);
-                            panic!()
+                let activity = data.config.bot.activity();
+                ctx.set_activity(activity);
+
+                let messages = collect(&shard, |event| {
+                    match event {
+                        Event::MessageCreate(event) => Some(event.message.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |msg| {
+                            let msg = msg.clone();
+                            let cache = ctx.cache.clone();
+
+                            async move {
+                                !msg.is_own(cache)
+                                && !msg.is_private()
+                            }
+                    }
+                );
+                
+                let messages_http = http.clone();
+                let messages_arc = arc.clone();
+                let messages_task = messages.for_each(move |msg| {
+                    //let http = _ctx.clone().http();
+                    let data = messages_arc.clone();
+                    let http = messages_http.clone();
+
+                    async move {
+                        use discord::watchers::*;
+
+                        tokio::join!(
+                            vore(&http, &data.db, &msg),
+                            l_biden(&http, &msg),
+                            look_cl(&http, &msg),
+                        );
+                    }
+                });
+                tokio::spawn(messages_task);
+
+                let reactions = collect(&shard, |event| {
+                    match event {
+                        Event::ReactionAdd(event) => Some(event.reaction.clone()),
+                        _ => None,
+                    }
+                }).filter(
+                    move |reaction| {
+                        let reaction = reaction.clone();
+                        let data = arc.clone();
+                        let config = &data.config.watchers;
+                        let channel_allowed = config.channel_allowed(reaction.channel_id);
+
+                        async move {
+                            reaction.user_id == Some(bot_id)
+                            && reaction.guild_id.is_some()
+                            && channel_allowed
                         }
-                    };
+                    }
+                );
 
-                    ctx.set_activity(activity).await;
+                let config = data.config().clone();
+                let channel = config.bug_reports_channel().copied();
+
+                if let Some(channel) = channel {
+                    let reactions_task = reactions.for_each(move |reaction| {
+                        let http = http.clone();
+    
+                        async move {
+                            use discord::bug_reports::bug_reports;
+    
+                            bug_reports(&http, reaction, &channel).await;
+                        }
+                    });
+
+                    tokio::spawn(reactions_task);
                 }
 
-                Ok(Data {})
+                Ok(data)
             })
         })
-        .build()
+        .build();
+
+    let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
+        .framework(framework)
         .await
         .unwrap();
-    */
 
     trace!("discord framework set up");
 
-    // i don't like how far in you have to go to access this :<
-    let http = client.cache_and_http.http.clone();
+    /*let shards = client.shard_manager.clone();
 
-    if config.logs.discord.enabled() {
-        DiscordSubscriber::init_discord(
-            http.clone(),
-            config.logs.discord.channel().unwrap().into(),
-            discord_receiver,
-        )
-        .await;
-        trace!("hi discord!");
-    }
+    tokio::spawn(async move {
+        loop { 
+            let runners = shards.runners.clone();
+            let guard = runners.lock().await;    
+
+            let shard = guard.get(&ShardId(0));
+            //debug!(?shard);
+
+            if let Some(shard) = shard {
+                if shard.stage == ConnectionStage::Connected {
+
+                    let messages = MessageCollector::new(shard);
+
+                    messages.stream().for_each(|msg| {
+
+                        let http = http.clone();
+                        let db = data.db.clone();
+
+                        async move {
+                            discord::watchers::vore(&http, &db, &msg).await;
+                        }   
+                    }).await
+                }
+            }
+        }
+    });*/
 
     trace!("discord framework started");
     client.start().await.unwrap();

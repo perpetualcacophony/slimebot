@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{Activity, ChannelId, GuildId};
+use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
@@ -49,7 +49,7 @@ impl BotConfig {
         self.testing_server.as_ref()
     }
 
-    pub fn activity(&self) -> Option<Activity> {
+    pub fn activity(&self) -> Option<ActivityData> {
         if let Some(activity) = &self.activity {
             if activity.is_empty() {
                 warn!("bot.activity provided in config as empty string, defaulting to none");
@@ -57,13 +57,13 @@ impl BotConfig {
             }
 
             let parsed_activity = if activity.starts_with("playing ") {
-                Activity::playing(activity.strip_prefix("playing ").unwrap())
+                ActivityData::playing(activity.strip_prefix("playing ").unwrap())
             } else if activity.starts_with("listening to ") {
-                Activity::playing(activity.strip_prefix("listening to ").unwrap())
+                ActivityData::playing(activity.strip_prefix("listening to ").unwrap())
             } else if activity.starts_with("watching ") {
-                Activity::playing(activity.strip_prefix("watching ").unwrap())
+                ActivityData::playing(activity.strip_prefix("watching ").unwrap())
             } else if activity.starts_with("competing in ") {
-                Activity::playing(activity.strip_prefix("competing in ").unwrap())
+                ActivityData::playing(activity.strip_prefix("competing in ").unwrap())
             } else {
                 error!("bot.activity in config could not be parsed - must start with `playing`, `listening to`, `watching` or `competing in`");
                 warn!("disabling bot activity");
@@ -91,7 +91,6 @@ impl BotConfig {
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
     flavor_texts: Vec<String>,
-    pub discord: DiscordConfig,
 }
 
 impl LogsConfig {
@@ -107,36 +106,6 @@ impl LogsConfig {
         }
 
         flavor_text
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct DiscordConfig {
-    enabled: bool,
-    channel: Option<ChannelId>,
-}
-
-impl DiscordConfig {
-    pub fn enabled(&self) -> bool {
-        if self.enabled {
-            info!("discord logger enabled");
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn channel(&self) -> Option<ChannelId> {
-        if self.enabled {
-            if let Some(channel) = self.channel {
-                Some(channel)
-            } else {
-                warn!("no channel configured for discord logger");
-                None
-            }
-        } else {
-            None
-        }
     }
 }
 
