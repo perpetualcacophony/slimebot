@@ -2,12 +2,14 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use logging::DiscordSubscriber;
 
 /// Functionality called from Discord.
 mod discord;
+#[allow(clippy::wildcard_imports)]
+use discord::commands::*;
 use discord::framework::Handler;
 use mongodb::Database;
 
@@ -17,15 +19,13 @@ mod config;
 mod db;
 
 use poise::{
-    serenity_prelude::{self as serenity, futures::{future, StreamExt, TryFutureExt, TryStream, TryStreamExt}, CacheHttp, Context, FutureExt, GatewayIntents, Message, MessageCollector, ShardManager, User, UserId},
+    serenity_prelude::{self as serenity, GatewayIntents},
     PrefixFrameworkOptions,
 };
 use tracing::{info, trace};
 use tracing_unwrap::ResultExt;
 
 use chrono::Utc;
-
-use crate::discord::watchers::Registry;
 type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
@@ -80,14 +80,12 @@ async fn main() {
     let discord_receiver = DiscordSubscriber::init_stdout();
 
     let data = Data::new();
-    let mut config = data.config.clone();
+    let config = data.config.clone();
 
     if let Some(flavor_text) = config.logs.flavor_text() {
         info!("{flavor_text}")
     }
 
-    #[allow(clippy::wildcard_imports)]
-    use discord::commands::*;
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
@@ -109,20 +107,9 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|ctx, _ready, framework| {
+        .setup(|_, _, _| {
             Box::pin( async move {
-                //let framework = framework.clone();
-                
-                Registry::new(ctx.clone(), framework.user_data().await.clone())
-                    .add_watcher(
-                        r"(?i)(?:[^a-z]|^)(voring|vores|vore)",
-                        |ctx, data, msg| Box::pin(async move {
-                            discord::watchers::vore(ctx, &data.db, &msg).await
-                        })
-                    )
-                    .run();
-
-                Ok(data)
+                Ok(Data::new())
             })
         })
         .build();
@@ -147,7 +134,7 @@ async fn main() {
     }
 
     trace!("discord framework started");
-    client.start().await;
+    client.start().await.unwrap();
 }
 
 trait FormatDuration {
