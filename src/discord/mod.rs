@@ -3,4 +3,4 @@ pub mod bug_reports;
 pub mod watchers;
 
 
-mod sprint;
+pub mod sprint;

@@ -8,6 +8,7 @@ use std::sync::Arc;
 mod discord;
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
+use discord::framework::Handler;
 use mongodb::Database;
 
 /// Config file parsing and option access.
@@ -33,6 +34,7 @@ pub struct Data {
     config: config::Config,
     db: Database,
     started: UtcDateTime,
+    sprint: Sprint,
 }
 
 impl Data {
@@ -51,10 +53,13 @@ impl Data {
 
         let started = Utc::now();
 
+        let sprint = Sprint::new();
+
         Self {
             config,
             db,
             started,
+            sprint
         }
     }
 
@@ -64,6 +69,10 @@ impl Data {
 
     const fn db(&self) -> &Database {
         &self.db
+    }
+
+    const fn sprint(&self) -> &Sprint {
+        &self.sprint
     }
 }
 
@@ -94,9 +103,6 @@ async fn main() {
                 ban(),
                 banban(),
                 uptime(),
-                //purge_after(),
-                borzoi(),
-                minecraft(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
