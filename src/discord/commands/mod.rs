@@ -4,7 +4,7 @@ mod watch_fic;
 use anyhow::anyhow;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt,CacheHttp, Channel, CreateAttachment, Member, MessageId, User
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
     },
     CreateReply,
 };
@@ -94,15 +94,19 @@ pub async fn pfp(
     }
 
     if ctx.guild().is_some() {
-        let guild = ctx.guild().expect("guild should already be verified").clone();
+        let guild = ctx
+            .guild()
+            .expect("guild should already be verified")
+            .clone();
         let members = guild.members.clone();
 
         let member = if let Some(user) = user {
             members.get(&user.id).expect("member should exist")
         } else {
-            members.get(&ctx.author().id).expect("author should be a member")
+            members
+                .get(&ctx.author().id)
+                .expect("author should be a member")
         };
-
 
         enum PfpType {
             Guild,
@@ -181,8 +185,12 @@ pub async fn pfp(
 
         let attachment = CreateAttachment::url(ctx.http(), &pfp).await?;
 
-        ctx.send(CreateReply::default().content(response_text).attachment(attachment))
-            .await?;
+        ctx.send(
+            CreateReply::default()
+                .content(response_text)
+                .attachment(attachment),
+        )
+        .await?;
     } else {
         fn author_response(author: &User) -> (String, String) {
             let response_text = if author.avatar_url().is_some() {
@@ -215,8 +223,12 @@ pub async fn pfp(
             author_response(ctx.author())
         };
 
-        ctx.send(CreateReply::default().content(response_text).attachment(CreateAttachment::url(ctx.http(), &pfp).await?))
-            .await?;
+        ctx.send(
+            CreateReply::default()
+                .content(response_text)
+                .attachment(CreateAttachment::url(ctx.http(), &pfp).await?),
+        )
+        .await?;
     }
 
     Ok(())
@@ -348,7 +360,9 @@ pub async fn purge_after(ctx: Context<'_>, id: MessageId) -> CommandResult {
 
     targeted
         .for_each(|msg| async move {
-            msg.delete(ctx.http()).await.expect("deleting message should not fail");
+            msg.delete(ctx.http())
+                .await
+                .expect("deleting message should not fail");
             info!("deleted message {}: {}", msg.id, msg.content);
         })
         .await;
@@ -380,21 +394,21 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
     let response = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random").await?;
 
     if response.status().is_server_error() {
-        ctx.reply("sorry, dog api is down!").await.expect("sending message should not fail");
+        ctx.reply("sorry, dog api is down!")
+            .await
+            .expect("sending message should not fail");
         return Err(anyhow!("dog api down").into());
     }
 
-    let image_url = response
-        .json::<DogApiResponse>()
-        .await?
-        .message;
+    let image_url = response.json::<DogApiResponse>().await?.message;
 
     let attachment = CreateAttachment::url(&ctx, &image_url).await?;
 
-    let reply = ctx.reply_builder(CreateReply::default()
-        .content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)")
-        .attachment(attachment)
-        .reply(true)
+    let reply = ctx.reply_builder(
+        CreateReply::default()
+            .content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)")
+            .attachment(attachment)
+            .reply(true),
     );
 
     ctx.send(reply).await?;

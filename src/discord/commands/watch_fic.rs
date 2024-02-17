@@ -36,12 +36,16 @@ pub async fn watch_fic(
     */
 
     loop {
-        let stored_chapter_count = read_chapter_count(id).expect("stored chapter count should be valid");
-        let chapter_ids = get_chapter_ids(id).await.expect("getting chapter ids should not fail");
+        let stored_chapter_count =
+            read_chapter_count(id).expect("stored chapter count should be valid");
+        let chapter_ids = get_chapter_ids(id)
+            .await
+            .expect("getting chapter ids should not fail");
 
         if stored_chapter_count < chapter_ids.len() {
             info!("request made. update!");
-            store_chapter_count(id, chapter_ids.len()).expect("storing chapter count should not fail");
+            store_chapter_count(id, chapter_ids.len())
+                .expect("storing chapter count should not fail");
 
             channel
                 .id()
@@ -53,7 +57,9 @@ pub async fn watch_fic(
                         role.id,
                         chapter_ids.len(),
                         id,
-                        chapter_ids.last().expect("work should have at least 1 chapter")
+                        chapter_ids
+                            .last()
+                            .expect("work should have at least 1 chapter")
                     ),
                 )
                 .await
@@ -102,7 +108,8 @@ async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
     //.expect("ao3 request failed");
 
     let doc = Html::parse_document(&text);
-    let selector = Selector::parse("ol.chapter.index.group>li>a").expect("hard-coded selector should be valid");
+    let selector = Selector::parse("ol.chapter.index.group>li>a")
+        .expect("hard-coded selector should be valid");
 
     let chapter_ids = doc
         .select(&selector)

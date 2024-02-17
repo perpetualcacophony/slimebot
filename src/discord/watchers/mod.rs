@@ -51,10 +51,18 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
             timestamp: recent,
             author: new_message.author.id,
         };
-        vore_mentions.insert_one(new_mention, None).await.expect("inserting to db should not fail");
+        vore_mentions
+            .insert_one(new_mention, None)
+            .await
+            .expect("inserting to db should not fail");
 
         // fixing bug where error happens if collection has 1 object and returns none
-        let last = if vore_mentions.count_documents(None, None).await.expect("collection should have at least one item") == 1 {
+        let last = if vore_mentions
+            .count_documents(None, None)
+            .await
+            .expect("collection should have at least one item")
+            == 1
+        {
             vore_mentions
                 .find_one(None, None)
                 .await
@@ -78,16 +86,15 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
         let time = recent - last;
         let time_text = time.format_largest();
 
-        http
-            .send_message(
-                new_message.channel_id,
-                Vec::new(),
-                &json!({
-                    "content": format!("~~{time_text}~~ 0 days without mentioning vore")
-                }),
-            )
-            .await
-            .expect("sending message should not fail");
+        http.send_message(
+            new_message.channel_id,
+            Vec::new(),
+            &json!({
+                "content": format!("~~{time_text}~~ 0 days without mentioning vore")
+            }),
+        )
+        .await
+        .expect("sending message should not fail");
     }
 }
 

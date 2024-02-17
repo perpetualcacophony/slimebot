@@ -1,5 +1,6 @@
 use poise::serenity_prelude::{
-    futures::future::join_all, ChannelId, Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage, GetMessages, Http, Reaction, ReactionType, UserId
+    futures::future::join_all, ChannelId, Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter,
+    CreateMessage, GetMessages, Http, Reaction, ReactionType, UserId,
 };
 
 #[allow(unused_imports)]
@@ -68,7 +69,10 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
             .member
             .expect("reaction in guild should have member")
             .guild_id
-            .member(http, add_reaction.user_id.expect("reaction should have user id"))
+            .member(
+                http,
+                add_reaction.user_id.expect("reaction should have user id"),
+            )
             .await
             .expect("user id should match member");
 
@@ -95,7 +99,11 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
 
         info!(
             "@{} reported a bug: {} (#{})",
-            add_after.user(http).await.expect("reaction should have author").name,
+            add_after
+                .user(http)
+                .await
+                .expect("reaction should have author")
+                .name,
             add_after.message_id,
             add_after
                 .channel(http)

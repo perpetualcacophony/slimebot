@@ -1,6 +1,5 @@
 use poise::serenity_prelude::{
-    Color, CreateAttachment, CreateEmbed, EditWebhook,
-    ExecuteWebhook, User, Webhook,
+    Color, CreateAttachment, CreateEmbed, EditWebhook, ExecuteWebhook, User, Webhook,
 };
 use serde_json::json;
 use tracing::warn;

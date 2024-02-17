@@ -107,7 +107,7 @@ async fn main() {
             ..Default::default()
         })
         .setup(|ctx, ready, framework| {
-            Box::pin( async move {
+            Box::pin(async move {
                 let data = Data::new();
                 let arc = Arc::new(data.clone());
 
@@ -121,29 +121,29 @@ async fn main() {
                 poise::builtins::register_in_guild(
                     &http,
                     commands.as_ref(),
-                    *data.config.bot.testing_server().expect("bot testing server id should be valid")
-                ).await.expect("registering commands in guild should not fail");
+                    *data
+                        .config
+                        .bot
+                        .testing_server()
+                        .expect("bot testing server id should be valid"),
+                )
+                .await
+                .expect("registering commands in guild should not fail");
 
                 let activity = data.config.bot.activity();
                 ctx.set_activity(activity);
 
-                let messages = collect(&shard, |event| {
-                    match event {
-                        Event::MessageCreate(event) => Some(event.message.clone()),
-                        _ => None,
-                    }
-                }).filter(
-                    move |msg| {
-                            let msg = msg.clone();
-                            let cache = ctx.cache.clone();
+                let messages = collect(&shard, |event| match event {
+                    Event::MessageCreate(event) => Some(event.message.clone()),
+                    _ => None,
+                })
+                .filter(move |msg| {
+                    let msg = msg.clone();
+                    let cache = ctx.cache.clone();
 
-                            async move {
-                                !msg.is_own(cache)
-                                && !msg.is_private()
-                            }
-                    }
-                );
-                
+                    async move { !msg.is_own(cache) && !msg.is_private() }
+                });
+
                 let messages_http = http.clone();
                 let messages_arc = arc.clone();
                 let messages_task = messages.for_each(move |msg| {
@@ -163,25 +163,22 @@ async fn main() {
                 });
                 tokio::spawn(messages_task);
 
-                let reactions = collect(&shard, |event| {
-                    match event {
-                        Event::ReactionAdd(event) => Some(event.reaction.clone()),
-                        _ => None,
-                    }
-                }).filter(
-                    move |reaction| {
-                        let reaction = reaction.clone();
-                        let data = arc.clone();
-                        let config = &data.config.watchers;
-                        let channel_allowed = config.channel_allowed(reaction.channel_id);
+                let reactions = collect(&shard, |event| match event {
+                    Event::ReactionAdd(event) => Some(event.reaction.clone()),
+                    _ => None,
+                })
+                .filter(move |reaction| {
+                    let reaction = reaction.clone();
+                    let data = arc.clone();
+                    let config = &data.config.watchers;
+                    let channel_allowed = config.channel_allowed(reaction.channel_id);
 
-                        async move {
-                            reaction.user_id != Some(bot_id)
+                    async move {
+                        reaction.user_id != Some(bot_id)
                             && reaction.guild_id.is_some()
                             && channel_allowed
-                        }
                     }
-                );
+                });
 
                 let config = data.config().clone();
                 let channel = config.bug_reports_channel().copied();
@@ -189,10 +186,10 @@ async fn main() {
                 if let Some(channel) = channel {
                     let reactions_task = reactions.for_each(move |reaction| {
                         let http = http.clone();
-    
+
                         async move {
                             use discord::bug_reports::bug_reports;
-    
+
                             bug_reports(&http, reaction, &channel).await;
                         }
                     });
@@ -215,9 +212,9 @@ async fn main() {
     /*let shards = client.shard_manager.clone();
 
     tokio::spawn(async move {
-        loop { 
+        loop {
             let runners = shards.runners.clone();
-            let guard = runners.lock().await;    
+            let guard = runners.lock().await;
 
             let shard = guard.get(&ShardId(0));
             //debug!(?shard);
@@ -234,7 +231,7 @@ async fn main() {
 
                         async move {
                             discord::watchers::vore(&http, &db, &msg).await;
-                        }   
+                        }
                     }).await
                 }
             }
@@ -242,7 +239,10 @@ async fn main() {
     });*/
 
     trace!("discord framework started");
-    client.start().await.expect("client should not return error");
+    client
+        .start()
+        .await
+        .expect("client should not return error");
 }
 
 trait FormatDuration {
@@ -301,9 +301,11 @@ mod tests {
 
     #[test]
     fn format_full() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
+            .expect("hard-coded timestamp should be valid");
 
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
+            .expect("hard-coded timestamp should be valid");
 
         let duration = end - start;
 
@@ -312,18 +314,24 @@ mod tests {
 
     #[test]
     fn format_largest() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
+            .expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
+            .expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
+            .expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z")
+            .expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("1 hour", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
+            .expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z")
+            .expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("19 minutes", duration.format_largest(),);
     }
