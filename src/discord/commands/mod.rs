@@ -1,6 +1,7 @@
 mod ban;
 mod watch_fic;
 
+use anyhow::anyhow;
 use poise::{
     serenity_prelude::{
         futures::StreamExt,CacheHttp, Channel, CreateAttachment, Member, MessageId, User
@@ -376,13 +377,22 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
         message: String,
     }
 
-    let image_url = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random")
-        .await?
+    let response = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random").await?;
+
+    if response.status().is_server_error() {
+        ctx.reply("sorry, dog api is down!").await.expect("sending message should not fail");
+        return Err(anyhow!("dog api down").into());
+    }
+
+    let image_url = response
         .json::<DogApiResponse>()
         .await?
         .message;
 
-    ctx.reply(image_url).await?;
+    let attachment = CreateAttachment::url(&ctx, &image_url).await?;
+
+    let reply = ctx.reply_builder(CreateReply::default().content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)").attachment(attachment));
+    ctx.send(reply).await?;
 
     Ok(())
 }
