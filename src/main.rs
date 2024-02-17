@@ -108,7 +108,6 @@ async fn main() {
         })
         .setup(|ctx, ready, framework| {
             Box::pin(async move {
-                let data = Data::new();
                 let arc = Arc::new(data.clone());
 
                 let ctx = ctx.clone();
@@ -133,6 +132,7 @@ async fn main() {
                 let activity = data.config.bot.activity();
                 ctx.set_activity(activity);
 
+                let watchers_config = data.config.watchers.clone();
                 let messages = collect(&shard, |event| match event {
                     Event::MessageCreate(event) => Some(event.message.clone()),
                     _ => None,
@@ -140,8 +140,14 @@ async fn main() {
                 .filter(move |msg| {
                     let msg = msg.clone();
                     let cache = ctx.cache.clone();
+                    let config = &watchers_config;
+                    let allowed = config.channel_allowed(msg.channel_id);
 
-                    async move { !msg.is_own(cache) && !msg.is_private() }
+                    async move {
+                        !msg.is_own(cache)
+                            && !msg.is_private()
+                            && allowed
+                    }
                 });
 
                 let messages_http = http.clone();
@@ -150,6 +156,8 @@ async fn main() {
                     //let http = _ctx.clone().http();
                     let data = messages_arc.clone();
                     let http = messages_http.clone();
+
+                    trace!(?msg.id, "message captured");
 
                     async move {
                         use discord::watchers::*;
@@ -169,14 +177,10 @@ async fn main() {
                 })
                 .filter(move |reaction| {
                     let reaction = reaction.clone();
-                    let data = arc.clone();
-                    let config = &data.config.watchers;
-                    let channel_allowed = config.channel_allowed(reaction.channel_id);
-
+                    
                     async move {
                         reaction.user_id != Some(bot_id)
                             && reaction.guild_id.is_some()
-                            && channel_allowed
                     }
                 });
 
@@ -186,6 +190,8 @@ async fn main() {
                 if let Some(channel) = channel {
                     let reactions_task = reactions.for_each(move |reaction| {
                         let http = http.clone();
+
+                        trace!(?reaction.message_id, "reaction captured");
 
                         async move {
                             use discord::bug_reports::bug_reports;
@@ -251,6 +257,7 @@ trait FormatDuration {
 }
 
 impl FormatDuration for chrono::Duration {
+    #[rustfmt::skip]
     fn format_largest(&self) -> String {
         let (d, h, m, s) = (
             self.num_days(),
@@ -260,15 +267,15 @@ impl FormatDuration for chrono::Duration {
         );
 
         match (d, h, m, s) {
-            (1, _, _, _) => ("1 day").to_string(),
-            (2.., _, _, _) => format!("{d} days"),
-            (_, 1, _, _) => ("1 hour").to_string(),
-            (_, 2.., _, _) => format!("{h} hours"),
-            (_, _, 1, _) => ("1 minute").to_string(),
-            (_, _, 2.., _) => format!("{m} minutes"),
-            (_, _, _, 1) => ("1 second").to_string(),
-            (_, _, _, 2..) => format!("{s} seconds"),
-            (_, _, _, _) => "less than a second".to_string(),
+            (1  , _  , _  , _  ) => ("1 day").to_string(),
+            (2.., _  , _  , _  ) => format!("{d} days"),
+            (_  , 1  , _  , _  ) => ("1 hour").to_string(),
+            (_  , 2.., _  , _  ) => format!("{h} hours"),
+            (_  , _  , 1  , _  ) => ("1 minute").to_string(),
+            (_  , _  , 2.., _  ) => format!("{m} minutes"),
+            (_  , _  , _  , 1  ) => ("1 second").to_string(),
+            (_  , _  , _  , 2..) => format!("{s} seconds"),
+            (_  , _  , _  , _  ) => "less than a second".to_string(),
         }
     }
 
