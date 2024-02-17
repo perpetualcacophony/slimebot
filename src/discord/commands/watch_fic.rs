@@ -36,12 +36,16 @@ pub async fn watch_fic(
     */
 
     loop {
-        let stored_chapter_count = read_chapter_count(id).unwrap();
-        let chapter_ids = get_chapter_ids(id).await.unwrap();
+        let stored_chapter_count =
+            read_chapter_count(id).expect("stored chapter count should be valid");
+        let chapter_ids = get_chapter_ids(id)
+            .await
+            .expect("getting chapter ids should not fail");
 
         if stored_chapter_count < chapter_ids.len() {
             info!("request made. update!");
-            store_chapter_count(id, chapter_ids.len()).unwrap();
+            store_chapter_count(id, chapter_ids.len())
+                .expect("storing chapter count should not fail");
 
             channel
                 .id()
@@ -53,11 +57,13 @@ pub async fn watch_fic(
                         role.id,
                         chapter_ids.len(),
                         id,
-                        chapter_ids.last().unwrap()
+                        chapter_ids
+                            .last()
+                            .expect("work should have at least 1 chapter")
                     ),
                 )
                 .await
-                .unwrap();
+                .expect("sending message should not fail");
         } else {
             info!("request made. no update")
         }
@@ -102,19 +108,20 @@ async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
     //.expect("ao3 request failed");
 
     let doc = Html::parse_document(&text);
-    let selector = Selector::parse("ol.chapter.index.group>li>a").unwrap();
+    let selector = Selector::parse("ol.chapter.index.group>li>a")
+        .expect("hard-coded selector should be valid");
 
     let chapter_ids = doc
         .select(&selector)
         .map(|el| {
             el.value()
                 .attr("href")
-                .unwrap()
+                .expect("<a> element should have href attr")
                 .split("/chapters/")
                 .nth(1)
-                .unwrap()
+                .expect("should have at least 2 chapters")
                 .parse()
-                .unwrap()
+                .expect("id should be valid usize")
         })
         .collect::<Vec<usize>>();
 

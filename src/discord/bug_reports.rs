@@ -1,26 +1,34 @@
-use poise::serenity_prelude::{ReactionType, Reaction, Context, CacheHttp, futures::future::join_all, UserId, CreateEmbed, Color, ChannelId};
+use poise::serenity_prelude::{
+    futures::future::join_all, ChannelId, Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter,
+    CreateMessage, GetMessages, Http, Reaction, ReactionType, UserId,
+};
 
 #[allow(unused_imports)]
-use tracing::debug;
-use tracing::info;
+use tracing::{debug, info, trace};
 
-pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &ChannelId) {
+pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelId) {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
-    let ladybugs = add_reaction.message(ctx.http()).await.unwrap().reactions.iter().find(|r| r.reaction_type == ladybug_reaction).unwrap().count;
-    
+    let ladybugs = add_reaction
+        .message(http)
+        .await
+        .expect("reaction should have a message")
+        .reactions
+        .iter()
+        .find(|r| r.reaction_type == ladybug_reaction)
+        .map_or_else(|| 0, |r| r.count);
+
     let add_after = add_reaction.clone();
-    
+
     if add_reaction.emoji == ladybug_reaction && ladybugs == 1 {
         let messages = add_reaction
             .channel_id
-            .messages(ctx.http(), |get| {
-                get.around(add_reaction.message_id).limit(5)
-            })
+            .messages(
+                http,
+                GetMessages::new().around(add_reaction.message_id).limit(5),
+            )
             .await
-            .unwrap();
-
-        let http = ctx.http();
+            .expect("channel should have messages");
 
         let messages = messages
             .into_iter()
@@ -52,25 +60,27 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             });
 
         let messages = join_all(messages).await;
-        let footer_icon = UserId(ctx.http().http().application_id().unwrap())
-            .to_user(ctx.http())
+        let footer_icon = UserId::new(http.application_id().expect("bot app should have id").get())
+            .to_user(http)
             .await
-            .unwrap()
+            .expect("user id should match a user")
             .face();
         let member = add_reaction
             .member
-            .unwrap()
+            .expect("reaction in guild should have member")
             .guild_id
-            .unwrap()
-            .member(ctx.http(), add_reaction.user_id.unwrap())
+            .member(
+                http,
+                add_reaction.user_id.expect("reaction should have user id"),
+            )
             .await
-            .unwrap();
+            .expect("user id should match member");
 
         let mut embed = CreateEmbed::default();
 
-        embed
+        embed = embed
             .title("bug report!")
-            .author(|author| author.icon_url(member.face()).name(member.display_name()))
+            .author(CreateEmbedAuthor::new(member.display_name()).icon_url(member.face()))
             .description(
                 "react to a message with 🐞 to generate one of these reports!
 
@@ -79,25 +89,29 @@ pub async fn bug_reports(ctx: &Context, add_reaction: Reaction, channel: &Channe
             .thumbnail("https://files.catbox.moe/0v4p11.png")
             .color(Color::from_rgb(221, 46, 68))
             .fields(messages)
-            .footer(|footer| footer.icon_url(footer_icon).text("slimebot"))
+            .footer(CreateEmbedFooter::new("slimebot").icon_url(footer_icon))
             .timestamp(add_reaction.message_id.created_at());
 
         channel
-            .send_message(ctx.http(), |msg| msg.set_embed(embed.clone()))
+            .send_message(http, CreateMessage::new().embed(embed.clone()))
             .await
-            .unwrap();
+            .expect("sending message should not fail");
 
         info!(
             "@{} reported a bug: {} (#{})",
-            add_after.user(ctx.http()).await.unwrap().name,
+            add_after
+                .user(http)
+                .await
+                .expect("reaction should have author")
+                .name,
             add_after.message_id,
             add_after
-            .channel(ctx.http())
-            .await
-            .unwrap() // todo: handle the http request failing
-            .guild()
-            .unwrap() // this is ok - the report will not be outside a guild
-            .name(),
+                .channel(http)
+                .await
+                .expect("reaction should have channel")
+                .guild()
+                .expect("channel should be in guild")
+                .name(),
         );
     }
 }

@@ -1,31 +1,54 @@
 mod ban;
 mod watch_fic;
 
-use poise::serenity_prelude::{Channel, Member, User};
-use tokio::join;
-use tracing::{error, info, instrument};
+use anyhow::anyhow;
+use poise::{
+    serenity_prelude::{
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
+    },
+    CreateReply,
+};
+use serde::Deserialize;
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, instrument};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, crate::Data, Error>;
+
+type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
 use crate::FormatDuration;
 
+trait LogCommands {
+    async fn log_command(&self);
+}
+
+impl LogCommands for Context<'_> {
+    async fn log_command(&self) {
+        let channel = self
+            .channel_id()
+            .name(self.http())
+            .await
+            .map_or("dms".to_string(), |c| format!("#{c}"));
+        info!(
+            "@{} ({}): {}",
+            self.author().name,
+            channel,
+            self.invocation_string()
+        );
+    }
+}
+
 /// bot will respond on successful execution
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command, discard_spare_arguments)]
-pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
+pub async fn ping(ctx: Context<'_>) -> CommandResult {
+    ctx.log_command().await;
 
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel.map_or("dms".to_string(), |c| format!("#{c}")),
-        ctx.invocation_string()
-    );
-
-    let ping = ping.as_millis();
+    let ping = ctx.ping().await.as_millis();
     if ping == 0 {
         ctx.say("pong! (please try again later to display latency)")
             .await?;
@@ -38,17 +61,10 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 
 #[instrument(skip_all)]
 #[poise::command(slash_command, prefix_command, hide_in_help, discard_spare_arguments)]
-pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
-    let (channel, ping) = join!(ctx.channel_id().name(ctx.cache()), ctx.ping(),);
+pub async fn pong(ctx: Context<'_>) -> CommandResult {
+    ctx.log_command().await;
 
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel.map_or("dms".to_string(), |c| format!("#{c}")),
-        ctx.invocation_string()
-    );
-
-    let ping = ping.as_millis();
+    let ping = ctx.ping().await.as_millis();
     if ping == 0 {
         ctx.say("ping! (please try again later to display latency)")
             .await?;
@@ -61,7 +77,7 @@ pub async fn pong(ctx: Context<'_>) -> Result<(), Error> {
 
 /// display a user's profile picture
 #[instrument(skip_all)]
-#[poise::command(prefix_command, slash_command, discard_spare_arguments, rename = "pfp")]
+#[poise::command(prefix_command, slash_command, discard_spare_arguments)]
 pub async fn pfp(
     ctx: Context<'_>,
     #[description = "the user to display the profile picture of - defaults to you"] user: Option<
@@ -70,28 +86,26 @@ pub async fn pfp(
     #[flag]
     #[description = "show the user's global profile picture, ignoring if they have a server one set"]
     global: bool,
-) -> Result<(), Error> {
-    let channel = ctx
-        .channel_id()
-        .name(ctx.cache())
-        .await
-        .map_or("dms".to_string(), |c| format!("#{c}"));
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel,
-        ctx.invocation_string()
-    );
+) -> CommandResult {
+    ctx.log_command().await;
 
     if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!");
     }
 
-    if let Some(guild) = ctx.guild() {
+    if ctx.guild().is_some() {
+        let guild = ctx
+            .guild()
+            .expect("guild should already be verified")
+            .clone();
+        let members = guild.members.clone();
+
         let member = if let Some(user) = user {
-            guild.member(ctx.http(), user.id).await.unwrap()
+            members.get(&user.id).expect("member should exist")
         } else {
-            ctx.author_member().await.unwrap().into_owned()
+            members
+                .get(&ctx.author().id)
+                .expect("author should be a member")
         };
 
         enum PfpType {
@@ -166,11 +180,17 @@ pub async fn pfp(
         let response_text = if &member.user == ctx.author() {
             author_response(pfp_type, global)
         } else {
-            other_response(&member, pfp_type, global)
+            other_response(member, pfp_type, global)
         };
 
-        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
-            .await?;
+        let attachment = CreateAttachment::url(ctx.http(), &pfp).await?;
+
+        ctx.send(
+            CreateReply::default()
+                .content(response_text)
+                .attachment(attachment),
+        )
+        .await?;
     } else {
         fn author_response(author: &User) -> (String, String) {
             let response_text = if author.avatar_url().is_some() {
@@ -203,8 +223,12 @@ pub async fn pfp(
             author_response(ctx.author())
         };
 
-        ctx.send(|f| f.content(response_text).attachment((*pfp).into()))
-            .await?;
+        ctx.send(
+            CreateReply::default()
+                .content(response_text)
+                .attachment(CreateAttachment::url(ctx.http(), &pfp).await?),
+        )
+        .await?;
     }
 
     Ok(())
@@ -212,11 +236,7 @@ pub async fn pfp(
 
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
-pub async fn echo(
-    ctx: Context<'_>,
-    channel: Option<Channel>,
-    message: String,
-) -> Result<(), Error> {
+pub async fn echo(ctx: Context<'_>, channel: Option<Channel>, message: String) -> CommandResult {
     let id = match channel {
         Some(channel) => channel.id(),
         None => ctx.channel_id(),
@@ -268,11 +288,11 @@ pub async fn audio(
 
 #[instrument(skip(ctx, user))]
 #[poise::command(prefix_command)]
-pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<(), Error> {
+pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> CommandResult {
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
         ban::joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
     } else {
-        ban::joke_ban(ctx, &user, ctx.author().id.0, reason).await?;
+        ban::joke_ban(ctx, &user, ctx.author().id.get(), reason).await?;
     }
 
     Ok(())
@@ -280,7 +300,7 @@ pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
-pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn banban(ctx: Context<'_>) -> CommandResult {
     if ctx.author().id == 497014954935713802 {
         ban::joke_ban(
             ctx,
@@ -290,9 +310,9 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
         )
         .await?;
     } else {
-        ctx.send(|m| m.content("https://files.catbox.moe/jm6sr9.png"))
+        ctx.send(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
             .await
-            .unwrap();
+            .expect("banban image should be valid");
     }
 
     Ok(())
@@ -300,29 +320,207 @@ pub async fn banban(ctx: Context<'_>) -> Result<(), Error> {
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command)]
-pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
-    let channel = ctx
-        .channel_id()
-        .name(ctx.cache())
-        .await
-        .map_or("dms".to_string(), |c| format!("#{c}"));
-    info!(
-        "@{} ({}): {}",
-        ctx.author().name,
-        channel,
-        ctx.invocation_string()
-    );
+pub async fn uptime(ctx: Context<'_>) -> CommandResult {
+    ctx.log_command().await;
 
     let started = ctx.data().started;
     let uptime = chrono::Utc::now() - started;
 
-    ctx.say(format!(
+    ctx.reply(format!(
         "uptime: {} (since {})",
         uptime.format_full(),
         started.format("%Y-%m-%d %H:%M UTC")
     ))
     .await
-    .unwrap();
+    .expect("sending message should not fail");
 
     Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(prefix_command)]
+pub async fn purge_after(ctx: Context<'_>, id: MessageId) -> CommandResult {
+    ctx.log_command().await;
+
+    let messages = ctx.channel_id().messages_iter(ctx.http());
+
+    let targeted = messages.filter_map(|msg| async move {
+        if let Ok(msg) = msg {
+            if msg.id >= id {
+                Some(msg)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
+
+    //println!("{:?}", Box::pin(messages).next().await);
+
+    targeted
+        .for_each(|msg| async move {
+            msg.delete(ctx.http())
+                .await
+                .expect("deleting message should not fail");
+            info!("deleted message {}: {}", msg.id, msg.content);
+        })
+        .await;
+
+    info!("done!");
+
+    /*let content = messages.try_fold(
+        String::new(),
+        |acc, m| async move { Ok(acc + "\n" + &m.content) }
+    ).await.unwrap();
+
+    println!("{content}");
+
+    ctx.say(content).await.unwrap();*/
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
+    ctx.log_command().await;
+
+    #[derive(Deserialize)]
+    struct DogApiResponse {
+        message: String,
+    }
+
+    let response = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random").await?;
+
+    if response.status().is_server_error() {
+        ctx.reply("sorry, dog api is down!")
+            .await
+            .expect("sending message should not fail");
+        return Err(anyhow!("dog api down").into());
+    }
+
+    let image_url = response.json::<DogApiResponse>().await?.message;
+
+    let attachment = CreateAttachment::url(&ctx, &image_url).await?;
+
+    let reply = ctx.reply_builder(
+        CreateReply::default()
+            .content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)")
+            .attachment(attachment)
+            .reply(true),
+    );
+
+    ctx.send(reply).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
+    ctx.log_command().await;
+
+    let (url, filename) = if gif {
+        ("https://cataas.com/cat/gif", "cat.gif")
+    } else {
+        ("https://cataas.com/cat", "cat.jpg")
+    };
+
+    let response = reqwest::get(url).await?;
+
+    let bytes = response.bytes().await?;
+
+    let attachment = CreateAttachment::bytes(bytes, filename);
+    let reply = CreateReply::default()
+        .content("cat courtesy of [cataas.com](<https://cataas.com/>)")
+        .attachment(attachment)
+        .reply(true);
+
+    ctx.send(reply).await?;
+
+    Ok(())
+}
+
+pub use minecraft::minecraft;
+mod minecraft {
+    use super::{CommandResult, Context, LogCommands};
+    use poise::{serenity_prelude::CreateEmbed, CreateReply};
+    use serde::Deserialize;
+    use tracing::{debug, instrument};
+
+    #[derive(Deserialize, Clone, Debug)]
+    struct ApiResponse {
+        online: bool,
+        version: Option<ApiResponseVersion>,
+        players: Option<ApiResponsePlayers>,
+    }
+
+    impl ApiResponse {
+        fn version(&self) -> &ApiResponseVersion {
+            self.version
+                .as_ref()
+                .expect("online api response should have version")
+        }
+
+        fn players(&self) -> &ApiResponsePlayers {
+            self.players
+                .as_ref()
+                .expect("online api response should have players")
+        }
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
+    struct ApiResponseVersion {
+        #[serde(rename = "name_clean")]
+        name_clean: String,
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
+    struct ApiResponsePlayers {
+        online: u8,
+        #[serde(rename = "list")]
+        list: Vec<ApiResponsePlayer>,
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
+    struct ApiResponsePlayer {
+        name_clean: String,
+    }
+
+    #[instrument(skip_all)]
+    #[poise::command(slash_command, prefix_command)]
+    pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> CommandResult {
+        ctx.log_command().await;
+
+        let address = server.unwrap_or("162.218.211.126".to_owned());
+        let request_url = format!("https://api.mcstatus.io/v2/status/java/{address}");
+
+        let response = reqwest::get(request_url)
+            .await?
+            .json::<ApiResponse>()
+            .await?;
+
+        debug!("{:#?}", response);
+
+        let mut embed = CreateEmbed::default();
+        embed = embed.title(address);
+
+        if response.online {
+            let players_online = response.players().online;
+            embed = embed.description(format!("players online: {players_online}"));
+
+            embed = embed.fields(
+                response
+                    .players()
+                    .list
+                    .iter()
+                    .map(|p| (&p.name_clean, "", false)),
+            );
+        }
+
+        ctx.send(CreateReply::default().embed(embed)).await?;
+
+        Ok(())
+    }
 }

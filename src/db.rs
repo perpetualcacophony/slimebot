@@ -14,10 +14,12 @@ pub fn database(config: &DbConfig) -> Database {
     let options = ClientOptions::builder()
         .app_name("slimebot".to_string())
         .credential(credential)
-        .hosts(vec![ServerAddress::parse(config.url()).unwrap()])
+        .hosts(vec![
+            ServerAddress::parse(config.url()).expect("db address should be valid")
+        ])
         .build();
 
     mongodb::Client::with_options(options)
-        .unwrap()
+        .expect("client options should be valid")
         .database("slimebot")
 }

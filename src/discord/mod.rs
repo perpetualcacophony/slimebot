@@ -1,6 +1,3 @@
+pub mod bug_reports;
 pub mod commands;
-
-pub mod framework;
-
-mod watchers;
-mod bug_reports;
+pub mod watchers;
