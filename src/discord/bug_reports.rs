@@ -3,8 +3,7 @@ use poise::serenity_prelude::{
 };
 
 #[allow(unused_imports)]
-use tracing::debug;
-use tracing::info;
+use tracing::{debug, info, trace};
 
 pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelId) {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
@@ -12,12 +11,11 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
     let ladybugs = add_reaction
         .message(http)
         .await
-        .unwrap()
+        .expect("reaction should have a message")
         .reactions
         .iter()
         .find(|r| r.reaction_type == ladybug_reaction)
-        .unwrap()
-        .count;
+        .map_or_else(|| 0, |r| r.count);
 
     let add_after = add_reaction.clone();
 
@@ -29,7 +27,7 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
                 GetMessages::new().around(add_reaction.message_id).limit(5),
             )
             .await
-            .unwrap();
+            .expect("channel should have messages");
 
         let messages = messages
             .into_iter()
@@ -61,18 +59,18 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
             });
 
         let messages = join_all(messages).await;
-        let footer_icon = UserId::new(http.application_id().unwrap().get())
+        let footer_icon = UserId::new(http.application_id().expect("bot app should have id").get())
             .to_user(http)
             .await
-            .unwrap()
+            .expect("user id should match a user")
             .face();
         let member = add_reaction
             .member
-            .unwrap()
+            .expect("reaction in guild should have member")
             .guild_id
-            .member(http, add_reaction.user_id.unwrap())
+            .member(http, add_reaction.user_id.expect("reaction should have user id"))
             .await
-            .unwrap();
+            .expect("user id should match member");
 
         let mut embed = CreateEmbed::default();
 
@@ -93,18 +91,18 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
         channel
             .send_message(http, CreateMessage::new().embed(embed.clone()))
             .await
-            .unwrap();
+            .expect("sending message should not fail");
 
         info!(
             "@{} reported a bug: {} (#{})",
-            add_after.user(http).await.unwrap().name,
+            add_after.user(http).await.expect("reaction should have author").name,
             add_after.message_id,
             add_after
                 .channel(http)
                 .await
-                .unwrap() // todo: handle the http request failing
+                .expect("reaction should have channel")
                 .guild()
-                .unwrap() // this is ok - the report will not be outside a guild
+                .expect("channel should be in guild")
                 .name(),
         );
     }

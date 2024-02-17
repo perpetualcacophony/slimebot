@@ -1,4 +1,5 @@
 #![warn(clippy::perf)]
+#![warn(clippy::unwrap_used)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
@@ -119,8 +120,8 @@ async fn main() {
                 poise::builtins::register_in_guild(
                     &http,
                     commands.as_ref(),
-                    *data.config.bot.testing_server().unwrap()
-                ).await.unwrap();
+                    *data.config.bot.testing_server().expect("bot testing server id should be valid")
+                ).await.expect("registering commands in guild should not fail");
 
                 let activity = data.config.bot.activity();
                 ctx.set_activity(activity);
@@ -174,7 +175,7 @@ async fn main() {
                         let channel_allowed = config.channel_allowed(reaction.channel_id);
 
                         async move {
-                            reaction.user_id == Some(bot_id)
+                            reaction.user_id != Some(bot_id)
                             && reaction.guild_id.is_some()
                             && channel_allowed
                         }
@@ -206,7 +207,7 @@ async fn main() {
     let mut client = serenity::Client::builder(config.bot.token(), GatewayIntents::all())
         .framework(framework)
         .await
-        .unwrap();
+        .expect("client should be valid");
 
     trace!("discord framework set up");
 
@@ -240,7 +241,7 @@ async fn main() {
     });*/
 
     trace!("discord framework started");
-    client.start().await.unwrap();
+    client.start().await.expect("client should not return error");
 }
 
 trait FormatDuration {
@@ -299,9 +300,9 @@ mod tests {
 
     #[test]
     fn format_full() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
 
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").expect("hard-coded timestamp should be valid");
 
         let duration = end - start;
 
@@ -310,18 +311,18 @@ mod tests {
 
     #[test]
     fn format_largest() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
-        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("1 hour", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
-        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").expect("hard-coded timestamp should be valid");
+        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").expect("hard-coded timestamp should be valid");
         let duration = end - start;
         assert_eq!("19 minutes", duration.format_largest(),);
     }

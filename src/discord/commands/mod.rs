@@ -93,13 +93,13 @@ pub async fn pfp(
     }
 
     if ctx.guild().is_some() {
-        let guild = ctx.guild().unwrap().clone();
+        let guild = ctx.guild().expect("guild should already be verified").clone();
         let members = guild.members.clone();
 
         let member = if let Some(user) = user {
-            members.get(&user.id).unwrap()
+            members.get(&user.id).expect("member should exist")
         } else {
-            members.get(&ctx.author().id).unwrap()
+            members.get(&ctx.author().id).expect("author should be a member")
         };
 
 
@@ -175,7 +175,7 @@ pub async fn pfp(
         let response_text = if &member.user == ctx.author() {
             author_response(pfp_type, global)
         } else {
-            other_response(&member, pfp_type, global)
+            other_response(member, pfp_type, global)
         };
 
         let attachment = CreateAttachment::url(ctx.http(), &pfp).await?;
@@ -299,7 +299,7 @@ pub async fn banban(ctx: Context<'_>) -> CommandResult {
     } else {
         ctx.send(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
             .await
-            .unwrap();
+            .expect("banban image should be valid");
     }
 
     Ok(())
@@ -313,13 +313,13 @@ pub async fn uptime(ctx: Context<'_>) -> CommandResult {
     let started = ctx.data().started;
     let uptime = chrono::Utc::now() - started;
 
-    ctx.say(format!(
+    ctx.reply(format!(
         "uptime: {} (since {})",
         uptime.format_full(),
         started.format("%Y-%m-%d %H:%M UTC")
     ))
     .await
-    .unwrap();
+    .expect("sending message should not fail");
 
     Ok(())
 }
@@ -347,7 +347,7 @@ pub async fn purge_after(ctx: Context<'_>, id: MessageId) -> CommandResult {
 
     targeted
         .for_each(|msg| async move {
-            msg.delete(ctx.http()).await.unwrap();
+            msg.delete(ctx.http()).await.expect("deleting message should not fail");
             info!("deleted message {}: {}", msg.id, msg.content);
         })
         .await;

@@ -36,7 +36,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
         .http()
         .get_channel_webhooks(ctx.channel_id())
         .await
-        .unwrap()
+        .expect("webhooks request should not fail")
         .into_iter()
         .find(|wh| wh.name == Some("Wick".to_string()))
         .unwrap_or(
@@ -59,7 +59,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
             .await,
         );
 
-    if hook.name.clone().unwrap() != wick.display_name() {
+    if hook.name.clone().expect("webhook name should be valid") != wick.display_name() {
         hook.edit(ctx.http(), EditWebhook::new().name(wick.display_name()))
             .await
             .unwrap_or_log();
@@ -71,7 +71,7 @@ async fn wick_webhook(ctx: Context<'_>) -> Webhook {
             EditWebhook::new().avatar(
                 &CreateAttachment::url(ctx.http(), &wick.face())
                     .await
-                    .unwrap(),
+                    .expect("creating attachment should not fail"),
             ),
         )
         .await

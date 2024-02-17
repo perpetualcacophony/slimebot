@@ -57,13 +57,13 @@ impl BotConfig {
             }
 
             let parsed_activity = if activity.starts_with("playing ") {
-                ActivityData::playing(activity.strip_prefix("playing ").unwrap())
+                ActivityData::playing(activity.strip_prefix("playing ").expect("activity should have prefix"))
             } else if activity.starts_with("listening to ") {
-                ActivityData::playing(activity.strip_prefix("listening to ").unwrap())
+                ActivityData::playing(activity.strip_prefix("listening to ").expect("activity should have prefix"))
             } else if activity.starts_with("watching ") {
-                ActivityData::playing(activity.strip_prefix("watching ").unwrap())
+                ActivityData::playing(activity.strip_prefix("watching ").expect("activity should have prefix"))
             } else if activity.starts_with("competing in ") {
-                ActivityData::playing(activity.strip_prefix("competing in ").unwrap())
+                ActivityData::playing(activity.strip_prefix("competing in ").expect("activity should have prefix"))
             } else {
                 error!("bot.activity in config could not be parsed - must start with `playing`, `listening to`, `watching` or `competing in`");
                 warn!("disabling bot activity");

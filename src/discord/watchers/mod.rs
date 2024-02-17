@@ -15,9 +15,9 @@ async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
         new_message
             .channel(http)
             .await
-            .unwrap() // todo: handle the http request failing
+            .expect("message should have channel")
             .guild()
-            .unwrap() // this is ok - the message will not be outside a guild
+            .expect("channel should be in a guild")
             .name(),
         new_message.content
     );
@@ -26,7 +26,7 @@ async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
 #[instrument(skip_all, level = "trace")]
 async fn check_vore(content: &str) -> bool {
     Regex::new(r"(?i)(?:[^a-z]|^)(voring|vores|vore)")
-        .unwrap()
+        .expect("hard-coded regex should be valid")
         .captures(content)
         .is_some()
 }
@@ -51,15 +51,15 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
             timestamp: recent,
             author: new_message.author.id,
         };
-        vore_mentions.insert_one(new_mention, None).await.unwrap();
+        vore_mentions.insert_one(new_mention, None).await.expect("inserting to db should not fail");
 
         // fixing bug where error happens if collection has 1 object and returns none
-        let last = if vore_mentions.count_documents(None, None).await.unwrap() == 1 {
+        let last = if vore_mentions.count_documents(None, None).await.expect("collection should have at least one item") == 1 {
             vore_mentions
                 .find_one(None, None)
                 .await
-                .unwrap() // will fail if db connection fails
-                .unwrap() // will fail if collection is empty
+                .expect("db request should not fail")
+                .expect("collection should not be empty")
                 .timestamp
         } else {
             vore_mentions
@@ -70,8 +70,8 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
                         .build(),
                 )
                 .await
-                .unwrap() // will fail if db connection fails
-                .unwrap() // will fail if collection is empty
+                .expect("db request should not fail")
+                .expect("collection should not be empty")
                 .timestamp
         };
 
@@ -87,7 +87,7 @@ pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
                 }),
             )
             .await
-            .unwrap();
+            .expect("sending message should not fail");
     }
 }
 
@@ -101,9 +101,9 @@ pub async fn l_biden(http: &Http, new_message: &Message) {
             new_message
                 .channel(http)
                 .await
-                .unwrap() // todo: handle the http request failing
+                .expect("message should have a channel")
                 .guild()
-                .unwrap() // this is ok - the message will not be outside a guild
+                .expect("channel should be inside a guild")
                 .name(),
             new_message.content
         );
@@ -115,7 +115,7 @@ pub async fn l_biden(http: &Http, new_message: &Message) {
                 CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
             )
             .await
-            .unwrap();
+            .expect("sending message should not fail");
     }
 }
 
@@ -134,9 +134,9 @@ pub async fn look_cl(http: &Http, new_message: &Message) {
             new_message
                 .channel(http)
                 .await
-                .unwrap() // todo: handle the http request failing
+                .expect("message should be in a channel")
                 .guild()
-                .unwrap() // this is ok - the message will not be outside a guild
+                .expect("channel should be in a guild")
                 .name(),
             new_message.content
         );
@@ -148,14 +148,14 @@ pub async fn look_cl(http: &Http, new_message: &Message) {
                 .reference_message(new_message)
             )
             .await
-            .unwrap();
+            .expect("sending message should not fail");
         } else {
             new_message.channel_id.send_message(http, CreateMessage::new()
                 .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
                 .reference_message(new_message)
             )
             .await
-            .unwrap();
+            .expect("sending message should not fail");
         }
     }
 }
