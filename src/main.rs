@@ -98,6 +98,7 @@ async fn main() {
                 //purge_after(),
                 borzoi(),
                 cat(),
+                fox(),
                 minecraft(),
             ],
             prefix_options: PrefixFrameworkOptions {

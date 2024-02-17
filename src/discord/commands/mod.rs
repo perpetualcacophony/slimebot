@@ -442,6 +442,31 @@ pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn fox(ctx: Context<'_>) -> CommandResult {
+    ctx.log_command().await;
+
+    #[derive(Deserialize)]
+    struct ApiResponse {
+        image: String,
+    }
+    
+    let json: ApiResponse = reqwest::get("https://randomfox.ca/floof/").await?
+        .json::<ApiResponse>().await?;
+
+    let attachment = CreateAttachment::url(&ctx, &json.image).await?;
+    let reply = CreateReply::default()
+        .content("fox courtesy of [randomfox.ca](<https://randomfox.ca/>)")
+        .attachment(attachment)
+        .reply(true);
+
+    ctx.send(reply).await?;
+
+    Ok(())
+}
+
+
 pub use minecraft::minecraft;
 mod minecraft {
     use super::{CommandResult, Context, LogCommands};
