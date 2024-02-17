@@ -471,17 +471,17 @@ mod minecraft {
 }
 
 #[instrument(skip_all)]
-#[poise::command(prefix_command, subcommands("create", "join"))]
-pub async fn sprint(ctx: Context<'_>) -> Result<(), Error> {
+#[poise::command(prefix_command, subcommands("create", "join", "list"))]
+pub async fn sprint(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
 #[instrument(skip_all)]
 #[poise::command(prefix_command)]
-pub async fn create(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn create(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
-    let sprint = ctx.data().sprint();
+
     //sprint.words_sender().send();
 
     Ok(())
@@ -489,8 +489,26 @@ pub async fn create(ctx: Context<'_>) -> Result<(), Error> {
 
 #[instrument(skip_all)]
 #[poise::command(prefix_command)]
-pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn join(ctx: Context<'_>) -> CommandResult {
     ctx.say("join").await.unwrap();
+
+    let sprint = ctx.data().sprint();
+    sprint.add_member(ctx.author().clone()).await;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(prefix_command)]
+pub async fn list(ctx: Context<'_>) -> CommandResult {
+    let sprint = ctx.data().sprint();
+    let members = sprint.members().await;
+
+    let list = members.iter().fold(String::new(), |acc, user| {
+        acc + "\n" + &user.name
+    });
+
+    ctx.reply(list).await?;
 
     Ok(())
 }

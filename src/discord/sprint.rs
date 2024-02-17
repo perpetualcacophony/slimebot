@@ -2,42 +2,63 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use mongodb::{bson::doc, Collection, Database};
-use poise::serenity_prelude::{Member, UserId};
+use poise::serenity_prelude::{User, UserId};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::Mutex;
+use tracing::{instrument, warn};
 
-#[derive(Debug)]
+type ArcMutex<T> = Arc<Mutex<T>>;
+
+#[derive(Debug, Clone)]
 pub struct Sprint {
-    duration: Option<Duration>,
-    members: Vec<Member>,
-    words_receiver: Receiver<u32>,
-    words_sender: Sender<u32>,
+    data: ArcMutex<SprintData>
 }
 
 impl Sprint {
     pub fn new() -> Self {
-        let (tx, rx) = mpsc::channel(128);
+        let data = Arc::new(Mutex::new(
+            SprintData::new()
+        ));
 
         Self {
-            duration: None,
-            members: Vec::new(),
-            words_receiver: rx,
-            words_sender: tx,
+            data
         }
     }
 
-    pub fn arc() -> Arc<Self> {
-        Arc::new(
-            Self::new()
-        )
+    #[instrument(level = "trace", skip_all)]
+    pub async fn add_member(&self, member: User) {
+        let mut data = self.data.lock().await;
+        let members = &mut data.members;
+
+        if members.contains(&member) {
+            warn!(?member.id, "member already in list, ignoring")
+        } else {
+            members.push(member)
+        }
+    }
+
+    pub async fn members(&self) -> Vec<User> {
+        let data = self.data.lock().await;
+        data.members.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SprintData {
+    duration: Option<Duration>,
+    members: Vec<User>,
+}
+
+impl SprintData {
+    fn new() -> Self {
+        Self {
+            duration: None,
+            members: Vec::new(),
+        }
     }
 
     fn setup(&mut self, minutes: i64) {
         self.duration = Some(Duration::minutes(minutes))
-    }
-
-    fn add_member(&mut self, member: Member) {
-        self.members.push(member);
     }
 
     fn start() {
@@ -47,15 +68,6 @@ impl Sprint {
     fn finish(&self) {
 
     }
-
-    pub fn words_sender(&self) -> Sender<u32> {
-        self.words_sender.clone()
-    }
-}
-
-enum SprintPacket {
-    Create(i64),
-    
 }
 
 #[derive(Default, Serialize, Deserialize)]

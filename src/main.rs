@@ -35,7 +35,7 @@ pub struct Data {
     config: config::Config,
     db: Database,
     started: UtcDateTime,
-    sprint: Arc<Sprint>,
+    sprint: Sprint,
 }
 
 impl Data {
@@ -54,13 +54,13 @@ impl Data {
 
         let started = Utc::now();
 
-        let sprint = Sprint::arc();
+        let sprint = Sprint::new();
 
         Self {
             config,
             db,
             started,
-            sprint
+            sprint,
         }
     }
 
@@ -72,8 +72,8 @@ impl Data {
         &self.db
     }
 
-    fn sprint(&self) -> Arc<Sprint> {
-        self.sprint.clone()
+    const fn sprint(&self) -> &Sprint {
+        &self.sprint
     }
 }
 
