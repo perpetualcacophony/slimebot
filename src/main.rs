@@ -97,6 +97,7 @@ async fn main() {
                 uptime(),
                 //purge_after(),
                 borzoi(),
+                cat(),
                 minecraft(),
             ],
             prefix_options: PrefixFrameworkOptions {

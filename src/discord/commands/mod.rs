@@ -391,7 +391,38 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
 
     let attachment = CreateAttachment::url(&ctx, &image_url).await?;
 
-    let reply = ctx.reply_builder(CreateReply::default().content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)").attachment(attachment));
+    let reply = ctx.reply_builder(CreateReply::default()
+        .content("borzoi courtesy of [dog.ceo](<https://dog.ceo/dog-api/>)")
+        .attachment(attachment)
+        .reply(true)
+    );
+
+    ctx.send(reply).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
+    ctx.log_command().await;
+
+    let (url, filename) = if gif {
+        ("https://cataas.com/cat/gif", "cat.gif")
+    } else {
+        ("https://cataas.com/cat", "cat.jpg")
+    };
+
+    let response = reqwest::get(url).await?;
+
+    let bytes = response.bytes().await?;
+
+    let attachment = CreateAttachment::bytes(bytes, filename);
+    let reply = CreateReply::default()
+        .content("cat courtesy of [cataas.com](<https://cataas.com/>)")
+        .attachment(attachment)
+        .reply(true);
+
     ctx.send(reply).await?;
 
     Ok(())
