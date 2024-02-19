@@ -424,7 +424,9 @@ pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
     let (url, filename) = if gif {
         ("https://cataas.com/cat/gif", "cat.gif")
     } else {
-        ("https://cataas.com/cat", "cat.jpg")
+        ("https://cataas.com/cat", "cat.jpg") // i don't know why this works
+        // but asserting all images, even png ones, as .jpg is... fine, i guess?
+        // thanks discord
     };
 
     let response = reqwest::get(url).await?;
