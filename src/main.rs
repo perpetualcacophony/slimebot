@@ -167,6 +167,7 @@ async fn main() {
                             vore(&http, &data.db, &msg),
                             l_biden(&http, &msg),
                             look_cl(&http, &msg),
+                            watch_haiku(&http, &msg),
                         );
                     }
                 });

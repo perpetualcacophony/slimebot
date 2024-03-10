@@ -4,9 +4,11 @@ use poise::serenity_prelude::{CacheHttp, CreateMessage, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 
 use crate::FormatDuration;
+
+mod haiku;
 
 async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
     info!(
@@ -164,5 +166,17 @@ pub async fn look_cl(http: &Http, new_message: &Message) {
             .await
             .expect("sending message should not fail");
         }
+    }
+}
+
+pub async fn watch_haiku(http: &Http, msg: &Message) {
+    if let Some(haiku) = haiku::check_haiku(&msg.content) {
+        let reply = CreateMessage::new();
+
+        let haiku = haiku.iter().map(|line| format!("> *{line}*")).collect::<Vec<_>>().join("\n");
+
+        let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
+
+        msg.reply(http, txt).await.unwrap();
     }
 }
