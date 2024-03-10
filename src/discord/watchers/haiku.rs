@@ -135,7 +135,7 @@ fn syllables(word: &str) -> usize {
 mod tests {
     mod haikus {
         macro_rules! test_haiku {
-            ($name:ident, $text:expr) => {
+            ($name:ident: $text:expr$(,)?) => {
                 #[test]
                 #[tracing_test::traced_test]
                 fn $name() {
@@ -144,20 +144,26 @@ mod tests {
                     )
                 }
             };
+
+            ($name:ident: $text:expr, $($names:ident: $texts:expr),+$(,)?) => {
+                test_haiku!($name: $text);
+                test_haiku! { $($names: $texts),+ }
+            };
         }
 
-        test_haiku!(five, "five five five five five seven seven seven one five five five five five");
-        test_haiku!(olive, "a haze of olive encompassing points of white vibrantly muted");
-        test_haiku!(honey, "i am warm honey i am sweet cream and cherries lick me like candy");
-        test_haiku!(stew, "all the days blending together into a stew but not a good stew");
-        test_haiku!(tumblr, "anything that one haiku bot on tumblr posts turns out pretty good");
-        test_haiku!(bigfoot, "i got a picture with bigfoot and the ancient aliens dude slay");
-        test_haiku!(cool, "look at all the cool things that you find when you are trying to help people");
-        //test_haiku!(cringe, "don't kill the part of you that is cringe. kill the part of you that cringes.");
-        test_haiku!(a, "a a a a a a a a a a a a a a a a a");
+        test_haiku! {
+            five: "five five five five five seven seven seven one five five five five five",
+            olive: "a haze of olive encompassing points of white vibrantly muted",
+            honey: "i am warm honey i am sweet cream and cherries lick me like candy",
+            stew: "all the days blending together into a stew but not a good stew",
+            tumblr: "anything that one haiku bot on tumblr posts turns out pretty good",
+            bigfoot: "i got a picture with bigfoot and the ancient aliens dude slay",
+            cool: "look at all the cool things that you find when you are trying to help people",
+            a: "a a a a a a a a a a a a a a a a a",
+        }
 
         macro_rules! test_not_haiku {
-            ($name:ident, $text:expr) => {
+            ($name:ident: $text:expr$(,)?) => {
                 #[test]
                 #[tracing_test::traced_test]
                 #[should_panic]
@@ -167,16 +173,22 @@ mod tests {
                     )
                 }
             };
+
+            ($name:ident: $text:expr, $($names:ident: $texts:expr),+$(,)?) => {
+                test_not_haiku!($name: $text);
+                test_not_haiku! { $($names: $texts),+ }
+            };
         }
 
-        test_not_haiku!(what, "what");
+        test_not_haiku!{
+            what: "what",
+        } 
     }
     
     mod syllables {
         macro_rules! test_syllables {
-            ($word:ident, $count:expr) => {
+            ($word:ident: $count:expr$(,)?) => {
                 #[test]
-                #[tracing_test::traced_test]
                 fn $word() {
                     pretty_assertions::assert_eq!(
                         super::super::syllables(stringify!($word)),
@@ -184,15 +196,22 @@ mod tests {
                     )
                 }
             };
+
+            ($word:ident: $count:expr, $($words:ident: $counts:expr),+$(,)?) => {
+                test_syllables!($word: $count);
+                test_syllables! { $($words: $counts),+ }
+            };
         }
 
-        test_syllables!(five, 1);
-        test_syllables!(seven, 2);
-        test_syllables!(vibrantly, 3);
-        test_syllables!(cherries, 2);
-        test_syllables!(blending, 2);
-        test_syllables!(together, 3);
-        test_syllables!(the, 1);
-        test_syllables!(tumblr, 2);
+        test_syllables! {
+            five: 1,
+            seven: 2,
+            vibrantly: 3,
+            cherries: 2,
+            blending: 2,
+            together: 3,
+            the: 1,
+            tumblr: 2,
+        }
     }
 }
