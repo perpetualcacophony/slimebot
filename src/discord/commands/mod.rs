@@ -560,30 +560,79 @@ mod minecraft {
 #[poise::command(slash_command, prefix_command)]
 pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     let mut roll = DiceRoll::parse(&text).unwrap();
+    let mut roll2 = roll.clone();
 
     let rolls = roll.rolls();
     let total = roll.total();
 
-    let max = roll.dice.next().unwrap().max();
+    let faces = roll.dice.next().unwrap().faces;
 
-    let extra = match roll.extra {
-        n if n > 0 => format!(", *+{n}*"),
-        n if n < 0 => format!(", *{n}*"),
-        0 => "".to_owned(),
-        _ => unreachable!()
+    let total = if faces.get() == 1 || (faces.get() == 2 && rolls.clone().count() == 1) {
+        total.to_string()
+    } else {
+        match total {
+            t if t == roll2.clone().min() || t == roll2.clone().max() => format!("__{t}__"),
+            other => other.to_string()
+        }
     };
-    
-    let roll_text: String = rolls
-        .map(|n| {
-            match n.get() {
-                n if n == 1 || n == max.get() => format!("__{n}__"),
-                _ => n.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
 
-    let text = format!("**{total}** ({roll_text}{extra})");
+    debug!(total);
+
+    let text = if roll.extra == 0 {
+        if roll.dice.len().get() == 1 {
+            format!("**{total}**")
+        } else {
+            #[allow(clippy::collapsible_else_if)]
+            let roll_text = if faces.get() > 2 {
+                rolls
+                .map(|n| {
+                    match n.get() {
+                        n if n == 1 || n == faces.get() => format!("__{n}__"),
+                        _ => n.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+            } else {
+                rolls
+                .map(|n| {
+                    n.to_string()
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+            };
+
+            format!("**{total}** ({roll_text})")
+        }
+    } else {
+        let extra = match roll.extra {
+            n if n > 0 => format!(", +{n}"),
+            n if n < 0 => format!(", {n}"),
+            _ => unreachable!()
+        };
+
+        #[allow(clippy::collapsible_else_if)]
+        let roll_text = if faces.get() > 2 {
+            rolls
+            .map(|n| {
+                match n.get() {
+                    n if n == 1 || n == faces.get() => format!("__{n}__"),
+                    _ => n.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+        } else {
+            rolls
+            .map(|n| {
+                n.to_string()
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+        };
+
+        format!("**{total}** ({roll_text}{extra})")
+    };
 
     ctx.reply(text).await?;
 
@@ -686,14 +735,21 @@ mod roll {
             ExactSizeIterator::len(self).try_into().expect("number of dice should not be 0")
         }
 
-        fn min(&self) -> NaturalI8 {
+        #[instrument]
+        pub fn lowest_roll(&self) -> NaturalI8 {
+            debug!(len = ?self.len());
             self.len()
         }
 
-        pub fn max(&self) -> NaturalI8 {
-            self.clone().fold(0, |sum, die| {
+        #[instrument]
+        pub fn highest_roll(&self) -> NaturalI8 {
+            let highest = self.clone().fold(0, |sum, die| {
                 sum + die.max().get()
-            }).try_into().expect("number of dice != 0 and dice.min() == 1")
+            });
+
+            debug!(highest);
+
+            highest.try_into().expect("number of dice != 0 and dice.min() == 1")
         }
     }
 
@@ -818,8 +874,18 @@ mod roll {
                 })
                 .expect("");
 
+            debug!(?roll);
+
             roll
 
+        }
+
+        pub fn min(&self) -> i8 {
+            self.dice.lowest_roll().get() + self.extra
+        }
+
+        pub fn max(&self) -> i8 {
+            self.dice.highest_roll().get() + self.extra
         }
     }
     
