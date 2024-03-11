@@ -1,6 +1,8 @@
 mod ban;
 mod watch_fic;
 
+use std::{num::{NonZeroI8, NonZeroU8}, ops::Neg, str::FromStr};
+
 use anyhow::anyhow;
 use poise::{
     serenity_prelude::{
@@ -8,6 +10,8 @@ use poise::{
     },
     CreateReply,
 };
+use rand::seq::IteratorRandom;
+use regex::Regex;
 use serde::Deserialize;
 
 #[allow(unused_imports)]
@@ -20,7 +24,7 @@ type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::FormatDuration;
+use crate::{discord::commands::roll::{DiceRoll, NaturalI8}, FormatDuration};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -549,5 +553,381 @@ mod minecraft {
         ctx.send(CreateReply::default().embed(embed)).await?;
 
         Ok(())
+    }
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command)]
+pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
+    let mut roll = DiceRoll::parse(&text).unwrap();
+
+    let max = roll.dice[0].faces.get();
+
+    let extra = match roll.extra {
+        n if n > 0 => format!(", *+{n}*"),
+        n if n < 0 => format!(", *{n}*"),
+        0 => "".to_owned(),
+        _ => unreachable!()
+    };
+    
+    let total: i8 = roll.total();
+    let roll_text: String = roll.rolls()
+        .into_iter()
+        .map(|n| {
+            match n.get() {
+                n if n == 1 || n == max => format!("__{n}__"),
+                _ => n.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let text = format!("**{total}** ({roll_text}{extra})");
+
+    ctx.reply(text).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(slash_command, prefix_command, discard_spare_arguments)]
+pub async fn flip(ctx: Context<'_>, coins: u8)-> CommandResult {
+    //let roll = DiceRoll::parse(&text).unwrap();
+
+    //let rolled = roll.execute();
+
+    //ctx.reply(rolled.to_string()).await.unwrap();
+
+    Ok(())
+}
+
+mod roll {
+    use std::{default, num::{NonZeroI8, ParseIntError, TryFromIntError}, ops::Neg, str::FromStr};
+
+    use rand::{rngs::ThreadRng, seq::IteratorRandom, Rng};
+    use regex::Regex;
+    use serde::Deserialize;
+    use thiserror::Error;
+    use tracing::{debug, instrument, trace};
+
+    #[derive(Debug, Error, PartialEq)]
+    pub enum DiceRollError {
+        #[error(transparent)]
+        InvalidNumber(#[from] NaturalI8Error),
+        #[error("")]
+        NoFaces,
+        #[error("")]
+        InvalidExtra(String),
+        #[error("")]
+        InvalidExtraSign(String),
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct Die {
+        pub faces: NaturalI8,
+        pub rolled: Option<NaturalI8>
+    }
+
+    impl Die {
+        fn new(faces: NaturalI8) -> Self {
+            Self {
+                faces,
+                rolled: None
+            }
+        }
+
+        fn roll(&mut self) -> NaturalI8 {
+            self.roll_with(&mut rand::thread_rng())
+        }
+
+        fn roll_with(&mut self, rng: &mut impl Rng) -> NaturalI8 {
+            let range = 1..=self.faces.get();
+            let roll = range.choose(rng)
+                .expect("should have at least one face")
+                .try_into()
+                .expect("faces is a valid NaturalI8");
+            self.rolled = Some(roll);
+            roll
+        }
+
+        fn d20() -> Self {
+            Self::new(NaturalI8::twenty())
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Default)]
+    pub struct DiceRoll {
+        pub dice: Vec<Die>,
+        pub extra: i8,
+    }
+
+    impl Iterator for DiceRoll {
+        type Item = i8;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let mut item = self.dice.iter_mut().find(|die| die.rolled.is_none());
+
+            item.as_mut().map(|die| die.roll());
+
+            item.map(|die| die.rolled.expect("die should have been rolled").get())
+        }
+    }
+    
+    impl DiceRoll {
+        pub fn new(count: usize, faces: i8, extra: i8) -> Result<Self, DiceRollError> {
+            let faces = faces.try_into()?;
+
+            let dice = vec![Die::new(faces); count];
+
+            let new = Self { dice, extra };
+            Ok(new)
+        }
+
+        pub fn rolls(&self) -> Vec<NaturalI8> {
+            self.dice.iter().map(|die| {
+                die.rolled.unwrap()
+            }).collect()
+        }
+
+        pub fn total(&mut self) -> i8 {
+            self.dice.iter_mut().fold(0, |sum, die| {
+                let rolled = die.roll().get();
+                sum + rolled
+            }) + self.extra
+        }
+
+        #[instrument]
+        pub fn parse(text: &str) -> Result<Self, DiceRollError> {
+            let regex = Regex::new(r"([0-9]*)d([0-9]+)\s*(?:(\+|-)\s*([0-9]+))?")
+                .expect("hard-coded regex should be valid");
+    
+            let roll = regex.captures(text)
+                .map(|caps| {
+                    trace!(?caps);
+
+                    let count = caps.get(1)
+                        .map_or(Ok(NaturalI8::default()), |mat| mat.as_str().parse())
+                        .unwrap_or_default();
+                    trace!(?count);
+                    let faces: NaturalI8 = caps.get(2).ok_or(DiceRollError::NoFaces)?.as_str().parse()?;
+                    trace!(?faces);
+    
+                    let extra_unsigned = caps.get(4)
+                        .map(|mat| {
+                            let int = mat.as_str()
+                                .parse::<i8>()
+                                .map_err(|_| DiceRollError::InvalidExtra(mat.as_str().to_owned()));
+
+                            int.unwrap_or_default()    
+                        });
+                    trace!(?extra_unsigned);
+
+                    let extra_sign = caps.get(3).map_or("", |mat| mat.as_str());
+
+                    let extra = match extra_sign {
+                        "+" => extra_unsigned,
+                        "-" => extra_unsigned.map(|int|int.neg()),
+                        _ => None,
+                    }.unwrap_or_default();
+                    debug!(?extra);
+    
+                    DiceRoll::new(count.into(), faces.get(), extra)
+                })
+                .expect("");
+
+            roll
+
+        }
+    }
+    
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+    pub struct NaturalI8(NonZeroI8);
+
+    macro_rules! natural_const {
+        ($name:ident: $num:expr$(,)?) => {
+            pub fn $name() -> NaturalI8 {
+                NaturalI8::new(
+                    NonZeroI8::new(1).expect(format!("{} != 0", $num).as_str())
+                ).expect(format!("{} >= 1", $num).as_str())
+            }
+        };
+
+        ($name:ident: $num:expr, $($names:ident: $nums:expr),+$(,)?) => {
+            natural_const!($name: $num);
+            natural_const! { $($names: $nums),+ }
+        };
+    }
+    
+    impl NaturalI8 {
+        natural_const! {
+            one: 1,
+            twenty: 20,
+            one_hundred: 100,
+        }
+
+        pub fn new(value: NonZeroI8) -> Result<Self, NaturalI8Error> {
+            value.try_into()
+        }
+
+        pub fn get(&self) -> i8 {
+            self.get_non_zero().get()
+        }
+
+        pub fn get_non_zero(&self) -> NonZeroI8 {
+            self.0
+        }
+
+        pub fn min() -> Self {
+            Self::one()
+        }
+    }
+
+    impl Default for NaturalI8 {
+        fn default() -> Self {
+            Self::min()
+        }
+    }
+
+    impl std::fmt::Debug for NaturalI8 {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{:?}", self.0)
+        }
+    }
+    
+    impl TryFrom<NonZeroI8> for NaturalI8 {
+        type Error = NaturalI8Error;
+    
+        fn try_from(value: NonZeroI8) -> Result<Self, Self::Error> {
+            if value.get() >= 1 {
+                Ok(Self(value))
+            } else {
+                Err(NaturalI8Error::ValueNegative(value))
+            }
+        }
+    }
+    
+    impl TryFrom<i8> for NaturalI8 {
+        type Error = NaturalI8Error;
+    
+        fn try_from(value: i8) -> Result<Self, Self::Error> {
+            let non_zero: NonZeroI8 = value.try_into()?;
+    
+            if non_zero.get() >= 1 {
+                Ok(Self(non_zero))
+            } else {
+                Err(NaturalI8Error::ValueNegative(non_zero))
+            }
+        }
+    }
+    
+    impl FromStr for NaturalI8 {
+        type Err = NaturalI8Error;
+    
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let non_zero: NonZeroI8 = s.parse()?;
+    
+            if non_zero.get() >= 1 {
+                Ok(Self(non_zero))
+            } else {
+                Err(NaturalI8Error::ValueNegative(non_zero))
+            }
+        }
+    }
+
+    impl From<NaturalI8> for usize {
+        fn from(val: NaturalI8) -> Self {
+            val.get().try_into().expect("usize > 0 && NaturalI8 > 0")
+        }
+    }
+
+    impl ToString for NaturalI8 {
+        fn to_string(&self) -> String {
+            self.get().to_string()
+        }
+    }
+
+    #[derive(Error, Debug, PartialEq)]
+    pub enum NaturalI8Error {
+        #[error("parsed value as zero")]
+        ParsedZero(#[from] ParseIntError),
+        #[error("value cannot be zero")]
+        TryFromZero(#[from] TryFromIntError),
+        #[error("value `{0}` is negative")]
+        ValueNegative(NonZeroI8)
+    }
+
+    mod tests {
+        use tracing::trace;
+        use tracing_test::traced_test;
+
+        use crate::discord::commands::roll::NaturalI8;
+
+        use super::{DiceRoll, Die};
+
+        macro_rules! test_parse {
+            ($name:ident: $text:expr => $parsed:expr$(,)?) => {
+                #[test]
+                fn $name() {
+                    pretty_assertions::assert_eq!(
+                        super::DiceRoll::parse($text),
+                        $parsed
+                    )
+                }
+            };
+
+            ($name:ident: $text:expr => $parsed:expr, $($names:ident: $texts:expr => $parseds:expr),+$(,)?) => {
+                test_parse!($name: $text => $parsed);
+                test_parse! { $($names: $texts => $parseds),+ }
+            };
+        }
+
+        test_parse!{
+            two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
+            d_twenty: "d20" => DiceRoll::new(1, 20, 0),
+            d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
+            two_d_four_minus_two: "2d4-2" => DiceRoll::new(2, 4, -2)
+        }
+
+        #[test]
+        fn roll_die() {
+            let mut die = Die::d20();
+            let range = NaturalI8::one()..=NaturalI8::one_hundred();
+            let mut rng = rand::thread_rng();
+
+            for _ in 1..1000 {
+                let rolled: NaturalI8 = die.roll_with(&mut rng);
+                assert!(range.contains(&rolled))
+            }
+        }
+
+        #[test]
+        #[traced_test]
+        fn rolls_sensible() {
+            let roll = DiceRoll::parse("2d20").expect("hard-coded");
+            let range = 2..=40;
+
+            for _ in 1..1000 {
+                let rolls = roll.clone().collect::<Vec<_>>();
+                let sum: i8 = rolls.iter().sum();
+                trace!(sum, ?rolls);
+                assert!(range.contains(&sum))
+            }
+        }
+
+        #[test]
+        #[traced_test]
+        fn rolls_sum_sensible() {
+            let roll = DiceRoll::parse("2d20+4").expect("hard-coded");
+            let range = 6..=44;
+            let extra = roll.extra;
+            
+            for _ in 1..2 {
+                let mut roll = roll.clone();
+                let sum: i8 = roll.total();
+                let rolls = roll.rolls();
+                trace!(sum, ?rolls, extra);
+                assert!(range.contains(&sum))
+            }
+        }
     }
 }

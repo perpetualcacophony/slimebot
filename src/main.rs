@@ -100,6 +100,7 @@ async fn main() {
                 cat(),
                 fox(),
                 minecraft(),
+                roll(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),

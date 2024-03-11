@@ -135,9 +135,11 @@ fn syllables(word: &str) -> usize {
 mod tests {
     mod haikus {
         macro_rules! test_haiku {
-            ($name:ident: $text:expr$(,)?) => {
+            ($(#[$m:meta])?
+             $name:ident: $text:expr$(,)?) => {
                 #[test]
                 #[tracing_test::traced_test]
+                $(#[$m])?
                 fn $name() {
                     assert!(
                         super::super::check_haiku($text).is_some()
@@ -164,14 +166,7 @@ mod tests {
 
         macro_rules! test_not_haiku {
             ($name:ident: $text:expr$(,)?) => {
-                #[test]
-                #[tracing_test::traced_test]
-                #[should_panic]
-                fn $name() {
-                    assert!(
-                        super::super::check_haiku($text).is_some()
-                    )
-                }
+                test_haiku!(#[should_panic] $name: $text);
             };
 
             ($name:ident: $text:expr, $($names:ident: $texts:expr),+$(,)?) => {
