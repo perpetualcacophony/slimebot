@@ -561,7 +561,10 @@ mod minecraft {
 pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     let mut roll = DiceRoll::parse(&text).unwrap();
 
-    let max = roll.dice[0].faces.get();
+    let rolls = roll.rolls();
+    let total = roll.total();
+
+    let max = roll.dice.next().unwrap().max();
 
     let extra = match roll.extra {
         n if n > 0 => format!(", *+{n}*"),
@@ -570,12 +573,10 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
         _ => unreachable!()
     };
     
-    let total: i8 = roll.total();
-    let roll_text: String = roll.rolls()
-        .into_iter()
+    let roll_text: String = rolls
         .map(|n| {
             match n.get() {
-                n if n == 1 || n == max => format!("__{n}__"),
+                n if n == 1 || n == max.get() => format!("__{n}__"),
                 _ => n.to_string()
             }
         })
@@ -602,9 +603,10 @@ pub async fn flip(ctx: Context<'_>, coins: u8)-> CommandResult {
 }
 
 mod roll {
-    use std::{default, num::{NonZeroI8, ParseIntError, TryFromIntError}, ops::Neg, str::FromStr};
+    use std::{default, iter::Sum, num::{NonZeroI8, ParseIntError, TryFromIntError}, ops::Neg, str::FromStr};
 
-    use rand::{rngs::ThreadRng, seq::IteratorRandom, Rng};
+    use mongodb::bson::raw::Iter;
+    use rand::{rngs::{StdRng, ThreadRng}, seq::IteratorRandom, Rng, SeedableRng};
     use regex::Regex;
     use serde::Deserialize;
     use thiserror::Error;
@@ -625,75 +627,156 @@ mod roll {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Die {
         pub faces: NaturalI8,
-        pub rolled: Option<NaturalI8>
     }
 
     impl Die {
         fn new(faces: NaturalI8) -> Self {
             Self {
                 faces,
-                rolled: None
             }
         }
 
-        fn roll(&mut self) -> NaturalI8 {
+        fn roll(&self) -> NaturalI8 {
             self.roll_with(&mut rand::thread_rng())
         }
 
-        fn roll_with(&mut self, rng: &mut impl Rng) -> NaturalI8 {
+        fn roll_with(&self, rng: &mut impl Rng) -> NaturalI8 {
             let range = 1..=self.faces.get();
             let roll = range.choose(rng)
                 .expect("should have at least one face")
                 .try_into()
                 .expect("faces is a valid NaturalI8");
-            self.rolled = Some(roll);
             roll
         }
 
         fn d20() -> Self {
             Self::new(NaturalI8::twenty())
         }
+
+        fn min(&self) -> NaturalI8 {
+            NaturalI8::min()
+        }
+
+        pub fn max(&self) -> NaturalI8 {
+            self.faces
+        }
     }
 
-    #[derive(Clone, Debug, PartialEq, Default)]
-    pub struct DiceRoll {
-        pub dice: Vec<Die>,
-        pub extra: i8,
+    #[derive(Debug, Clone, PartialEq, Default)]
+    pub struct Dice {
+        vec: Vec<Die>,
+        index: usize,
     }
 
-    impl Iterator for DiceRoll {
-        type Item = i8;
+    impl Dice {
+        pub fn new(count: NaturalI8, faces: NaturalI8) -> Self {
+            let vec = vec![Die::new(faces); count.into()];
+
+            Self {
+                vec,
+                index: 0
+            }
+        }
+
+        pub fn roll(&self, rng: StdRng) -> Roll<Self> {
+            Roll::new(self.clone(), rng)
+        }
+
+        pub fn len(&self) -> NaturalI8 {
+            ExactSizeIterator::len(self).try_into().expect("number of dice should not be 0")
+        }
+
+        fn min(&self) -> NaturalI8 {
+            self.len()
+        }
+
+        pub fn max(&self) -> NaturalI8 {
+            self.clone().fold(0, |sum, die| {
+                sum + die.max().get()
+            }).try_into().expect("number of dice != 0 and dice.min() == 1")
+        }
+    }
+
+    impl TryFrom<usize> for NaturalI8 {
+        type Error = NaturalI8Error;
+
+        fn try_from(value: usize) -> Result<Self, Self::Error> {
+            let int: i8 = value.try_into()?;
+            let non_zero: NonZeroI8 = int.try_into()?;
+
+            non_zero.try_into()
+        }
+    }
+
+    impl Iterator for Dice {
+        type Item = Die;
 
         fn next(&mut self) -> Option<Self::Item> {
-            let mut item = self.dice.iter_mut().find(|die| die.rolled.is_none());
-
-            item.as_mut().map(|die| die.roll());
-
-            item.map(|die| die.rolled.expect("die should have been rolled").get())
+            let item: Option<&Die> = self.vec.get(self.index);
+            self.index += 1;
+            item.copied()
         }
+    }
+
+    impl ExactSizeIterator for Dice {
+        fn len(&self) -> usize {
+            self.vec.len()
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Roll<It: Iterator<Item = Die>> {
+        iter: It,
+        rng: StdRng,
+    }
+
+    impl<It: Iterator<Item = Die>> Roll<It> {
+        fn new(iter: It, rng: StdRng) -> Self {
+            Self { iter, rng }
+        }
+
+        fn total(self, extra: i8) -> i8 {
+            self.sum::<i8>() + extra
+        }
+    }
+
+    impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
+        type Item = NaturalI8;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let die = self.iter.next();
+            die.map(|die| die.roll_with(&mut self.rng))
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct DiceRoll {
+        pub dice: Dice,
+        pub extra: i8,
+        rng: StdRng
     }
     
     impl DiceRoll {
-        pub fn new(count: usize, faces: i8, extra: i8) -> Result<Self, DiceRollError> {
+        pub fn new(count: i8, faces: i8, extra: i8) -> Result<Self, DiceRollError> {
             let faces = faces.try_into()?;
+            let count = count.try_into()?;
 
-            let dice = vec![Die::new(faces); count];
+            let dice = Dice::new(count, faces);
 
-            let new = Self { dice, extra };
+            let seed: [u8; 32] = rand::random();
+            let rng = StdRng::from_seed(seed);
+
+            let new = Self { dice, extra, rng };
             Ok(new)
         }
 
-        pub fn rolls(&self) -> Vec<NaturalI8> {
-            self.dice.iter().map(|die| {
-                die.rolled.unwrap()
-            }).collect()
+        pub fn rolls(&self) -> Roll<Dice> {
+            self.dice.roll(self.rng.clone())
         }
 
-        pub fn total(&mut self) -> i8 {
-            self.dice.iter_mut().fold(0, |sum, die| {
-                let rolled = die.roll().get();
-                sum + rolled
-            }) + self.extra
+        pub fn total(&self) -> i8 {
+            let sum = self.rolls().sum::<NaturalI8>();
+            sum.get() + self.extra
         }
 
         #[instrument]
@@ -731,7 +814,7 @@ mod roll {
                     }.unwrap_or_default();
                     debug!(?extra);
     
-                    DiceRoll::new(count.into(), faces.get(), extra)
+                    DiceRoll::new(count.get(), faces.get(), extra)
                 })
                 .expect("");
 
@@ -782,6 +865,15 @@ mod roll {
         }
     }
 
+    impl std::iter::Sum for NaturalI8 {
+        fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+            iter.map(|natural| natural.get())
+                .sum::<i8>()
+                .try_into()
+                .expect("sum of naturals must be natural")
+        }
+    }
+
     impl Default for NaturalI8 {
         fn default() -> Self {
             Self::min()
@@ -817,6 +909,13 @@ mod roll {
             } else {
                 Err(NaturalI8Error::ValueNegative(non_zero))
             }
+        }
+    }
+
+    impl Sum<NaturalI8> for i8 {
+        fn sum<I: Iterator<Item = NaturalI8>>(iter: I) -> Self {
+            iter.map(|natural| natural.get())
+                .sum()
         }
     }
     
@@ -907,8 +1006,8 @@ mod roll {
             let range = 2..=40;
 
             for _ in 1..1000 {
-                let rolls = roll.clone().collect::<Vec<_>>();
-                let sum: i8 = rolls.iter().sum();
+                let rolls = roll.rolls();
+                let sum: i8 = rolls.clone().sum();
                 trace!(sum, ?rolls);
                 assert!(range.contains(&sum))
             }
