@@ -111,6 +111,13 @@ impl Sum<NaturalI8> for i8 {
     }
 }
 
+impl Sum<NaturalI8> for i16 {
+    fn sum<I: Iterator<Item = NaturalI8>>(iter: I) -> Self {
+        iter.map(|natural| natural.get() as i16)
+            .sum()
+    }
+}
+
 impl FromStr for NaturalI8 {
     type Err = NaturalI8Error;
 
@@ -145,4 +152,10 @@ pub enum NaturalI8Error {
     TryFromZero(#[from] TryFromIntError),
     #[error("value `{0}` is negative")]
     ValueNegative(NonZeroI8)
+}
+
+impl From<NaturalI8> for i16 {
+    fn from(value: NaturalI8) -> Self {
+        value.get().into()
+    }
 }

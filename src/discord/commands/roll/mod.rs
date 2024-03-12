@@ -94,14 +94,14 @@ impl Dice {
     }
 
     #[instrument]
-    pub fn highest_roll(&self) -> NaturalI8 {
+    pub fn highest_roll(&self) -> i16 {
         let highest = self.clone().fold(0, |sum, die| {
-            sum + die.max().get()
+            sum + die.max().get() as i16
         });
 
         debug!(highest);
 
-        highest.try_into().expect("number of dice != 0 and dice.min() == 1")
+        highest
     }
 }
 
@@ -143,8 +143,8 @@ impl<It: Iterator<Item = Die>> Roll<It> {
         Self { iter, rng }
     }
 
-    fn total(self, extra: i8) -> i8 {
-        self.sum::<i8>() + extra
+    fn total(self, extra: i8) -> i16 {
+        self.sum::<i16>() + extra as i16
     }
 }
 
@@ -182,9 +182,9 @@ impl DiceRoll {
         self.dice.roll(self.rng.clone())
     }
 
-    pub fn total(&self) -> i8 {
-        let sum = self.rolls().sum::<NaturalI8>();
-        sum.get() + self.extra
+    pub fn total(&self) -> i16 {
+        let sum = self.rolls().sum::<i16>();
+        sum + self.extra as i16
     }
 
     #[instrument]
@@ -232,12 +232,13 @@ impl DiceRoll {
 
     }
 
-    pub fn min(&self) -> i8 {
-        self.dice.lowest_roll().get() + self.extra
+    pub fn min(&self) -> i16 {
+        self.dice.lowest_roll().get() as i16 + self.extra as i16
     }
 
-    pub fn max(&self) -> i8 {
-        self.dice.highest_roll().get() + self.extra
+    pub fn max(&self) -> i16 {
+        let highest: i16 = self.dice.highest_roll();
+        highest + self.extra as i16
     }
 }
 
@@ -275,7 +276,7 @@ mod tests {
 
     #[test]
     fn roll_die() {
-        let mut die = Die::d20();
+        let die = Die::d20();
         let range = NaturalI8::one()..=NaturalI8::twenty();
         let mut rng = rand::thread_rng();
 
@@ -307,8 +308,8 @@ mod tests {
         let extra = roll.extra;
         
         for _ in 1..2 {
-            let mut roll = roll.clone();
-            let sum: i8 = roll.total();
+            let roll = roll.clone();
+            let sum: i16 = roll.total();
             let rolls = roll.rolls();
             trace!(sum, ?rolls, extra);
             assert!(range.contains(&sum))

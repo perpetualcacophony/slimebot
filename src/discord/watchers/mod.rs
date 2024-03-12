@@ -172,8 +172,6 @@ pub async fn look_cl(http: &Http, new_message: &Message) {
 #[instrument(skip_all)]
 pub async fn watch_haiku(http: &Http, msg: &Message) {
     if let Some(haiku) = haiku::check_haiku(&msg.content) {
-        let reply = CreateMessage::new();
-
         let haiku = haiku.iter().map(|line| format!("> *{line}*")).collect::<Vec<_>>().join("\n");
 
         let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
