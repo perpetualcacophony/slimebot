@@ -1,12 +1,14 @@
-use std::{iter::Sum, num::{NonZeroI8, ParseIntError, TryFromIntError}, str::FromStr};
+use std::{
+    iter::Sum,
+    num::{NonZeroI8, ParseIntError, TryFromIntError},
+    str::FromStr,
+};
 
 use serde::Deserialize;
 use thiserror::Error;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 pub struct NaturalI8(NonZeroI8);
-
-
 
 impl NaturalI8 {
     pub fn new(value: NonZeroI8) -> Result<Self, NaturalI8Error> {
@@ -39,7 +41,7 @@ mod natural_consts {
                 ).expect(format!("{} >= 1", $num).as_str())
             }
         };
-    
+
         ($name:ident: $num:expr, $($names:ident: $nums:expr),+$(,)?) => {
             natural_const!($name: $num);
             natural_const! { $($names: $nums),+ }
@@ -106,15 +108,13 @@ impl TryFrom<i8> for NaturalI8 {
 
 impl Sum<NaturalI8> for i8 {
     fn sum<I: Iterator<Item = NaturalI8>>(iter: I) -> Self {
-        iter.map(|natural| natural.get())
-            .sum()
+        iter.map(|natural| natural.get()).sum()
     }
 }
 
 impl Sum<NaturalI8> for i16 {
     fn sum<I: Iterator<Item = NaturalI8>>(iter: I) -> Self {
-        iter.map(|natural| natural.get() as i16)
-            .sum()
+        iter.map(|natural| natural.get() as i16).sum()
     }
 }
 
@@ -151,7 +151,7 @@ pub enum NaturalI8Error {
     #[error("value cannot be zero")]
     TryFromZero(#[from] TryFromIntError),
     #[error("value `{0}` is negative")]
-    ValueNegative(NonZeroI8)
+    ValueNegative(NonZeroI8),
 }
 
 impl From<NaturalI8> for i16 {

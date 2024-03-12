@@ -1,6 +1,6 @@
 use mongodb::error;
-use thiserror::Error;
 use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
+use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 
 use crate::{roll::DiceRollError, Data};
@@ -32,7 +32,7 @@ pub enum UserError {
 #[derive(Debug, Error)]
 pub enum InputError {
     #[error(transparent)]
-    DiceRoll(#[from] DiceRollError)
+    DiceRoll(#[from] DiceRollError),
 }
 
 impl From<serenity::Error> for Error {
@@ -62,7 +62,7 @@ pub fn handle_framework_error(err: FrameworkError<'_, Data, Error>) -> BoxFuture
                 let _enter = span.enter();
 
                 handle_error(error, ctx).in_current_span().await;
-            },
+            }
             _ => {
                 poise::builtins::on_error(err).await;
             }
@@ -75,10 +75,10 @@ async fn handle_error(err: Error, ctx: Context<'_, Data, Error>) {
         Error::User(u) => {
             warn!(%u);
             ctx.reply(u.to_string()).await;
-        },
+        }
         Error::Bot(_) => {
             error!("{err}");
-        },
+        }
         _ => {
             error!("{err}");
         }

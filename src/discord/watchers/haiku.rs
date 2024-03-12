@@ -6,9 +6,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
     //let en_us = Standard::from_embedded(Language::EnglishUS).unwrap();
 
     let words = text.split_whitespace();
-    let parsed = words.clone().map(|word| {
-        syllables(word)
-    });
+    let parsed = words.clone().map(|word| syllables(word));
 
     let mut parsed = words.zip(parsed);
 
@@ -93,31 +91,33 @@ fn syllables(word: &str) -> usize {
         "cringe" => return 1,
         "alien" => return 3,
         "aliens" => return 3,
-        _ => ()
+        _ => (),
     }
 
     let mut last_letter: Option<char> = None;
 
     let mut vowels = Vec::new();
-    
+
     for letter in word.chars() {
         let last = last_letter.map(|ch| ch.to_lowercase().next().unwrap());
 
         let last_is_vowel = matches!(last, Some('a' | 'e' | 'i' | 'o' | 'u' | 'y'));
 
-        if matches!(letter.to_lowercase().to_string().as_str(), "a" | "e" | "i" | "o" | "u" | "y")
-            && !last_is_vowel {
-                vowels.push(letter)
-            }
+        if matches!(
+            letter.to_lowercase().to_string().as_str(),
+            "a" | "e" | "i" | "o" | "u" | "y"
+        ) && !last_is_vowel
+        {
+            vowels.push(letter)
+        }
 
-            last_letter.replace(letter);
+        last_letter.replace(letter);
     }
     //vowels.dedup();
 
     debug!(%word, ?vowels);
 
     if word.ends_with("ses") || word.ends_with("ces") {
-        
     } else if vowels.len() > 1 {
         if word.ends_with("es") || word.ends_with("ed") || word.ends_with("e") {
             if let Some('e') = vowels.last() {
@@ -175,11 +175,11 @@ mod tests {
             };
         }
 
-        test_not_haiku!{
+        test_not_haiku! {
             what: "what",
-        } 
+        }
     }
-    
+
     mod syllables {
         macro_rules! test_syllables {
             ($word:ident: $count:expr$(,)?) => {

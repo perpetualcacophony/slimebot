@@ -7,7 +7,7 @@ use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
 pub mod natural;
-use natural::{NaturalI8, NaturalI8Error, NaturalI8Constants};
+use natural::{NaturalI8, NaturalI8Constants, NaturalI8Error};
 
 use anyhow::anyhow;
 
@@ -32,9 +32,7 @@ pub struct Die {
 
 impl Die {
     fn new(faces: NaturalI8) -> Self {
-        Self {
-            faces,
-        }
+        Self { faces }
     }
 
     fn roll(&self) -> NaturalI8 {
@@ -43,7 +41,8 @@ impl Die {
 
     fn roll_with(&self, rng: &mut impl Rng) -> NaturalI8 {
         let range = 1..=self.faces.get();
-        let roll = range.choose(rng)
+        let roll = range
+            .choose(rng)
             .expect("should have at least one face")
             .try_into()
             .expect("faces is a valid NaturalI8");
@@ -73,10 +72,7 @@ impl Dice {
     pub fn new(count: NaturalI8, faces: NaturalI8) -> Self {
         let vec = vec![Die::new(faces); count.into()];
 
-        Self {
-            vec,
-            index: 0
-        }
+        Self { vec, index: 0 }
     }
 
     pub fn roll(&self, rng: StdRng) -> Roll<Self> {
@@ -84,7 +80,9 @@ impl Dice {
     }
 
     pub fn len(&self) -> NaturalI8 {
-        ExactSizeIterator::len(self).try_into().expect("number of dice should not be 0")
+        ExactSizeIterator::len(self)
+            .try_into()
+            .expect("number of dice should not be 0")
     }
 
     #[instrument]
@@ -95,9 +93,9 @@ impl Dice {
 
     #[instrument]
     pub fn highest_roll(&self) -> i16 {
-        let highest = self.clone().fold(0, |sum, die| {
-            sum + die.max().get() as i16
-        });
+        let highest = self
+            .clone()
+            .fold(0, |sum, die| sum + die.max().get() as i16);
 
         debug!(highest);
 
@@ -161,7 +159,7 @@ impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
 pub struct DiceRoll {
     pub dice: Dice,
     pub extra: i8,
-    rng: StdRng
+    rng: StdRng,
 }
 
 impl DiceRoll {
@@ -192,34 +190,41 @@ impl DiceRoll {
         let regex = Regex::new(r"([0-9]*)d([0-9]+)\s*(?:(\+|-)\s*([0-9]+))?")
             .expect("hard-coded regex should be valid");
 
-        let roll = regex.captures(text)
+        let roll = regex
+            .captures(text)
             .map(|caps| {
                 trace!(?caps);
 
-                let count = caps.get(1)
+                let count = caps
+                    .get(1)
                     .map_or(Ok(NaturalI8::default()), |mat| mat.as_str().parse())
                     .unwrap_or_default();
                 trace!(?count);
-                let faces: NaturalI8 = caps.get(2).ok_or(DiceRollError::NoFaces)?.as_str().parse()?;
+                let faces: NaturalI8 = caps
+                    .get(2)
+                    .ok_or(DiceRollError::NoFaces)?
+                    .as_str()
+                    .parse()?;
                 trace!(?faces);
 
-                let extra_unsigned = caps.get(4)
-                    .map(|mat| {
-                        let int = mat.as_str()
-                            .parse::<i8>()
-                            .map_err(|_| DiceRollError::InvalidExtra(mat.as_str().to_owned()));
+                let extra_unsigned = caps.get(4).map(|mat| {
+                    let int = mat
+                        .as_str()
+                        .parse::<i8>()
+                        .map_err(|_| DiceRollError::InvalidExtra(mat.as_str().to_owned()));
 
-                        int.unwrap_or_default()    
-                    });
+                    int.unwrap_or_default()
+                });
                 trace!(?extra_unsigned);
 
                 let extra_sign = caps.get(3).map_or("", |mat| mat.as_str());
 
                 let extra = match extra_sign {
                     "+" => extra_unsigned,
-                    "-" => extra_unsigned.map(|int|int.neg()),
+                    "-" => extra_unsigned.map(|int| int.neg()),
                     _ => None,
-                }.unwrap_or_default();
+                }
+                .unwrap_or_default();
                 debug!(?extra);
 
                 DiceRoll::new(count.get(), faces.get(), extra)
@@ -229,7 +234,6 @@ impl DiceRoll {
         debug!(?roll);
 
         Ok(roll?)
-
     }
 
     pub fn min(&self) -> i16 {
@@ -267,7 +271,7 @@ mod tests {
         };
     }
 
-    test_parse!{
+    test_parse! {
         two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
         d_twenty: "d20" => DiceRoll::new(1, 20, 0),
         d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
@@ -306,7 +310,7 @@ mod tests {
         let roll = DiceRoll::parse("2d20+4").expect("hard-coded");
         let range = 6..=44;
         let extra = roll.extra;
-        
+
         for _ in 1..2 {
             let roll = roll.clone();
             let sum: i16 = roll.total();

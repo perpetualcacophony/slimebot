@@ -32,7 +32,7 @@ pub async fn watch_fic(
         .message()
         .await?
         .await_component_interaction(ctx)    async fn _ping(ctx: Context<'_>) -> anyhow::Result<()> {
-        
+
     }
         .author_id(ctx.author().id)
         .await;

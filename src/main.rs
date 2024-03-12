@@ -19,7 +19,9 @@ mod db;
 mod errors;
 
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, CacheHttp, Event, GatewayIntents},
+    serenity_prelude::{
+        self as serenity, collect, futures::StreamExt, CacheHttp, Event, GatewayIntents,
+    },
     PrefixFrameworkOptions,
 };
 
@@ -149,11 +151,7 @@ async fn main() {
                     let config = &watchers_config;
                     let allowed = config.channel_allowed(msg.channel_id);
 
-                    async move {
-                        !msg.is_own(cache)
-                            && !msg.is_private()
-                            && allowed
-                    }
+                    async move { !msg.is_own(cache) && !msg.is_private() && allowed }
                 });
 
                 let messages_http = http.clone();
@@ -184,11 +182,8 @@ async fn main() {
                 })
                 .filter(move |reaction| {
                     let reaction = reaction.clone();
-                    
-                    async move {
-                        reaction.user_id != Some(bot_id)
-                            && reaction.guild_id.is_some()
-                    }
+
+                    async move { reaction.user_id != Some(bot_id) && reaction.guild_id.is_some() }
                 });
 
                 let config = data.config().clone();
