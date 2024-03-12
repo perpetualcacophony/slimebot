@@ -19,9 +19,7 @@ mod db;
 mod errors;
 
 use poise::{
-    serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, CacheHttp, Event, GatewayIntents,
-    },
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
 
@@ -71,9 +69,6 @@ impl Data {
         &self.db
     }
 }
-
-// i should replace this with anyhow::Error
-type Error = Box<dyn std::error::Error + Send + Sync>;
 
 type DiscordToken = String;
 
@@ -209,7 +204,10 @@ async fn main() {
                 trace!("finished setup, accepting commands");
 
                 if let Some(status_channel) = config.bot.status_channel() {
-                    status_channel.say(http, "ready!").await;
+                    status_channel
+                        .say(http, "ready!")
+                        .await
+                        .expect_or_log("failed to send status message");
                 }
 
                 Ok(data)

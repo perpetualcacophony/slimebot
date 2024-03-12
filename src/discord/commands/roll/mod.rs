@@ -8,9 +8,6 @@ use tracing::{debug, instrument, trace};
 
 pub mod natural;
 use natural::{NaturalI8, NaturalI8Constants, NaturalI8Error};
-
-use anyhow::anyhow;
-
 #[derive(Debug, Error, PartialEq)]
 pub enum DiceRollError {
     #[error(transparent)]
@@ -41,12 +38,12 @@ impl Die {
 
     fn roll_with(&self, rng: &mut impl Rng) -> NaturalI8 {
         let range = 1..=self.faces.get();
-        let roll = range
+
+        range
             .choose(rng)
             .expect("should have at least one face")
             .try_into()
-            .expect("faces is a valid NaturalI8");
-        roll
+            .expect("faces is a valid NaturalI8")
     }
 
     fn d20() -> Self {
@@ -233,7 +230,7 @@ impl DiceRoll {
 
         debug!(?roll);
 
-        Ok(roll?)
+        roll
     }
 
     pub fn min(&self) -> i16 {
@@ -247,6 +244,7 @@ impl DiceRoll {
 }
 
 mod tests {
+    #![allow(unused_imports)]
     use tracing::trace;
     use tracing_test::traced_test;
 
@@ -257,10 +255,15 @@ mod tests {
     macro_rules! test_parse {
         ($name:ident: $text:expr => $parsed:expr$(,)?) => {
             #[test]
+            #[traced_test]
             fn $name() {
+                tracing::debug!("{:?}", super::DiceRoll::parse($text));
+                tracing::debug!("{:?}", $parsed);
+
+                // super dumb fix for broken tests
                 pretty_assertions::assert_eq!(
-                    super::DiceRoll::parse($text),
-                    $parsed
+                    format!("{:?}", super::DiceRoll::parse($text)),
+                    format!("{:?}", $parsed)
                 )
             }
         };

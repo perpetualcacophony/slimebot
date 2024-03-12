@@ -1,17 +1,14 @@
 mod ban;
 mod watch_fic;
 
-use std::{num::{NonZeroI8, NonZeroU8}, ops::Neg, str::FromStr};
-
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use poise::{
     serenity_prelude::{
         futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
     },
     CreateReply,
 };
-use rand::{seq::IteratorRandom, Rng, SeedableRng};
-use regex::Regex;
+use rand::{Rng, SeedableRng};
 use serde::Deserialize;
 
 #[allow(unused_imports)]
@@ -25,7 +22,7 @@ type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::{discord::commands::roll::{natural::NaturalI8, DiceRoll}, errors, FormatDuration};
+use crate::{discord::commands::roll::DiceRoll, errors, FormatDuration};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -49,7 +46,12 @@ impl LogCommands for Context<'_> {
 
 /// bot will respond on successful execution
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command, discard_spare_arguments)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn ping(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
@@ -65,7 +67,13 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command, hide_in_help, discard_spare_arguments)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    hide_in_help,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn pong(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
@@ -82,7 +90,12 @@ pub async fn pong(ctx: Context<'_>) -> CommandResult {
 
 /// display a user's profile picture
 #[instrument(skip_all)]
-#[poise::command(prefix_command, slash_command, discard_spare_arguments)]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn pfp(
     ctx: Context<'_>,
     #[description = "the user to display the profile picture of - defaults to you"] user: Option<
@@ -240,7 +253,10 @@ pub async fn pfp(
 }
 
 #[instrument(skip(ctx))]
-#[poise::command(slash_command)]
+#[poise::command(
+    slash_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn echo(ctx: Context<'_>, channel: Option<Channel>, message: String) -> CommandResult {
     let id = match channel {
         Some(channel) => channel.id(),
@@ -292,7 +308,7 @@ pub async fn audio(
 }*/
 
 #[instrument(skip(ctx, user))]
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
 pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> CommandResult {
     if ctx.author().id == 497014954935713802 || user.id == 966519580266737715 {
         ban::joke_ban(ctx, ctx.author(), 966519580266737715, "sike".to_string()).await?;
@@ -304,7 +320,7 @@ pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Comman
 }
 
 #[instrument(skip(ctx))]
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
 pub async fn banban(ctx: Context<'_>) -> CommandResult {
     if ctx.author().id == 497014954935713802 {
         ban::joke_ban(
@@ -324,7 +340,7 @@ pub async fn banban(ctx: Context<'_>) -> CommandResult {
 }
 
 #[instrument(skip(ctx))]
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
 pub async fn uptime(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
@@ -387,7 +403,11 @@ pub async fn purge_after(ctx: Context<'_>, id: MessageId) -> CommandResult {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
@@ -399,12 +419,9 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
     let response = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random").await?;
 
     if response.status().is_server_error() {
-        ctx.reply("sorry, dog api is down!")
-            .await?;
+        ctx.reply("sorry, dog api is down!").await?;
 
-        return Err(
-            Error::Manual(anyhow!("dog api down"))
-        )
+        return Err(Error::Manual(anyhow!("dog api down")));
     }
 
     let image_url = response.json::<DogApiResponse>().await?.message;
@@ -424,7 +441,11 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
     ctx.log_command().await;
 
@@ -432,8 +453,8 @@ pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
         ("https://cataas.com/cat/gif", "cat.gif")
     } else {
         ("https://cataas.com/cat", "cat.jpg") // i don't know why this works
-        // but asserting all images, even png ones, as .jpg is... fine, i guess?
-        // thanks discord
+                                              // but asserting all images, even png ones, as .jpg is... fine, i guess?
+                                              // thanks discord
     };
 
     let response = reqwest::get(url).await?;
@@ -452,7 +473,11 @@ pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn fox(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
@@ -460,9 +485,11 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
     struct ApiResponse {
         image: String,
     }
-    
-    let json: ApiResponse = reqwest::get("https://randomfox.ca/floof/").await?
-        .json::<ApiResponse>().await?;
+
+    let json: ApiResponse = reqwest::get("https://randomfox.ca/floof/")
+        .await?
+        .json::<ApiResponse>()
+        .await?;
 
     let attachment = CreateAttachment::url(&ctx, &json.image).await?;
     let reply = CreateReply::default()
@@ -474,7 +501,6 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
 
     Ok(())
 }
-
 
 pub use minecraft::minecraft;
 mod minecraft {
@@ -523,7 +549,11 @@ mod minecraft {
     }
 
     #[instrument(skip_all)]
-    #[poise::command(slash_command, prefix_command)]
+    #[poise::command(
+        slash_command,
+        prefix_command,
+        required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+    )]
     pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> CommandResult {
         ctx.log_command().await;
 
@@ -560,7 +590,11 @@ mod minecraft {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     let mut roll = DiceRoll::parse(&text)?;
     let roll2 = roll.clone();
@@ -568,14 +602,14 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     let rolls = roll.rolls();
     let total = roll.total();
 
-    let faces = roll.dice.next().unwrap().faces;
+    let faces = roll.dice.next().expect("at least one die").faces;
 
     let total = if faces.get() == 1 || (faces.get() == 2 && rolls.clone().count() == 1) {
         total.to_string()
     } else {
         match total {
             t if t == roll2.clone().min() || t == roll2.clone().max() => format!("__{t}__"),
-            other => other.to_string()
+            other => other.to_string(),
         }
     };
 
@@ -588,21 +622,14 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
             #[allow(clippy::collapsible_else_if)]
             let roll_text = if faces.get() > 2 {
                 rolls
-                .map(|n| {
-                    match n.get() {
+                    .map(|n| match n.get() {
                         n if n == 1 || n == faces.get() => format!("__{n}__"),
-                        _ => n.to_string()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
+                        _ => n.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
             } else {
-                rolls
-                .map(|n| {
-                    n.to_string()
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
+                rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
             };
 
             format!("**{total}** ({roll_text})")
@@ -611,27 +638,20 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
         let extra = match roll.extra {
             n if n > 0 => format!(", +{n}"),
             n if n < 0 => format!(", {n}"),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         #[allow(clippy::collapsible_else_if)]
         let roll_text = if faces.get() > 2 {
             rolls
-            .map(|n| {
-                match n.get() {
+                .map(|n| match n.get() {
                     n if n == 1 || n == faces.get() => format!("__{n}__"),
-                    _ => n.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ")
+                    _ => n.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
         } else {
-            rolls
-            .map(|n| {
-                n.to_string()
-            })
-            .collect::<Vec<_>>()
-            .join(", ")
+            rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
         };
 
         format!("**{total}** ({roll_text}{extra})")
@@ -643,8 +663,13 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
 }
 
 #[instrument(skip_all)]
-#[poise::command(slash_command, prefix_command, discard_spare_arguments)]
-pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool)-> CommandResult {
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
     let coins = coins.map(|int| if int == 0 { 1 } else { int }).unwrap_or(1);
@@ -675,7 +700,7 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool)-> 
                 }
             } else {
                 tails += 1;
-                
+
                 if verbose {
                     results.push("tails")
                 }
@@ -689,7 +714,7 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool)-> 
         } else {
             "".to_owned()
         };
-        
+
         if verbose {
             format!("**{results_text}** {verbose_text}")
         } else {

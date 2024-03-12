@@ -4,7 +4,7 @@ use poise::serenity_prelude::{CacheHttp, CreateMessage, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{debug, info, instrument};
+use tracing::{info, instrument};
 
 use crate::FormatDuration;
 
@@ -180,6 +180,8 @@ pub async fn watch_haiku(http: &Http, msg: &Message) {
 
         let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
 
-        msg.reply(http, txt).await.unwrap();
+        msg.reply(http, txt)
+            .await
+            .expect("sending message should not fail");
     }
 }

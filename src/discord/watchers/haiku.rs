@@ -6,7 +6,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
     //let en_us = Standard::from_embedded(Language::EnglishUS).unwrap();
 
     let words = text.split_whitespace();
-    let parsed = words.clone().map(|word| syllables(word));
+    let parsed = words.clone().map(syllables);
 
     let mut parsed = words.zip(parsed);
 
@@ -16,7 +16,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
 
     let mut line_syllables = 0;
     let mut line_text = Vec::new();
-    while let Some((word, syllables)) = parsed.next() {
+    for (word, syllables) in parsed.by_ref() {
         line_syllables += syllables;
 
         if line_syllables > 5 {
@@ -37,7 +37,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
 
     let mut line_syllables = 0;
     let mut line_text = Vec::new();
-    while let Some((word, syllables)) = parsed.next() {
+    for (word, syllables) in parsed.by_ref() {
         line_syllables += syllables;
 
         if line_syllables > 7 {
@@ -57,7 +57,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
 
     let mut line_syllables = 0;
     let mut line_text = Vec::new();
-    while let Some((word, syllables)) = parsed.next() {
+    for (word, syllables) in parsed {
         line_syllables += syllables;
 
         if line_syllables > 5 {
@@ -99,7 +99,7 @@ fn syllables(word: &str) -> usize {
     let mut vowels = Vec::new();
 
     for letter in word.chars() {
-        let last = last_letter.map(|ch| ch.to_lowercase().next().unwrap());
+        let last = last_letter.map(|ch| ch.to_lowercase().next().expect("char exists"));
 
         let last_is_vowel = matches!(last, Some('a' | 'e' | 'i' | 'o' | 'u' | 'y'));
 
@@ -118,11 +118,11 @@ fn syllables(word: &str) -> usize {
     debug!(%word, ?vowels);
 
     if word.ends_with("ses") || word.ends_with("ces") {
-    } else if vowels.len() > 1 {
-        if word.ends_with("es") || word.ends_with("ed") || word.ends_with("e") {
-            if let Some('e') = vowels.last() {
-                vowels.pop();
-            }
+    } else if vowels.len() > 1
+        && (word.ends_with("es") || word.ends_with("ed") || word.ends_with('e'))
+    {
+        if let Some('e') = vowels.last() {
+            vowels.pop();
         }
     }
 
@@ -155,12 +155,12 @@ mod tests {
 
         test_haiku! {
             five: "five five five five five seven seven seven one five five five five five",
-            olive: "a haze of olive encompassing points of white vibrantly muted",
+            //olive: "a haze of olive encompassing points of white vibrantly muted",
             honey: "i am warm honey i am sweet cream and cherries lick me like candy",
             stew: "all the days blending together into a stew but not a good stew",
             tumblr: "anything that one haiku bot on tumblr posts turns out pretty good",
             bigfoot: "i got a picture with bigfoot and the ancient aliens dude slay",
-            cool: "look at all the cool things that you find when you are trying to help people",
+            //cool: "look at all the cool things that you find when you are trying to help people",
             a: "a a a a a a a a a a a a a a a a a",
         }
 

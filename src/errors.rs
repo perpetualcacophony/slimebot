@@ -1,7 +1,7 @@
-use mongodb::error;
 use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
 use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
+use tracing_unwrap::ResultExt;
 
 use crate::{roll::DiceRollError, Data};
 
@@ -57,14 +57,27 @@ pub fn handle_framework_error(err: FrameworkError<'_, Data, Error>) -> BoxFuture
     Box::pin(async {
         match err {
             FrameworkError::Command { error, ctx, .. } => {
-                let command = &ctx.command().name;
+                let command = ctx.invoked_command_name();
                 let span = error_span!("", command);
                 let _enter = span.enter();
 
                 handle_error(error, ctx).in_current_span().await;
             }
+            FrameworkError::MissingBotPermissions {
+                missing_permissions,
+                ctx,
+                ..
+            } => {
+                let command = ctx.invoked_command_name();
+                let span = error_span!("", command);
+                let _enter = span.enter();
+
+                error!(%missing_permissions, "bot is missing permissions");
+            }
             _ => {
-                poise::builtins::on_error(err).await;
+                poise::builtins::on_error(err)
+                    .await
+                    .expect_or_log("failed to handle framework error");
             }
         };
     })
@@ -74,7 +87,9 @@ async fn handle_error(err: Error, ctx: Context<'_, Data, Error>) {
     match err {
         Error::User(u) => {
             warn!(%u);
-            ctx.reply(u.to_string()).await;
+            ctx.reply(u.to_string())
+                .await
+                .expect_or_log("failed to send discord error message");
         }
         Error::Bot(_) => {
             error!("{err}");
