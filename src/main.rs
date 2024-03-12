@@ -16,8 +16,10 @@ mod config;
 
 mod db;
 
+mod errors;
+
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, CacheHttp, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
 
@@ -101,11 +103,13 @@ async fn main() {
                 fox(),
                 minecraft(),
                 roll(),
+                flip(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()
             },
+            on_error: errors::handle_framework_error,
             ..Default::default()
         })
         .setup(|ctx, ready, framework| {
@@ -190,9 +194,10 @@ async fn main() {
                 let config = data.config().clone();
                 let channel = config.bug_reports_channel().copied();
 
+                let react_http = http.clone();
                 if let Some(channel) = channel {
                     let reactions_task = reactions.for_each(move |reaction| {
-                        let http = http.clone();
+                        let http = react_http.clone();
 
                         trace!(?reaction.message_id, "reaction captured");
 
@@ -206,6 +211,12 @@ async fn main() {
                     tokio::spawn(reactions_task);
                 }
 
+                trace!("finished setup, accepting commands");
+
+                if let Some(status_channel) = config.bot.status_channel() {
+                    status_channel.say(http, "ready!").await;
+                }
+
                 Ok(data)
             })
         })
@@ -216,38 +227,6 @@ async fn main() {
         .await
         .expect("client should be valid");
 
-    trace!("discord framework set up");
-
-    /*let shards = client.shard_manager.clone();
-
-    tokio::spawn(async move {
-        loop {
-            let runners = shards.runners.clone();
-            let guard = runners.lock().await;
-
-            let shard = guard.get(&ShardId(0));
-            //debug!(?shard);
-
-            if let Some(shard) = shard {
-                if shard.stage == ConnectionStage::Connected {
-
-                    let messages = MessageCollector::new(shard);
-
-                    messages.stream().for_each(|msg| {
-
-                        let http = http.clone();
-                        let db = data.db.clone();
-
-                        async move {
-                            discord::watchers::vore(&http, &db, &msg).await;
-                        }
-                    }).await
-                }
-            }
-        }
-    });*/
-
-    trace!("discord framework started");
     client
         .start()
         .await

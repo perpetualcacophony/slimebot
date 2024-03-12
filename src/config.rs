@@ -32,6 +32,7 @@ pub struct BotConfig {
     testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
+    status_channel: Option<ChannelId>,
 }
 
 impl BotConfig {
@@ -101,6 +102,10 @@ impl BotConfig {
 
     pub fn prefix(&self) -> &str {
         &self.prefix
+    }
+
+    pub fn status_channel(&self) -> Option<ChannelId> {
+        self.status_channel
     }
 }
 
