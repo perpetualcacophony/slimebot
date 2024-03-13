@@ -2,6 +2,8 @@ mod ban;
 mod watch_fic;
 
 use anyhow::anyhow;
+use chrono::Utc;
+use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
         futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
@@ -11,6 +13,8 @@ use poise::{
 use rand::{Rng, SeedableRng};
 use serde::Deserialize;
 
+use tokio::time::Instant;
+use tracing::trace;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
@@ -22,7 +26,12 @@ type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::{discord::commands::roll::DiceRoll, errors, FormatDuration};
+use crate::{
+    discord::commands::roll::DiceRoll,
+    errors,
+    wordle::{DailyPuzzle, Game},
+    FormatDuration, UtcDateTime,
+};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -728,3 +737,115 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) ->
 }
 
 pub mod roll;
+
+pub mod wordle;
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn wordle(ctx: Context<'_>) -> CommandResult {
+    let typing = ctx.defer_or_broadcast().await?;
+
+    let puzzles = ctx.data().wordle.puzzles();
+
+    let words = &ctx.data().wordle.words;
+
+    let user = ctx.author().id;
+
+    // check if the user has a backlogged puzzle to play first
+    // is the previous puzzle backlogged?
+    let backlog = if let Ok(prev) = puzzles.previous().await? {
+        prev.is_backlogged(user).then_some(prev)
+
+    // if the previous puzzle isn't backlogged, then is the latest puzzle backlogged?
+    } else if let Some(latest) = puzzles.latest().await? {
+        if latest.is_backlogged(user) {
+            puzzles.new_puzzle(words).await?;
+            Some(latest)
+        } else {
+            None
+        }
+
+    // previous puzzle isn't backlogged, latest puzzle isn't backlogged, so no backlog
+    } else {
+        None
+    };
+
+    // play any backlogged puzzles first
+    let (title, puzzle) = if let Some(prev) = backlog {
+        trace!("playing backlogged puzzle");
+
+        (format!("wordle #{} (in backlog)", prev.number), Some(prev))
+
+    // if no backlogged puzzles, try to play latest puzzle
+    } else if let Some(mut latest) = puzzles.latest().await? {
+        trace!("requested latest puzzle");
+
+        // if the puzzle is old, create a new one
+        if latest.is_old() {
+            puzzles.new_puzzle(words).await?;
+        }
+
+        // update the puzzle to a new one if it's expired
+        if latest.is_expired() {
+            latest = puzzles.new_puzzle(words).await?;
+        }
+
+        // if puzzle hasn't already been completed, play it
+        if !latest.completed_by(user) {
+            trace!("playing latest puzzle");
+
+            (format!("wordle #{}", latest.number), Some(latest))
+
+        // if it's already completed, play a random puzzle
+        } else {
+            trace!("playing random puzzle");
+
+            ("free play".to_owned(), None)
+        }
+    // if there is no latest puzzle, create one and play it
+    } else {
+        let new = puzzles.new_puzzle(words).await?;
+        (format!("wordle #{}", new.number), Some(new))
+    };
+
+    let mut game = puzzle
+        .as_ref()
+        .map_or_else(|| Game::random(user, words), |puzzle| puzzle.play(user));
+
+    let handle = ctx.say(&title).await?;
+
+    debug!(game.answer);
+
+    drop(typing);
+
+    while let Some(msg) = ctx.channel_id().await_replies(ctx).stream().next().await {
+        let content = msg.content;
+
+        if words.contains(&content) {
+            game.guess(&content);
+            handle
+                .edit(
+                    ctx,
+                    CreateReply::default().content(format!("{title}\n{}", game.emoji())),
+                )
+                .await?;
+            debug!(guess = ?game.last_guess());
+
+            if game.won() {
+                ctx.say("you win!").await?;
+                break;
+            }
+        }
+    }
+
+    if let Some(puzzle) = puzzle {
+        puzzles.completed(puzzle.number, game).await?;
+    }
+
+    Ok(())
+}

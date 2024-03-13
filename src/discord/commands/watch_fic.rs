@@ -1,4 +1,4 @@
-use std::{fs, time::Duration};
+use std::time::Duration;
 
 use anyhow::{anyhow, bail};
 use poise::serenity_prelude::{Channel, Role};

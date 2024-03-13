@@ -3,7 +3,7 @@ use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{roll::DiceRollError, Data};
+use crate::{roll::DiceRollError, wordle, Data};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -21,6 +21,8 @@ pub enum BotError {
     Serenity(#[from] serenity::Error),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+    #[error("mongodb error: {0:#}")]
+    MongoDb(#[from] mongodb::error::Error),
 }
 
 #[derive(Debug, Error)]
@@ -53,6 +55,21 @@ impl From<DiceRollError> for Error {
     }
 }
 
+impl From<mongodb::error::Error> for Error {
+    fn from(value: mongodb::error::Error) -> Self {
+        Self::Bot(BotError::MongoDb(value))
+    }
+}
+
+impl From<wordle::Error> for Error {
+    fn from(value: wordle::Error) -> Self {
+        match value {
+            wordle::Error::MongoDb(err) => Self::Bot(BotError::MongoDb(err)),
+            _ => unimplemented!(),
+        }
+    }
+}
+
 pub fn handle_framework_error(err: FrameworkError<'_, Data, Error>) -> BoxFuture<()> {
     Box::pin(async {
         match err {
@@ -82,7 +99,6 @@ pub fn handle_framework_error(err: FrameworkError<'_, Data, Error>) -> BoxFuture
         };
     })
 }
-
 async fn handle_error(err: Error, ctx: Context<'_, Data, Error>) {
     match err {
         Error::User(u) => {
@@ -92,7 +108,7 @@ async fn handle_error(err: Error, ctx: Context<'_, Data, Error>) {
                 .expect_or_log("failed to send discord error message");
         }
         Error::Bot(_) => {
-            error!("{err}");
+            error!("{err:#}");
         }
         _ => {
             error!("{err}");

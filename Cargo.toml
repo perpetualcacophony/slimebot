@@ -22,7 +22,7 @@ anyhow = "1.0.74"
 chrono = { version = "0.4.31", default-features = false }
 config = { version = "0.13.3", default-features = false, features = ["toml"] }
 hyphenation = { version = "0.8.4", features = ["embed_en-us"] }
-mongodb = "2.8.0"
+mongodb = "2.8.1"
 openssl = { version = "0.10.62", features = ["vendored"] }
 poise = "0.6.1"
 rand = "0.8.5"
