@@ -4,6 +4,7 @@ edition = "2021"
 readme = "README.md"
 license = "AGPL-3.0"
 version = "1.6.2"
+build = "build.rs"
 
 [profile.release]
 strip = true
@@ -43,3 +44,6 @@ tracing-unwrap = { version = "0.10.0", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
+
+[build-dependencies]
+built = { version = "0.7.1", features = ["git2"] }

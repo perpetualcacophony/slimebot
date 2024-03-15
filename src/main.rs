@@ -125,6 +125,22 @@ type DiscordToken = String;
 async fn main() {
     logging::init_tracing();
 
+    let build = if built_info::DEBUG {
+        let branch = built_info::GIT_HEAD_REF
+            .map(|s| s.split('/').last().expect("head ref should have slashes"))
+            .unwrap_or("DETACHED");
+
+        format!(
+            "development branch {} (`{}`)",
+            branch,
+            built_info::GIT_COMMIT_HASH_SHORT.expect("should be built with a git repo")
+        )
+    } else {
+        format!("release {}", built_info::PKG_VERSION)
+    };
+
+    info!("{build}");
+
     let data = Data::new();
     let config = data.config.clone();
 
@@ -151,6 +167,7 @@ async fn main() {
                 roll(),
                 flip(),
                 d20(),
+                version(),
                 wordle(),
             ],
             prefix_options: PrefixFrameworkOptions {
@@ -324,6 +341,11 @@ impl FormatDuration for chrono::Duration {
 
         formatted
     }
+}
+
+mod built_info {
+    // The file has been placed there by the build script.
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 #[cfg(test)]

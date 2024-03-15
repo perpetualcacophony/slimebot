@@ -28,6 +28,7 @@ type CommandResult = Result<(), Error>;
 pub use watch_fic::watch_fic;
 
 use crate::{
+    built_info,
     discord::commands::roll::DiceRoll,
     errors::{self, InputError},
     roll::Die,
@@ -760,6 +761,33 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) ->
 
 pub mod roll;
 
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn version(ctx: Context<'_>) -> CommandResult {
+    let build = if built_info::DEBUG {
+        let branch = built_info::GIT_HEAD_REF
+            .map(|s| s.split('/').last().expect("head ref should have slashes"))
+            .unwrap_or("DETACHED");
+
+        format!(
+            "development branch {} (`{}`)",
+            branch,
+            built_info::GIT_COMMIT_HASH_SHORT.expect("should be built with a git repo")
+        )
+    } else {
+        format!("release {}", built_info::PKG_VERSION)
+    };
+
+    ctx.reply(build).await?;
+
+    Ok(())
+}
+
 pub mod wordle;
 
 #[instrument(skip_all)]
@@ -771,16 +799,6 @@ pub mod wordle;
     subcommands("display", "daily", "random")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
-    let amber = ctx
-        .data()
-        .wordle()
-        .puzzles()
-        .playable_for(393543391519965184.into())
-        .await?
-        .collect::<Vec<_>>();
-
-    debug!(?amber);
-
     let typing = ctx.defer_or_broadcast().await?;
 
     let dm = ctx.author().create_dm_channel(&ctx).await?;
