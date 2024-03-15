@@ -57,7 +57,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
 
     let mut line_syllables = 0;
     let mut line_text = Vec::new();
-    for (word, syllables) in parsed {
+    for (word, syllables) in parsed.by_ref() {
         line_syllables += syllables;
 
         if line_syllables > 5 {
@@ -77,7 +77,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
 
     debug!(total_syllables);
 
-    if total_syllables == 17 {
+    if total_syllables == 17 && parsed.next().is_none() {
         Some(vec![first_line, second_line, third_line])
     } else {
         None
@@ -177,6 +177,8 @@ mod tests {
 
         test_not_haiku! {
             what: "what",
+            birthday: "also it is my birthday because i fired my birthday beam and it created permanent birthday effect for me",
+            storm_drain: "gonna go explore that storm drain i was talking about (if i can get in)",
         }
     }
 
