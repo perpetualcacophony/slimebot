@@ -7,10 +7,12 @@ use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
-use discord::commands::wordle::{DailyGames, DailyPuzzles, WordsList};
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use mongodb::Database;
+
+pub mod games;
+use games::wordle::{DailyGames, DailyPuzzles, WordsList};
 
 /// Config file parsing and option access.
 mod config;
@@ -81,8 +83,8 @@ impl Data {
 
 #[derive(Debug, Clone)]
 struct WordleData {
-    answers: wordle::WordsList,
-    guesses: wordle::WordsList,
+    answers: WordsList,
+    guesses: WordsList,
     puzzles: DailyPuzzles,
     games: DailyGames,
 }
@@ -102,11 +104,11 @@ impl WordleData {
         }
     }
 
-    const fn answers(&self) -> &wordle::WordsList {
+    const fn answers(&self) -> &WordsList {
         &self.answers
     }
 
-    const fn guesses(&self) -> &wordle::WordsList {
+    const fn guesses(&self) -> &WordsList {
         &self.guesses
     }
 

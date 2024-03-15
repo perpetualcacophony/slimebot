@@ -32,7 +32,6 @@ use crate::{
     discord::commands::roll::DiceRoll,
     errors::{self, InputError},
     roll::Die,
-    wordle::{AsEmoji, Game},
     FormatDuration,
 };
 
@@ -516,7 +515,6 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
 
 pub use minecraft::minecraft;
 
-use self::wordle::DailyPuzzles;
 mod minecraft {
     use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};
@@ -788,7 +786,7 @@ pub async fn version(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-pub mod wordle;
+use crate::games::wordle::{self, *};
 
 #[instrument(skip_all)]
 #[poise::command(
