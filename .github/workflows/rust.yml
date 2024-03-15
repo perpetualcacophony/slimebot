@@ -15,12 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Install cargo-chef
-      run: cargo install cargo-chef
-    - name: Prepare
-      run: cargo chef prepare --recipe-path recipe.json
-    - name: Cook
-      run: cargo chef cook --recipe-path recipe.json
     - name: Build
       run: cargo build --verbose
     - name: Run tests
