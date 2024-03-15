@@ -3,19 +3,18 @@ use std::{
     collections::HashMap,
     fs,
     ops::{Index, IndexMut},
-    path::Display,
     slice::Iter,
     str::FromStr,
 };
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use chrono::Utc;
 use mongodb::{
-    bson::{bson, doc, Bson},
+    bson::doc,
     options::{FindOneOptions, FindOptions},
     Collection, Database,
 };
-use poise::serenity_prelude::{futures::StreamExt, model::user, FutureExt, UserId};
+use poise::serenity_prelude::{futures::StreamExt, UserId};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 

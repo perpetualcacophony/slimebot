@@ -1,28 +1,20 @@
 mod ban;
 mod watch_fic;
 
-use core::num;
-
 use anyhow::anyhow;
-use chrono::Utc;
-use mongodb::{
-    bson::doc,
-    options::{FindOneOptions, FindOptions},
-};
+use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::{stream, StreamExt},
-        ActionRowComponent, CacheHttp, Channel, ChannelId, CreateActionRow, CreateAttachment,
-        CreateButton, CreateInteractionResponse, CreateInteractionResponseFollowup,
+        futures::StreamExt, CacheHttp, Channel, ChannelId, CreateAttachment, CreateButton,
+        CreateInteractionResponse, CreateInteractionResponseFollowup,
         CreateInteractionResponseMessage, CreateMessage, EditMessage, Member, Message, MessageId,
-        ReactionType, ShardMessenger, User, UserId,
+        ReactionType, User,
     },
     CreateReply,
 };
 use rand::{Rng, SeedableRng};
 use serde::Deserialize;
 
-use tokio::time::error::Elapsed;
 use tracing::trace;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
@@ -38,8 +30,8 @@ pub use watch_fic::watch_fic;
 use crate::{
     discord::commands::roll::DiceRoll,
     errors::{self, InputError},
-    wordle::{AsEmoji, DailyPuzzle, Game},
-    FormatDuration, UtcDateTime,
+    wordle::{AsEmoji, Game},
+    FormatDuration,
 };
 
 trait LogCommands {

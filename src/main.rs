@@ -7,11 +7,10 @@ use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
-use discord::commands::wordle::{DailyGames, DailyPuzzle, DailyPuzzles, WordsList};
+use discord::commands::wordle::{DailyGames, DailyPuzzles, WordsList};
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
-use hyphenation::hyphenator::Word;
-use mongodb::{Collection, Database};
+use mongodb::Database;
 
 /// Config file parsing and option access.
 mod config;
