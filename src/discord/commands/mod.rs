@@ -30,6 +30,7 @@ pub use watch_fic::watch_fic;
 use crate::{
     discord::commands::roll::DiceRoll,
     errors::{self, InputError},
+    roll::Die,
     wordle::{AsEmoji, Game},
     FormatDuration,
 };
@@ -670,6 +671,24 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     };
 
     ctx.reply(text).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn d20(ctx: Context<'_>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
+
+    let die = Die::d20();
+    let rolled = die.roll().get();
+
+    ctx.reply(format!("**{rolled}**")).await?;
 
     Ok(())
 }

@@ -150,6 +150,7 @@ async fn main() {
                 minecraft(),
                 roll(),
                 flip(),
+                d20(),
                 wordle(),
             ],
             prefix_options: PrefixFrameworkOptions {
