@@ -8,12 +8,14 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::{anyhow, bail};
 use chrono::Utc;
 use mongodb::{
     bson::{bson, doc, Bson},
+    options::{FindOneOptions, FindOptions},
     Collection, Database,
 };
-use poise::serenity_prelude::{model::user, UserId};
+use poise::serenity_prelude::{futures::StreamExt, model::user, FutureExt, UserId};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 
@@ -61,7 +63,7 @@ impl FromStr for LetterState {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct Word {
+pub struct Word {
     word: Vec<char>,
     letters: HashMap<char, usize>,
 }
@@ -77,7 +79,7 @@ impl Word {
         for letter in word.iter() {
             if letters.contains_key(letter) {
                 if let Some(count) = letters.get_mut(letter) {
-                    *count -= 1
+                    *count += 1
                 };
             } else {
                 letters.insert(*letter, 1);
@@ -94,6 +96,8 @@ impl Word {
     fn guess(&self, word: &str) -> Guess {
         let mut guess: Guess = Guess::new(word);
         debug!(?guess);
+        debug!(answer = self.to_string());
+        debug!(answer = ?self.letters);
 
         let mut letters = self.letters.clone();
 
@@ -229,11 +233,13 @@ impl PartialEq<&str> for Guess {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Game {
     user: UserId,
-    pub answer: String,
     guesses: Vec<Guess>,
+    pub answer: Word,
+    pub started: StartTime,
+    pub number: Option<u32>,
 }
 
 //const WORDS: &str = include_str!("wordle.txt");
@@ -250,14 +256,15 @@ impl Game {
 
         Self {
             user,
-            answer: word,
             guesses: Vec::with_capacity(6),
+            answer: Word::new(&word),
+            started: StartTime::none(),
+            number: None,
         }
     }
 
     pub fn guess(&mut self, word: &str) {
-        let answer = Word::new(&self.answer);
-        let guess = answer.guess(word);
+        let guess = self.answer.guess(word);
         self.guesses.push(guess);
     }
 
@@ -265,20 +272,51 @@ impl Game {
         self.guesses.len()
     }
 
-    pub fn last_guess(&self) -> &Guess {
-        self.guesses
-            .last()
-            .expect("should have guessed at least once")
+    pub fn last_guess(&self) -> Option<&Guess> {
+        self.guesses.last()
     }
 
     pub fn won(&self) -> bool {
-        self.last_guess().all_correct()
+        self.last_guess().is_some_and(|g| g.all_correct())
     }
 
     pub fn emoji(&self) -> String {
         self.guesses
             .iter()
-            .fold(String::new(), |acc, guess| acc + "\n" + &guess.emoji())
+            .map(|guess| guess.as_emoji())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn results(&self) -> GameResult {
+        GameResult {
+            puzzle: self
+                .number
+                .expect("currently only supporting saving daily puzzles"),
+            user: self.user,
+            guesses: self.guesses.clone(),
+            num_guesses: self.guesses(),
+            completed: self.won(),
+        }
+    }
+
+    pub fn is_daily(&self) -> bool {
+        self.number.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct GameResult {
+    pub puzzle: u32,
+    user: UserId,
+    guesses: Vec<Guess>,
+    num_guesses: usize,
+    completed: bool,
+}
+
+impl AsEmoji for GameResult {
+    fn as_emoji(&self) -> Cow<str> {
+        self.guesses.as_emoji()
     }
 }
 
@@ -286,25 +324,49 @@ impl Game {
 pub struct DailyPuzzle {
     #[serde(rename = "_id")]
     pub number: u32,
-    pub started: UtcDateTime,
+    pub started: StartTime,
     answer: String,
-    completed: Vec<Game>,
+    finished: Vec<GameResult>,
 }
 
 impl DailyPuzzle {
     fn new(words: &WordsList, number: u32) -> Self {
-        let word = words.get_random().to_string();
+        let word = words.get_random().to_owned();
 
         Self {
             number,
-            started: Utc::now(),
+            started: StartTime::now(),
             answer: word,
             ..Default::default()
         }
     }
 
     pub fn play(&self, user: UserId) -> Game {
-        Game::from_word(user, &self.answer)
+        Game {
+            user,
+            guesses: Vec::with_capacity(6),
+            answer: Word::new(&self.answer),
+            started: self.started,
+            number: Some(self.number),
+        }
+    }
+
+    pub fn resume(&self, result: GameResult) -> Game {
+        Game {
+            user: result.user,
+            guesses: result.guesses,
+            answer: Word::new(&self.answer),
+            started: self.started,
+            number: Some(result.puzzle),
+        }
+    }
+
+    pub fn completed_by(&self, user: UserId) -> bool {
+        self.finished.iter().any(|game| game.user == user)
+    }
+
+    pub fn get_completion(&self, user: UserId) -> Option<&GameResult> {
+        self.finished.iter().find(|result| result.user == user)
     }
 
     fn completed(&mut self, completion: Game) {
@@ -314,31 +376,40 @@ impl DailyPuzzle {
             "completion should have the same answer"
         );
 
-        self.completed.push(completion);
+        self.finished.push(completion.results());
     }
 
-    pub fn completed_by(&self, user: UserId) -> bool {
-        self.completed.iter().any(|game| game.user == user)
-    }
-
-    #[instrument(skip_all)]
+    #[instrument(skip(self), fields(num = self.number))]
     pub fn is_old(&self) -> bool {
-        let time_since = Utc::now() - self.started;
-        debug!(hours = time_since.num_hours());
-        time_since.num_hours() >= PUZZLE_ACTIVE_HOURS && !self.is_expired()
+        self.started.is_old().map_or(false, |b| b) && !self.is_expired()
     }
 
+    #[instrument(skip(self), fields(num = self.number))]
     pub fn is_expired(&self) -> bool {
-        let time_since = Utc::now() - self.started;
-        time_since.num_hours() >= 2 * PUZZLE_ACTIVE_HOURS
+        self.started.is_expired().map_or(false, |b| b)
     }
 
+    #[instrument(skip(self), fields(num = self.number))]
     pub fn is_playable(&self, user: UserId) -> bool {
+        debug!(
+            expired = self.is_expired(),
+            completed = self.completed_by(user)
+        );
+
         !self.is_expired() && !self.completed_by(user)
     }
 
+    #[instrument(skip_all)]
     pub fn is_backlogged(&self, user: UserId) -> bool {
+        debug!(playable = self.is_playable(user), old = self.is_old());
+
         self.is_playable(user) && self.is_old()
+    }
+}
+
+impl PartialEq<String> for Word {
+    fn eq(&self, other: &String) -> bool {
+        &self.to_string() == other
     }
 }
 
@@ -379,23 +450,87 @@ impl From<&str> for Word {
 }
 
 #[derive(Debug, Clone)]
-pub struct DailyPuzzles(Collection<DailyPuzzle>);
+pub struct DailyGames {
+    collection: Collection<GameResult>,
+}
+
+impl DailyGames {
+    pub fn get(db: &Database) -> Self {
+        let collection = db.collection("wordle_daily_games");
+        Self { collection }
+    }
+
+    fn collection(&self) -> &Collection<GameResult> {
+        &self.collection
+    }
+
+    pub async fn find_daily(&self, user: UserId, puzzle: u32) -> DbResult<Option<GameResult>> {
+        self.collection()
+            .find_one(doc! { "user": user.to_string(), "puzzle": puzzle }, None)
+            .await
+    }
+
+    pub async fn save_game(&self, game: &Game) -> DbResult<Result<()>> {
+        let number = if let Some(n) = game.number {
+            n
+        } else {
+            return Ok(Err(anyhow!("test").into()));
+        };
+
+        if let Some(daily) = self.find_daily(game.user, number).await? {
+            self.collection()
+                .delete_one(
+                    doc! { "user": daily.user.to_string(), "puzzle": daily.puzzle },
+                    None,
+                )
+                .await?;
+        }
+
+        self.collection().insert_one(game.results(), None).await?;
+
+        Ok(Ok(()))
+    }
+
+    pub async fn find_uncompleted_daily(
+        &self,
+        user: UserId,
+        puzzle: u32,
+    ) -> DbResult<Option<GameResult>> {
+        self.collection()
+            .find_one(
+                doc! { "user": user.to_string(), "puzzle": puzzle, "completed": false },
+                None,
+            )
+            .await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyPuzzles {
+    collection: Collection<DailyPuzzle>,
+    pub words: WordsList,
+}
 
 impl DailyPuzzles {
-    pub fn get(db: &Database) -> Self {
-        let inner = db.collection("wordle_daily_puzzles");
-        Self(inner)
+    pub fn get(db: &Database, words: WordsList) -> Self {
+        let collection = db.collection("wordle_daily_puzzles");
+        Self { collection, words }
     }
 
     pub fn collection(&self) -> &Collection<DailyPuzzle> {
-        &self.0
+        &self.collection
     }
 
     pub async fn latest(&self) -> DbResult<Option<DailyPuzzle>> {
-        self.collection().find_one(None, None).await
+        self.collection()
+            .find_one(
+                None,
+                FindOneOptions::builder().sort(doc! { "_id": -1 }).build(),
+            )
+            .await
     }
 
-    pub async fn new_puzzle(&self, words: &WordsList) -> DbResult<DailyPuzzle> {
+    pub async fn new_puzzle(&self) -> DbResult<DailyPuzzle> {
         let latest = self.latest().await?;
 
         let number = if let Some(latest) = latest {
@@ -404,7 +539,7 @@ impl DailyPuzzles {
             1
         };
 
-        let puzzle = DailyPuzzle::new(words, number);
+        let puzzle = DailyPuzzle::new(&self.words, number);
 
         self.collection().insert_one(&puzzle, None).await?;
 
@@ -423,8 +558,7 @@ impl DailyPuzzles {
                 .await?
                 .expect("more than 1 puzzle, so previous puzzle should exist");
 
-            let time_since = Utc::now() - previous.started;
-            if time_since.num_hours() < 2 * PUZZLE_ACTIVE_HOURS {
+            if !previous.is_expired() {
                 Ok(previous)
             } else {
                 Err(Error::Expired(previous))
@@ -432,7 +566,9 @@ impl DailyPuzzles {
         })
     }
 
-    pub async fn completed(&self, number: u32, game: Game) -> DbResult<()> {
+    pub async fn completed(&self, game: Game) -> DbResult<()> {
+        let number = game.number.expect("scored game should have number");
+
         // extremely clunky fix - can't use update functions because of bson limitation
         let puzzle = self
             .collection()
@@ -453,9 +589,43 @@ impl DailyPuzzles {
 
         Ok(())
     }
+
+    pub async fn not_expired(&self) -> DbResult<Vec<DailyPuzzle>> {
+        let mut cursor = self
+            .collection()
+            .find(
+                None,
+                FindOptions::builder()
+                    .sort(doc! {"_id":-1})
+                    .limit(2)
+                    .build(),
+            )
+            .await?;
+
+        let mut vec = Vec::new();
+
+        while let Some(doc) = cursor.next().await {
+            let puzzle = doc?;
+
+            if !puzzle.is_expired() {
+                vec.push(puzzle)
+            }
+        }
+
+        Ok(vec)
+    }
+
+    pub async fn playable_for(&self, user: UserId) -> DbResult<impl Iterator<Item = DailyPuzzle>> {
+        Ok(self
+            .not_expired()
+            .await?
+            .into_iter()
+            .rev()
+            .filter(move |puzzle| !puzzle.completed_by(user)))
+    }
 }
 
-trait AsEmoji {
+pub trait AsEmoji {
     fn as_emoji(&self) -> Cow<str>;
 }
 
@@ -464,7 +634,47 @@ where
     T: AsEmoji,
 {
     fn as_emoji(&self) -> Cow<str> {
-        self.iter().map(|t| t.as_emoji()).collect::<String>().into()
+        self.iter()
+            .map(|t| t.as_emoji())
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into()
+    }
+}
+
+impl AsEmoji for Guess {
+    fn as_emoji(&self) -> Cow<str> {
+        self.emoji().into()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct StartTime(Option<UtcDateTime>);
+
+impl StartTime {
+    fn new(time: UtcDateTime) -> Self {
+        Self(Some(time))
+    }
+
+    fn now() -> Self {
+        Self(Some(Utc::now()))
+    }
+
+    fn none() -> Self {
+        Self(None)
+    }
+
+    pub fn age_hours(&self) -> Option<i64> {
+        self.0.map(|start| (Utc::now() - start).num_hours())
+    }
+
+    pub fn is_old(&self) -> Option<bool> {
+        self.age_hours().map(|age| age >= PUZZLE_ACTIVE_HOURS)
+    }
+
+    pub fn is_expired(&self) -> Option<bool> {
+        self.age_hours().map(|age| age >= 2 * PUZZLE_ACTIVE_HOURS)
     }
 }
 
@@ -493,5 +703,9 @@ mod tests {
 
         let guess = word.guess("handy");
         assert_eq!(guess, ".o...");
+
+        let word = Word::new("addra");
+        let guess = word.guess("opals");
+        assert_eq!(guess, "..o..")
     }
 }

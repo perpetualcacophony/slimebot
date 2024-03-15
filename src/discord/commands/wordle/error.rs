@@ -17,4 +17,6 @@ pub enum Error {
     OnlyOnePuzzle,
     #[error("mongodb error: {0:#}")]
     MongoDb(#[from] mongodb::error::Error),
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
 }

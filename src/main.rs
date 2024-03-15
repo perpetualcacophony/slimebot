@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
-use discord::commands::wordle::{DailyPuzzle, DailyPuzzles, WordsList};
+use discord::commands::wordle::{DailyGames, DailyPuzzle, DailyPuzzles, WordsList};
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use hyphenation::hyphenator::Word;
@@ -84,14 +84,20 @@ impl Data {
 struct WordleData {
     words: wordle::WordsList,
     puzzles: DailyPuzzles,
+    games: DailyGames,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
-        let puzzles = DailyPuzzles::get(db);
+        let puzzles = DailyPuzzles::get(db, words.clone());
+        let games = DailyGames::get(db);
 
-        Self { words, puzzles }
+        Self {
+            words,
+            puzzles,
+            games,
+        }
     }
 
     const fn words(&self) -> &wordle::WordsList {
@@ -100,6 +106,10 @@ impl WordleData {
 
     const fn puzzles(&self) -> &DailyPuzzles {
         &self.puzzles
+    }
+
+    const fn games(&self) -> &DailyGames {
+        &self.games
     }
 }
 

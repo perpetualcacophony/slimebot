@@ -1,19 +1,28 @@
 mod ban;
 mod watch_fic;
 
+use core::num;
+
 use anyhow::anyhow;
 use chrono::Utc;
-use mongodb::bson::doc;
+use mongodb::{
+    bson::doc,
+    options::{FindOneOptions, FindOptions},
+};
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
+        futures::{stream, StreamExt},
+        ActionRowComponent, CacheHttp, Channel, ChannelId, CreateActionRow, CreateAttachment,
+        CreateButton, CreateInteractionResponse, CreateInteractionResponseFollowup,
+        CreateInteractionResponseMessage, CreateMessage, EditMessage, Member, MessageId,
+        ReactionType, ShardMessenger, User, UserId,
     },
     CreateReply,
 };
 use rand::{Rng, SeedableRng};
 use serde::Deserialize;
 
-use tokio::time::Instant;
+use tokio::time::error::Elapsed;
 use tracing::trace;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
@@ -28,8 +37,8 @@ pub use watch_fic::watch_fic;
 
 use crate::{
     discord::commands::roll::DiceRoll,
-    errors,
-    wordle::{DailyPuzzle, Game},
+    errors::{self, InputError},
+    wordle::{AsEmoji, DailyPuzzle, Game},
     FormatDuration, UtcDateTime,
 };
 
@@ -512,6 +521,8 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
 }
 
 pub use minecraft::minecraft;
+
+use self::wordle::DailyPuzzles;
 mod minecraft {
     use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};
@@ -745,106 +756,343 @@ pub mod wordle;
     slash_command,
     prefix_command,
     discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
+    subcommands("display", "daily", "random")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
     let typing = ctx.defer_or_broadcast().await?;
 
+    let dm = ctx.author().create_dm_channel(&ctx).await?;
     let puzzles = ctx.data().wordle.puzzles();
 
-    let words = &ctx.data().wordle.words;
-
-    let user = ctx.author().id;
-
-    // check if the user has a backlogged puzzle to play first
-    // is the previous puzzle backlogged?
-    let backlog = if let Ok(prev) = puzzles.previous().await? {
-        prev.is_backlogged(user).then_some(prev)
-
-    // if the previous puzzle isn't backlogged, then is the latest puzzle backlogged?
-    } else if let Some(latest) = puzzles.latest().await? {
-        if latest.is_backlogged(user) {
-            puzzles.new_puzzle(words).await?;
-            Some(latest)
-        } else {
-            None
-        }
-
-    // previous puzzle isn't backlogged, latest puzzle isn't backlogged, so no backlog
+    if ctx.partial_guild().await.is_some() {
     } else {
-        None
-    };
+        let mut game = wordle_in_dm(ctx).await?;
+        drop(typing);
+        wordle_play(ctx, &mut game, dm.id).await?;
 
-    // play any backlogged puzzles first
-    let (title, puzzle) = if let Some(prev) = backlog {
-        trace!("playing backlogged puzzle");
-
-        (format!("wordle #{} (in backlog)", prev.number), Some(prev))
-
-    // if no backlogged puzzles, try to play latest puzzle
-    } else if let Some(mut latest) = puzzles.latest().await? {
-        trace!("requested latest puzzle");
-
-        // if the puzzle is old, create a new one
-        if latest.is_old() {
-            puzzles.new_puzzle(words).await?;
+        if game.won() && game.is_daily() {
+            puzzles.completed(game).await?;
         }
+    }
 
-        // update the puzzle to a new one if it's expired
-        if latest.is_expired() {
-            latest = puzzles.new_puzzle(words).await?;
-        }
+    Ok(())
+}
 
-        // if puzzle hasn't already been completed, play it
-        if !latest.completed_by(user) {
-            trace!("playing latest puzzle");
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn display(ctx: Context<'_>, puzzle: u32, user: Option<User>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
 
-            (format!("wordle #{}", latest.number), Some(latest))
+    let user = user.map_or_else(|| ctx.author().clone(), |user| user);
 
-        // if it's already completed, play a random puzzle
-        } else {
-            trace!("playing random puzzle");
+    let puzzle = ctx
+        .data()
+        .wordle()
+        .puzzles()
+        .collection()
+        .find_one(doc! { "_id": puzzle }, None)
+        .await?
+        .ok_or(InputError::Anyhow(anyhow!("that puzzle doesn't exist!")))?;
 
-            ("free play".to_owned(), None)
-        }
-    // if there is no latest puzzle, create one and play it
+    if let Some(result) = puzzle.get_completion(user.id) {
+        ctx.reply(format!(
+            "wordle #{} (`{}`)\n{}",
+            puzzle.number,
+            user.name,
+            result.as_emoji()
+        ))
+        .await?;
     } else {
-        let new = puzzles.new_puzzle(words).await?;
-        (format!("wordle #{}", new.number), Some(new))
-    };
+        Err(InputError::Anyhow(anyhow!(
+            "{} has not completed wordle #{}!",
+            user.name,
+            puzzle.number
+        )))?;
+    }
 
-    let mut game = puzzle
-        .as_ref()
-        .map_or_else(|| Game::random(user, words), |puzzle| puzzle.play(user));
+    Ok(())
+}
 
-    let handle = ctx.say(&title).await?;
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn daily(ctx: Context<'_>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
 
-    debug!(game.answer);
+    let dm = ctx.author().create_dm_channel(ctx).await?;
 
-    drop(typing);
-
-    while let Some(msg) = ctx.channel_id().await_replies(ctx).stream().next().await {
-        let content = msg.content;
-
-        if words.contains(&content) {
-            game.guess(&content);
-            handle
-                .edit(
-                    ctx,
-                    CreateReply::default().content(format!("{title}\n{}", game.emoji())),
-                )
+    if ctx
+        .data()
+        .wordle
+        .puzzles
+        .playable_for(ctx.author().id)
+        .await?
+        .next()
+        .is_none()
+    {
+        if let Some(latest) = ctx.data().wordle.puzzles.latest().await? {
+            if !latest.is_old() {
+                ctx.reply(format!(
+                    "you don't have a daily wordle ready yet! check back in {} hours",
+                    24 - latest.started.age_hours().unwrap()
+                ))
                 .await?;
-            debug!(guess = ?game.last_guess());
 
-            if game.won() {
-                ctx.say("you win!").await?;
-                break;
+                return Ok(());
             }
         }
     }
 
-    if let Some(puzzle) = puzzle {
-        puzzles.completed(puzzle.number, game).await?;
+    if ctx.guild_id().is_some() {
+        ctx.reply("daily wordle can't be played in servers - check your dms!")
+            .await?;
+    }
+
+    let mut game = wordle_in_dm(ctx).await?;
+    drop(_typing);
+    wordle_play(ctx, &mut game, dm.id).await?;
+
+    if game.won() && game.is_daily() {
+        ctx.data().wordle.puzzles.completed(game).await?;
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn random(ctx: Context<'_>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
+
+    let mut game = Game::random(ctx.author().id, ctx.data().wordle.words());
+    drop(_typing);
+    wordle_play(ctx, &mut game, ctx.channel_id()).await?;
+
+    Ok(())
+}
+
+async fn wordle_in_guild(ctx: Context<'_>) -> CommandResult {
+    Ok(())
+}
+
+async fn wordle_in_dm(ctx: Context<'_>) -> Result<wordle::Game, Error> {
+    let user = ctx.author().id;
+
+    let puzzles = ctx.data().wordle.puzzles();
+    let games = ctx.data().wordle.games();
+    let words = ctx.data().wordle.words();
+
+    let mut playable = puzzles.playable_for(user).await?;
+
+    let game = if let Some(puzzle) = playable.next() {
+        trace!(puzzle.number);
+
+        if let Some(unfinished) = games.find_uncompleted_daily(user, puzzle.number).await? {
+            puzzle.resume(unfinished)
+        } else {
+            puzzle.play(user)
+        }
+    } else if let Some(latest) = puzzles.latest().await? {
+        if latest.is_old() || latest.is_expired() {
+            puzzles.new_puzzle().await?.play(user)
+        } else {
+            Game::random(user, words)
+        }
+    } else {
+        puzzles.new_puzzle().await?.play(user)
+    };
+
+    /*
+    let game = if let Some(next) = puzzles.playable_for(user).await?.next() {
+        next.play(user)
+    } else if let Some(latest) = puzzles.latest().await? {
+        if let Some(unfinished) = ctx
+            .data()
+            .wordle
+            .games
+            .find_daily(user, latest.number)
+            .await?
+        {
+            latest.resume(unfinished)
+        } else if latest.is_old() {
+            puzzles.new_puzzle().await?.play(user)
+        } else {
+            Game::random(user, &puzzles.words)
+        }
+    } else {
+        puzzles.new_puzzle().await?.play(user)
+    };*/
+
+    Ok(game)
+}
+
+async fn wordle_play(ctx: Context<'_>, game: &mut Game, channel: ChannelId) -> CommandResult {
+    debug!(%game.answer);
+
+    let title = match game.started.is_old() {
+        None => "free play".to_owned(),
+        Some(true) => format!(
+            "wordle #{} (in backlog)",
+            game.number.expect("daily game has number")
+        ),
+        Some(false) => format!("wordle #{}", game.number.expect("daily game has number")),
+    };
+
+    let words = ctx.data().wordle.words();
+
+    let msg = CreateMessage::new()
+        .content(format!("{title}\nno guesses yet!"))
+        .button(if game.is_daily() {
+            CreateButton::new("pause")
+                .emoji(ReactionType::Unicode("⏸️".to_owned()))
+                .label("pause")
+                .style(poise::serenity_prelude::ButtonStyle::Primary)
+        } else {
+            CreateButton::new("cancel")
+                .emoji(ReactionType::Unicode("🚫".to_owned()))
+                .label("cancel")
+                .style(poise::serenity_prelude::ButtonStyle::Secondary)
+        })
+        .button(
+            CreateButton::new("give_up")
+                .emoji(ReactionType::Unicode("🏳️".to_owned()))
+                .label("give up")
+                .style(poise::serenity_prelude::ButtonStyle::Danger),
+        );
+
+    let mut game_message: poise::serenity_prelude::model::prelude::Message =
+        channel.send_message(&ctx, msg).await?;
+
+    let mut replies = channel.await_replies(ctx).stream();
+    let mut interactions = game_message.await_component_interactions(ctx).stream();
+
+    loop {
+        tokio::select! {
+            Some(msg) = replies.next() => {
+                let content = msg.content.as_str();
+
+                if content.len() == 5 {
+                    if words.contains(content) {
+                        msg
+                            .react(&ctx, ReactionType::Unicode("✅".to_owned()))
+                            .await?;
+
+                        game.guess(content);
+                        game_message.edit(
+                            ctx,
+                            EditMessage::new().content(format!(
+                                "{title} {}/6\n{}",
+                                game.guesses(),
+                                game.emoji()
+                            )),
+                        )
+                        .await?;
+                        debug!(guess = ?game.last_guess());
+
+                        if game.is_daily() {
+                            ctx.data()
+                                .wordle
+                                .games
+                                .save_game(game)
+                                .await?
+                                .expect("only saving daily games");
+                        }
+
+                        if game.won() {
+                            ctx.say("you win!").await?;
+                            break;
+                        }
+                    } else {
+                        msg
+                            .react(&ctx, ReactionType::Unicode("❓".to_owned()))
+                            .await?;
+                    }
+                } else if content.len() == 6 {
+                    msg
+                        .react(&ctx, ReactionType::Unicode("❌".to_owned()))
+                        .await?;
+
+                    msg
+                        .react(&ctx, ReactionType::Unicode("6️⃣".to_owned()))
+                        .await?;
+                }
+            }
+
+            Some(interaction) = interactions.next() => {
+                let blank_confirm = CreateInteractionResponseMessage::new()
+                    .button(
+                        CreateButton::new("yes")
+                            .emoji(ReactionType::Unicode("✅".to_owned()))
+                            .label("yes")
+                            .style(poise::serenity_prelude::ButtonStyle::Secondary),
+                    )
+                    .button(
+                        CreateButton::new("no")
+                            .emoji(ReactionType::Unicode("❌".to_owned()))
+                            .label("no")
+                            .style(poise::serenity_prelude::ButtonStyle::Secondary),
+                    );
+
+                match interaction.data.custom_id.as_str() {
+                    "cancel" => {
+                        let confirm_message = blank_confirm.content("really cancel?");
+                        interaction
+                            .create_response(ctx, CreateInteractionResponse::Message(confirm_message))
+                            .await?;
+
+                        let message = interaction.get_response(ctx).await?;
+
+                        if let Some(response) = message.await_component_interaction(ctx).await {
+                            if response.data.custom_id == "yes" {
+                                interaction.delete_response(ctx).await?;
+                                interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content("canceled!")).await?;
+                                break;
+                            } else {
+                                interaction.delete_response(ctx).await?;
+                            }
+                        }
+                    }
+                    "give_up" => {
+                        let confirm_message = blank_confirm.content("really give up?");
+                        interaction
+                            .create_response(ctx, CreateInteractionResponse::Message(confirm_message))
+                            .await?;
+
+                        let message = interaction.get_response(ctx).await?;
+
+                        if let Some(response) = message.await_component_interaction(ctx).await {
+                            if response.data.custom_id == "yes" {
+                                interaction.delete_response(ctx).await?;
+                                interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content(format!("the word was: {}", game.answer))).await?;
+                                break;
+                            } else {
+                                interaction.delete_response(ctx).await?;
+                            }
+                        }
+                    }
+                    "pause" => {
+                        interaction.create_response(ctx, CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content("your game has been saved - resume with `!!wordle daily`"))).await?;
+                        break;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
     }
 
     Ok(())

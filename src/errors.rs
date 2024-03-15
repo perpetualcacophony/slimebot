@@ -28,13 +28,15 @@ pub enum BotError {
 #[derive(Debug, Error)]
 pub enum UserError {
     #[error("invalid input: {0}")]
-    Input(InputError),
+    Input(#[from] InputError),
 }
 
 #[derive(Debug, Error)]
 pub enum InputError {
     #[error(transparent)]
     DiceRoll(#[from] DiceRollError),
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
 }
 
 impl From<serenity::Error> for Error {
@@ -67,6 +69,12 @@ impl From<wordle::Error> for Error {
             wordle::Error::MongoDb(err) => Self::Bot(BotError::MongoDb(err)),
             _ => unimplemented!(),
         }
+    }
+}
+
+impl From<InputError> for Error {
+    fn from(value: InputError) -> Self {
+        Error::User(UserError::Input(value))
     }
 }
 
