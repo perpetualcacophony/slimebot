@@ -240,6 +240,7 @@ pub struct Game {
     pub answer: Word,
     pub started: StartTime,
     pub number: Option<u32>,
+    pub ended: bool,
 }
 
 //const WORDS: &str = include_str!("wordle.txt");
@@ -260,6 +261,7 @@ impl Game {
             answer: Word::new(&word),
             started: StartTime::none(),
             number: None,
+            ended: false,
         }
     }
 
@@ -276,7 +278,7 @@ impl Game {
         self.guesses.last()
     }
 
-    pub fn won(&self) -> bool {
+    pub fn solved(&self) -> bool {
         self.last_guess().is_some_and(|g| g.all_correct())
     }
 
@@ -288,7 +290,7 @@ impl Game {
             .join("\n")
     }
 
-    fn results(&self) -> GameResult {
+    fn results(&self, ended: bool) -> GameResult {
         GameResult {
             puzzle: self
                 .number
@@ -296,7 +298,8 @@ impl Game {
             user: self.user,
             guesses: self.guesses.clone(),
             num_guesses: self.guesses(),
-            completed: self.won(),
+            solved: self.solved(),
+            ended,
         }
     }
 
@@ -311,7 +314,8 @@ pub struct GameResult {
     user: UserId,
     guesses: Vec<Guess>,
     num_guesses: usize,
-    completed: bool,
+    solved: bool,
+    ended: bool,
 }
 
 impl AsEmoji for GameResult {
@@ -348,6 +352,7 @@ impl DailyPuzzle {
             answer: Word::new(&self.answer),
             started: self.started,
             number: Some(self.number),
+            ended: false,
         }
     }
 
@@ -358,6 +363,7 @@ impl DailyPuzzle {
             answer: Word::new(&self.answer),
             started: self.started,
             number: Some(result.puzzle),
+            ended: false,
         }
     }
 
@@ -370,13 +376,15 @@ impl DailyPuzzle {
     }
 
     fn completed(&mut self, completion: Game) {
-        assert!(completion.won(), "game should be completed");
+        //assert!(completion.solved(), "game should be completed");
         assert!(
             completion.answer == self.answer,
             "completion should have the same answer"
         );
 
-        self.finished.push(completion.results());
+        let results = completion.results(true);
+
+        self.finished.push(results);
     }
 
     #[instrument(skip(self), fields(num = self.number))]
@@ -486,7 +494,9 @@ impl DailyGames {
                 .await?;
         }
 
-        self.collection().insert_one(game.results(), None).await?;
+        self.collection()
+            .insert_one(game.results(game.solved()), None)
+            .await?;
 
         Ok(Ok(()))
     }
@@ -590,6 +600,7 @@ impl DailyPuzzles {
         Ok(())
     }
 
+    #[instrument(skip_all, level = "trace")]
     pub async fn not_expired(&self) -> DbResult<Vec<DailyPuzzle>> {
         let mut cursor = self
             .collection()
@@ -608,7 +619,10 @@ impl DailyPuzzles {
             let puzzle = doc?;
 
             if !puzzle.is_expired() {
+                trace!("puzzle {} not expired", puzzle.number);
                 vec.push(puzzle)
+            } else {
+                trace!("puzzle {} expired", puzzle.number);
             }
         }
 

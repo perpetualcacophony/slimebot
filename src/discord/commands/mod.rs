@@ -14,7 +14,7 @@ use poise::{
         futures::{stream, StreamExt},
         ActionRowComponent, CacheHttp, Channel, ChannelId, CreateActionRow, CreateAttachment,
         CreateButton, CreateInteractionResponse, CreateInteractionResponseFollowup,
-        CreateInteractionResponseMessage, CreateMessage, EditMessage, Member, MessageId,
+        CreateInteractionResponseMessage, CreateMessage, EditMessage, Member, Message, MessageId,
         ReactionType, ShardMessenger, User, UserId,
     },
     CreateReply,
@@ -760,19 +760,89 @@ pub mod wordle;
     subcommands("display", "daily", "random")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
+    let amber = ctx
+        .data()
+        .wordle()
+        .puzzles()
+        .playable_for(393543391519965184.into())
+        .await?
+        .collect::<Vec<_>>();
+
+    debug!(?amber);
+
     let typing = ctx.defer_or_broadcast().await?;
 
     let dm = ctx.author().create_dm_channel(&ctx).await?;
     let puzzles = ctx.data().wordle.puzzles();
 
-    if ctx.partial_guild().await.is_some() {
-    } else {
-        let mut game = wordle_in_dm(ctx).await?;
-        drop(typing);
-        wordle_play(ctx, &mut game, dm.id).await?;
+    let mut playable = puzzles.playable_for(ctx.author().id).await?.peekable();
 
-        if game.won() && game.is_daily() {
-            puzzles.completed(game).await?;
+    let words = ctx.data().wordle().words();
+
+    let mut daily_button = CreateButton::new("daily")
+        .label("daily")
+        .emoji(ReactionType::Unicode("📅".to_owned()))
+        .style(poise::serenity_prelude::ButtonStyle::Primary);
+
+    daily_button = if playable.peek().is_some() {
+        daily_button
+    } else {
+        daily_button.disabled(true)
+    };
+
+    let menu_text = match playable.count() {
+        0 => "you don't have any daily wordles available. play a random game?",
+        1 => "you have 1 new daily wordle available!",
+        2 => "you have 2 new daily wordles available!",
+        _ => unreachable!(),
+    };
+
+    let menu = CreateMessage::new()
+        .content(menu_text)
+        .button(daily_button)
+        .button(
+            CreateButton::new("random")
+                .label("random")
+                .emoji(ReactionType::Unicode("🎲".to_owned()))
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        )
+        .button(
+            CreateButton::new("cancel")
+                .label("cancel")
+                .emoji(ReactionType::Unicode("🚫".to_owned()))
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        );
+
+    let menu = ctx.channel_id().send_message(ctx, menu).await?;
+
+    drop(typing);
+
+    if let Some(clicked) = menu.await_component_interaction(ctx).await {
+        match clicked.data.custom_id.as_str() {
+            "daily" => {
+                let typing = ctx.defer_or_broadcast().await?;
+                let mut game = wordle_in_dm(ctx).await?;
+                drop(typing);
+                wordle_play(ctx, &mut game, dm.id, Some(menu)).await?;
+
+                if game.is_daily() {
+                    puzzles.completed(game).await?;
+                }
+            }
+            "random" => {
+                let typing = ctx.defer_or_broadcast().await?;
+                let mut game = Game::random(ctx.author().id, words);
+                drop(typing);
+                wordle_play(ctx, &mut game, ctx.channel_id(), Some(menu)).await?;
+            }
+            "cancel" => {
+                clicked
+                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                    .await?;
+
+                menu.delete(ctx).await?;
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -860,9 +930,9 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
 
     let mut game = wordle_in_dm(ctx).await?;
     drop(_typing);
-    wordle_play(ctx, &mut game, dm.id).await?;
+    wordle_play(ctx, &mut game, dm.id, None).await?;
 
-    if game.won() && game.is_daily() {
+    if game.is_daily() {
         ctx.data().wordle.puzzles.completed(game).await?;
     }
 
@@ -881,12 +951,8 @@ pub async fn random(ctx: Context<'_>) -> CommandResult {
 
     let mut game = Game::random(ctx.author().id, ctx.data().wordle.words());
     drop(_typing);
-    wordle_play(ctx, &mut game, ctx.channel_id()).await?;
+    wordle_play(ctx, &mut game, ctx.channel_id(), None).await?;
 
-    Ok(())
-}
-
-async fn wordle_in_guild(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
@@ -941,7 +1007,12 @@ async fn wordle_in_dm(ctx: Context<'_>) -> Result<wordle::Game, Error> {
     Ok(game)
 }
 
-async fn wordle_play(ctx: Context<'_>, game: &mut Game, channel: ChannelId) -> CommandResult {
+async fn wordle_play(
+    ctx: Context<'_>,
+    game: &mut Game,
+    channel: ChannelId,
+    message: Option<Message>,
+) -> CommandResult {
     debug!(%game.answer);
 
     let title = match game.started.is_old() {
@@ -975,8 +1046,11 @@ async fn wordle_play(ctx: Context<'_>, game: &mut Game, channel: ChannelId) -> C
                 .style(poise::serenity_prelude::ButtonStyle::Danger),
         );
 
-    let mut game_message: poise::serenity_prelude::model::prelude::Message =
-        channel.send_message(&ctx, msg).await?;
+    if let Some(old) = message {
+        old.delete(ctx).await?;
+    }
+
+    let mut game_message = channel.send_message(&ctx, msg).await?;
 
     let mut replies = channel.await_replies(ctx).stream();
     let mut interactions = game_message.await_component_interactions(ctx).stream();
@@ -1013,7 +1087,7 @@ async fn wordle_play(ctx: Context<'_>, game: &mut Game, channel: ChannelId) -> C
                                 .expect("only saving daily games");
                         }
 
-                        if game.won() {
+                        if game.solved() {
                             ctx.say("you win!").await?;
                             break;
                         }
@@ -1077,6 +1151,7 @@ async fn wordle_play(ctx: Context<'_>, game: &mut Game, channel: ChannelId) -> C
 
                         if let Some(response) = message.await_component_interaction(ctx).await {
                             if response.data.custom_id == "yes" {
+                                game.ended = true;
                                 interaction.delete_response(ctx).await?;
                                 interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content(format!("the word was: {}", game.answer))).await?;
                                 break;
