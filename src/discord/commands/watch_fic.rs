@@ -1,11 +1,12 @@
-use std::{fs, time::Duration};
+use std::time::Duration;
 
 use anyhow::{anyhow, bail};
 use poise::serenity_prelude::{Channel, Role};
 use scraper::{Html, Selector};
 use tracing::{error, info, instrument};
 
-use crate::{Data, Error};
+use super::Error;
+use crate::Data;
 
 type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -15,7 +16,7 @@ pub async fn watch_fic(
     id: usize,
     channel: Channel,
     role: Role,
-) -> Result<(), Error> {
+) -> super::CommandResult {
     /*let reply = ctx
         .send(|f| {
             f.content("boop").components(|f| {
@@ -30,7 +31,9 @@ pub async fn watch_fic(
     let interaction = reply
         .message()
         .await?
-        .await_component_interaction(ctx)
+        .await_component_interaction(ctx)    async fn _ping(ctx: Context<'_>) -> anyhow::Result<()> {
+
+    }
         .author_id(ctx.author().id)
         .await;
     */
@@ -133,11 +136,12 @@ async fn get_chapter_ids(work_id: usize) -> Result<Vec<usize>, anyhow::Error> {
 // if i could work with an api, i probably *would* have this func call ao3
 // but. i can't. i think i've minimized ao3 calls to, like, 1 every loop
 fn store_chapter_count(work_id: usize, chapter_count: usize) -> Result<(), Error> {
-    fs::write(format!("works/{work_id}.len"), chapter_count.to_string())?;
+    //fs::write(format!("works/{work_id}.len"), chapter_count.to_string())?;
 
     Ok(())
 }
 
 fn read_chapter_count(work_id: usize) -> Result<usize, Error> {
-    Ok(fs::read_to_string(format!("works/{}.len", work_id))?.parse()?)
+    //Ok(fs::read_to_string(format!("works/{}.len", work_id))?.parse()?)
+    Ok(0)
 }
