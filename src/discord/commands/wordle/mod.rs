@@ -234,7 +234,7 @@ impl PartialEq<&str> for Guess {
 
 #[derive(Debug, Clone, Default)]
 pub struct Game {
-    user: UserId,
+    pub user: UserId,
     guesses: Vec<Guess>,
     pub answer: Word,
     pub started: StartTime,
