@@ -769,7 +769,7 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
 
     let mut playable = puzzles.playable_for(ctx.author().id).await?.peekable();
 
-    let words = ctx.data().wordle().words();
+    let answers = ctx.data().wordle().answers();
 
     let mut daily_button = CreateButton::new("daily")
         .label("daily")
@@ -823,7 +823,7 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
             }
             "random" => {
                 let typing = ctx.defer_or_broadcast().await?;
-                let mut game = Game::random(ctx.author().id, words);
+                let mut game = Game::random(ctx.author().id, answers);
                 drop(typing);
                 wordle_play(ctx, &mut game, ctx.channel_id(), Some(menu)).await?;
             }
@@ -941,7 +941,7 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
 pub async fn random(ctx: Context<'_>) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
-    let mut game = Game::random(ctx.author().id, ctx.data().wordle.words());
+    let mut game = Game::random(ctx.author().id, ctx.data().wordle.answers());
     drop(_typing);
     wordle_play(ctx, &mut game, ctx.channel_id(), None).await?;
 
@@ -953,7 +953,7 @@ async fn wordle_in_dm(ctx: Context<'_>) -> Result<wordle::Game, Error> {
 
     let puzzles = ctx.data().wordle.puzzles();
     let games = ctx.data().wordle.games();
-    let words = ctx.data().wordle.words();
+    let words = ctx.data().wordle.answers();
 
     let mut playable = puzzles.playable_for(user).await?;
 
@@ -1016,7 +1016,7 @@ async fn wordle_play(
         Some(false) => format!("wordle #{}", game.number.expect("daily game has number")),
     };
 
-    let words = ctx.data().wordle.words();
+    let guesses = ctx.data().wordle.guesses();
 
     let msg = CreateMessage::new()
         .content(format!("{title}\nno guesses yet!"))
@@ -1053,7 +1053,7 @@ async fn wordle_play(
                 let content = msg.content.as_str();
 
                 if content.len() == 5 {
-                    if words.contains(content) {
+                    if guesses.contains(content) {
                         msg
                             .react(&ctx, ReactionType::Unicode("✅".to_owned()))
                             .await?;
@@ -1080,7 +1080,8 @@ async fn wordle_play(
                         }
 
                         if game.solved() {
-                            ctx.say("you win!").await?;
+                            trace!("solved!");
+                            msg.reply(ctx, "you win!").await?;
                             break;
                         }
                     } else {

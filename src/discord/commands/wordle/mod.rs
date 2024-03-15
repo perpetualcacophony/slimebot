@@ -426,13 +426,28 @@ pub struct WordsList {
 }
 
 impl WordsList {
-    pub fn load() -> Self {
-        let file = fs::read_to_string("./wordle.txt").unwrap_or_else(|_| {
-            fs::read_to_string("/wordle.txt")
-                .expect("words should be at ./wordle.txt or /wordle.txt")
+    pub fn answers() -> Self {
+        let file = fs::read_to_string("./wordle_answers.txt").unwrap_or_else(|_| {
+            fs::read_to_string("/wordle_answers.txt")
+                .expect("words should be at ./wordle_answers.txt or /wordle_answers.txt")
         });
 
         let words = file.lines().map(|s| s.to_owned()).collect::<Vec<String>>();
+
+        Self { words }
+    }
+
+    pub fn guesses() -> Self {
+        let file = fs::read_to_string("./wordle_guesses.txt").unwrap_or_else(|_| {
+            fs::read_to_string("/wordle_guesses.txt")
+                .expect("words should be at ./wordle_guesses.txt or /wordle_guesses.txt")
+        });
+
+        let mut words = file.lines().map(|s| s.to_owned()).collect::<Vec<String>>();
+
+        let other = &mut WordsList::answers().words;
+
+        words.append(other);
 
         Self { words }
     }
@@ -517,13 +532,16 @@ impl DailyGames {
 #[derive(Debug, Clone)]
 pub struct DailyPuzzles {
     collection: Collection<DailyPuzzle>,
-    pub words: WordsList,
+    pub answers: WordsList,
 }
 
 impl DailyPuzzles {
     pub fn get(db: &Database, words: WordsList) -> Self {
         let collection = db.collection("wordle_daily_puzzles");
-        Self { collection, words }
+        Self {
+            collection,
+            answers: words,
+        }
     }
 
     pub fn collection(&self) -> &Collection<DailyPuzzle> {
@@ -548,7 +566,7 @@ impl DailyPuzzles {
             1
         };
 
-        let puzzle = DailyPuzzle::new(&self.words, number);
+        let puzzle = DailyPuzzle::new(&self.answers, number);
 
         self.collection().insert_one(&puzzle, None).await?;
 

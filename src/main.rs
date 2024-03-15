@@ -81,26 +81,33 @@ impl Data {
 
 #[derive(Debug, Clone)]
 struct WordleData {
-    words: wordle::WordsList,
+    answers: wordle::WordsList,
+    guesses: wordle::WordsList,
     puzzles: DailyPuzzles,
     games: DailyGames,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
-        let words = WordsList::load();
-        let puzzles = DailyPuzzles::get(db, words.clone());
+        let answers = WordsList::answers();
+        let guesses = WordsList::guesses();
+        let puzzles = DailyPuzzles::get(db, answers.clone());
         let games = DailyGames::get(db);
 
         Self {
-            words,
+            answers,
+            guesses,
             puzzles,
             games,
         }
     }
 
-    const fn words(&self) -> &wordle::WordsList {
-        &self.words
+    const fn answers(&self) -> &wordle::WordsList {
+        &self.answers
+    }
+
+    const fn guesses(&self) -> &wordle::WordsList {
+        &self.guesses
     }
 
     const fn puzzles(&self) -> &DailyPuzzles {
