@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
+use discord::commands::wordle::{DailyGames, DailyPuzzles, WordsList};
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use mongodb::Database;
@@ -36,6 +37,7 @@ pub struct Data {
     config: config::Config,
     db: Database,
     started: UtcDateTime,
+    wordle: WordleData,
 }
 
 impl Data {
@@ -54,10 +56,13 @@ impl Data {
 
         let started = Utc::now();
 
+        let wordle = WordleData::new(&db);
+
         Self {
             config,
             db,
             started,
+            wordle,
         }
     }
 
@@ -67,6 +72,43 @@ impl Data {
 
     const fn db(&self) -> &Database {
         &self.db
+    }
+
+    const fn wordle(&self) -> &WordleData {
+        &self.wordle
+    }
+}
+
+#[derive(Debug, Clone)]
+struct WordleData {
+    words: wordle::WordsList,
+    puzzles: DailyPuzzles,
+    games: DailyGames,
+}
+
+impl WordleData {
+    fn new(db: &Database) -> Self {
+        let words = WordsList::load();
+        let puzzles = DailyPuzzles::get(db, words.clone());
+        let games = DailyGames::get(db);
+
+        Self {
+            words,
+            puzzles,
+            games,
+        }
+    }
+
+    const fn words(&self) -> &wordle::WordsList {
+        &self.words
+    }
+
+    const fn puzzles(&self) -> &DailyPuzzles {
+        &self.puzzles
+    }
+
+    const fn games(&self) -> &DailyGames {
+        &self.games
     }
 }
 
@@ -101,6 +143,7 @@ async fn main() {
                 minecraft(),
                 roll(),
                 flip(),
+                wordle(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),

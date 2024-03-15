@@ -12,3 +12,5 @@
 
 /*.yaml
 !example-compose.yaml
+
+wordle.txt
