@@ -1,19 +1,19 @@
-FROM rust as builder
+FROM clux/muslrust:stable AS chef
+USER root
+RUN cargo install cargo-chef
+WORKDIR /app
 
-RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev libssl-dev
-RUN update-ca-certificates
-
-WORKDIR /build
+FROM chef AS planner
 COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-RUN cargo build --target x86_64-unknown-linux-musl --release
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
+COPY . .
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
-
-FROM alpine
-
-COPY --link --from=builder /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
-
+FROM alpine as runtime
+COPY --link --from=builder /app/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
 EXPOSE 443
-
 ENTRYPOINT ["slimebot"]
