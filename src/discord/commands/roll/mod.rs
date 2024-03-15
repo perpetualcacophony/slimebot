@@ -32,7 +32,7 @@ impl Die {
         Self { faces }
     }
 
-    fn roll(&self) -> NaturalI8 {
+    pub fn roll(&self) -> NaturalI8 {
         self.roll_with(&mut rand::thread_rng())
     }
 
@@ -46,7 +46,7 @@ impl Die {
             .expect("faces is a valid NaturalI8")
     }
 
-    fn d20() -> Self {
+    pub fn d20() -> Self {
         Self::new(NaturalI8::twenty())
     }
 

@@ -30,6 +30,7 @@ pub use watch_fic::watch_fic;
 use crate::{
     discord::commands::roll::DiceRoll,
     errors::{self, InputError},
+    roll::Die,
     wordle::{AsEmoji, Game},
     FormatDuration,
 };
@@ -681,6 +682,24 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
+pub async fn d20(ctx: Context<'_>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
+
+    let die = Die::d20();
+    let rolled = die.roll().get();
+
+    ctx.reply(format!("**{rolled}**")).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
 pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
@@ -769,7 +788,7 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
 
     let mut playable = puzzles.playable_for(ctx.author().id).await?.peekable();
 
-    let words = ctx.data().wordle().words();
+    let answers = ctx.data().wordle().answers();
 
     let mut daily_button = CreateButton::new("daily")
         .label("daily")
@@ -809,32 +828,45 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
 
     drop(typing);
 
-    if let Some(clicked) = menu.await_component_interaction(ctx).await {
-        match clicked.data.custom_id.as_str() {
-            "daily" => {
-                let typing = ctx.defer_or_broadcast().await?;
-                let mut game = wordle_in_dm(ctx).await?;
-                drop(typing);
-                wordle_play(ctx, &mut game, dm.id, Some(menu)).await?;
+    while let Some(clicked) = menu.await_component_interactions(ctx).stream().next().await {
+        if clicked.user.id == ctx.author().id {
+            match clicked.data.custom_id.as_str() {
+                "daily" => {
+                    let typing = ctx.defer_or_broadcast().await?;
+                    let mut game = wordle_in_dm(ctx).await?;
+                    drop(typing);
+                    wordle_play(ctx, &mut game, dm.id, Some(menu.clone())).await?;
 
-                if game.is_daily() {
-                    puzzles.completed(game).await?;
+                    if game.is_daily() {
+                        puzzles.completed(game).await?;
+                    }
                 }
-            }
-            "random" => {
-                let typing = ctx.defer_or_broadcast().await?;
-                let mut game = Game::random(ctx.author().id, words);
-                drop(typing);
-                wordle_play(ctx, &mut game, ctx.channel_id(), Some(menu)).await?;
-            }
-            "cancel" => {
-                clicked
-                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
-                    .await?;
+                "random" => {
+                    let typing = ctx.defer_or_broadcast().await?;
+                    let mut game = Game::random(ctx.author().id, answers);
+                    drop(typing);
+                    wordle_play(ctx, &mut game, ctx.channel_id(), Some(menu.clone())).await?;
+                }
+                "cancel" => {
+                    clicked
+                        .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                        .await?;
 
-                menu.delete(ctx).await?;
+                    menu.delete(ctx).await?;
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
+        } else {
+            clicked
+                .create_response(
+                    ctx,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .ephemeral(true)
+                            .content("you can't manage a game you didn't start!"),
+                    ),
+                )
+                .await?;
         }
     }
 
@@ -941,7 +973,7 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
 pub async fn random(ctx: Context<'_>) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
-    let mut game = Game::random(ctx.author().id, ctx.data().wordle.words());
+    let mut game = Game::random(ctx.author().id, ctx.data().wordle.answers());
     drop(_typing);
     wordle_play(ctx, &mut game, ctx.channel_id(), None).await?;
 
@@ -953,7 +985,7 @@ async fn wordle_in_dm(ctx: Context<'_>) -> Result<wordle::Game, Error> {
 
     let puzzles = ctx.data().wordle.puzzles();
     let games = ctx.data().wordle.games();
-    let words = ctx.data().wordle.words();
+    let words = ctx.data().wordle.answers();
 
     let mut playable = puzzles.playable_for(user).await?;
 
@@ -1016,7 +1048,7 @@ async fn wordle_play(
         Some(false) => format!("wordle #{}", game.number.expect("daily game has number")),
     };
 
-    let words = ctx.data().wordle.words();
+    let guesses = ctx.data().wordle.guesses();
 
     let msg = CreateMessage::new()
         .content(format!("{title}\nno guesses yet!"))
@@ -1053,7 +1085,7 @@ async fn wordle_play(
                 let content = msg.content.as_str();
 
                 if content.len() == 5 {
-                    if words.contains(content) {
+                    if guesses.contains(content) {
                         msg
                             .react(&ctx, ReactionType::Unicode("✅".to_owned()))
                             .await?;
@@ -1080,7 +1112,8 @@ async fn wordle_play(
                         }
 
                         if game.solved() {
-                            ctx.say("you win!").await?;
+                            trace!("solved!");
+                            msg.reply(ctx, "you win!").await?;
                             break;
                         }
                     } else {
@@ -1100,6 +1133,19 @@ async fn wordle_play(
             }
 
             Some(interaction) = interactions.next() => {
+                if interaction.user.id != game.user {
+                    interaction.create_response(
+                        ctx,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .ephemeral(true)
+                                .content("you can't manage a game you didn't start!"),
+                        ),
+                    )
+                    .await?;
+                    continue;
+                }
+
                 let blank_confirm = CreateInteractionResponseMessage::new()
                     .button(
                         CreateButton::new("yes")
@@ -1124,6 +1170,19 @@ async fn wordle_play(
                         let message = interaction.get_response(ctx).await?;
 
                         if let Some(response) = message.await_component_interaction(ctx).await {
+                            if response.user.id != game.user {
+                                response.create_response(
+                                    ctx,
+                                    CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .ephemeral(true)
+                                            .content("you can't manage a game you didn't start!"),
+                                    ),
+                                )
+                                .await?;
+                                continue;
+                            }
+
                             if response.data.custom_id == "yes" {
                                 interaction.delete_response(ctx).await?;
                                 interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content("canceled!")).await?;
@@ -1142,6 +1201,18 @@ async fn wordle_play(
                         let message = interaction.get_response(ctx).await?;
 
                         if let Some(response) = message.await_component_interaction(ctx).await {
+                            if response.user.id != game.user {
+                                response.create_response(
+                                    ctx,
+                                    CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .ephemeral(true)
+                                            .content("you can't manage a game you didn't start!"),
+                                    ),
+                                ).await?;
+                                continue;
+                            }
+
                             if response.data.custom_id == "yes" {
                                 game.ended = true;
                                 interaction.delete_response(ctx).await?;
