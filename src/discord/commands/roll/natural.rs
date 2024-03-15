@@ -37,7 +37,7 @@ mod natural_consts {
         ($name:ident: $num:expr$(,)?) => {
             fn $name() -> NaturalI8 {
                 NaturalI8::new(
-                    NonZeroI8::new(1).expect(format!("{} != 0", $num).as_str())
+                    NonZeroI8::new($num).expect(format!("{} != 0", $num).as_str())
                 ).expect(format!("{} >= 1", $num).as_str())
             }
         };
@@ -157,5 +157,17 @@ pub enum NaturalI8Error {
 impl From<NaturalI8> for i16 {
     fn from(value: NaturalI8) -> Self {
         value.get().into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NaturalI8, NaturalI8Constants};
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn twenty() {
+        let twenty = NaturalI8::twenty();
+        assert_eq!(twenty.get(), 20)
     }
 }
