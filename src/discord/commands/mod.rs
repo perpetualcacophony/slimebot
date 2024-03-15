@@ -1176,7 +1176,7 @@ async fn wordle_play(
                             .emoji(ReactionType::Unicode("❌".to_owned()))
                             .label("no")
                             .style(poise::serenity_prelude::ButtonStyle::Secondary),
-                    );
+                    ).ephemeral(true);
 
                 match interaction.data.custom_id.as_str() {
                     "cancel" => {
@@ -1188,25 +1188,9 @@ async fn wordle_play(
                         let message = interaction.get_response(ctx).await?;
 
                         if let Some(response) = message.await_component_interaction(ctx).await {
-                            if response.user.id != game.user {
-                                response.create_response(
-                                    ctx,
-                                    CreateInteractionResponse::Message(
-                                        CreateInteractionResponseMessage::new()
-                                            .ephemeral(true)
-                                            .content("you can't manage a game you didn't start!"),
-                                    ),
-                                )
-                                .await?;
-                                continue;
-                            }
-
                             if response.data.custom_id == "yes" {
-                                interaction.delete_response(ctx).await?;
                                 interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content("canceled!")).await?;
                                 break;
-                            } else {
-                                interaction.delete_response(ctx).await?;
                             }
                         }
                     }
@@ -1219,25 +1203,10 @@ async fn wordle_play(
                         let message = interaction.get_response(ctx).await?;
 
                         if let Some(response) = message.await_component_interaction(ctx).await {
-                            if response.user.id != game.user {
-                                response.create_response(
-                                    ctx,
-                                    CreateInteractionResponse::Message(
-                                        CreateInteractionResponseMessage::new()
-                                            .ephemeral(true)
-                                            .content("you can't manage a game you didn't start!"),
-                                    ),
-                                ).await?;
-                                continue;
-                            }
-
                             if response.data.custom_id == "yes" {
                                 game.ended = true;
-                                interaction.delete_response(ctx).await?;
                                 interaction.create_followup(ctx, CreateInteractionResponseFollowup::new().content(format!("the word was: {}", game.answer))).await?;
                                 break;
-                            } else {
-                                interaction.delete_response(ctx).await?;
                             }
                         }
                     }
