@@ -12,7 +12,7 @@ use discord::commands::*;
 use mongodb::Database;
 
 pub mod games;
-use games::wordle::{DailyGames, DailyPuzzles, WordsList};
+use games::wordle::{DailyWordles, WordsList};
 
 /// Config file parsing and option access.
 mod config;
@@ -83,41 +83,24 @@ impl Data {
 
 #[derive(Debug, Clone)]
 struct WordleData {
-    answers: WordsList,
-    guesses: WordsList,
-    puzzles: DailyPuzzles,
-    games: DailyGames,
+    words: WordsList,
+    wordles: DailyWordles,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
-        let answers = WordsList::answers();
-        let guesses = WordsList::guesses();
-        let puzzles = DailyPuzzles::get(db, answers.clone());
-        let games = DailyGames::get(db);
+        let words = WordsList::load();
+        let wordles = DailyWordles::new(db);
 
-        Self {
-            answers,
-            guesses,
-            puzzles,
-            games,
-        }
+        Self { words, wordles }
     }
 
-    const fn answers(&self) -> &WordsList {
-        &self.answers
+    const fn words(&self) -> &WordsList {
+        &self.words
     }
 
-    const fn guesses(&self) -> &WordsList {
-        &self.guesses
-    }
-
-    const fn puzzles(&self) -> &DailyPuzzles {
-        &self.puzzles
-    }
-
-    const fn games(&self) -> &DailyGames {
-        &self.games
+    const fn wordles(&self) -> &DailyWordles {
+        &self.wordles
     }
 }
 

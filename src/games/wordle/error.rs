@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::DailyPuzzle;
+use super::puzzle::DailyPuzzle;
 
 #[derive(Debug, Error)]
 pub enum Error {

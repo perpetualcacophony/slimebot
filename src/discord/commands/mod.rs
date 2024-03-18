@@ -21,7 +21,7 @@ use tracing::{debug, error, info, instrument};
 
 //type Error = Box<dyn std::error::Error + Send + Sync>;
 type Error = errors::Error;
-type Context<'a> = poise::Context<'a, crate::Data, Error>;
+pub type Context<'a> = poise::Context<'a, crate::Data, Error>;
 
 type CommandResult = Result<(), Error>;
 
@@ -794,10 +794,15 @@ use crate::games::wordle::{self, *};
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("display", "daily", "random")
+    //subcommands("display", "daily", "random")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
-    let typing = ctx.defer_or_broadcast().await?;
+    let words = ctx.data().wordle.words();
+    let dailies = ctx.data().wordle.wordles();
+
+    crate::games::wordle::play(ctx, false, words.clone(), dailies.clone(), true).await?;
+
+    /*let typing = ctx.defer_or_broadcast().await?;
 
     let dm = ctx.author().create_dm_channel(&ctx).await?;
     let puzzles = ctx.data().wordle.puzzles();
@@ -884,11 +889,12 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
                 )
                 .await?;
         }
-    }
+    }*/
 
     Ok(())
 }
 
+/*
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -1220,3 +1226,4 @@ async fn wordle_play(
 
     Ok(())
 }
+*/

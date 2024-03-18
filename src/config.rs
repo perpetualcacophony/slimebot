@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
@@ -13,6 +15,7 @@ pub struct Config {
     pub db: DbConfig,
     pub watchers: WatchersConfig,
     pub bug_reports: Option<BugReportsConfig>,
+    pub wordle: Option<WordleConfig>,
 }
 
 impl Config {
@@ -194,4 +197,10 @@ impl BugReportsConfig {
     fn channel(&self) -> &ChannelId {
         &self.channel
     }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WordleConfig {
+    pub guesses_file: String,
+    pub answers_file: String,
 }

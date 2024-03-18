@@ -2,7 +2,9 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fs,
-    ops::{Index, IndexMut},
+    future::Future,
+    ops::{Index, IndexMut, Not},
+    path::Path,
     slice::Iter,
     str::FromStr,
 };
@@ -14,322 +16,54 @@ use mongodb::{
     options::{FindOneOptions, FindOptions},
     Collection, Database,
 };
-use poise::serenity_prelude::{futures::StreamExt, UserId};
+use poise::{
+    serenity_prelude::{
+        futures::{Stream, StreamExt, TryFutureExt, TryStreamExt},
+        CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
+        CreateInteractionResponse, CreateInteractionResponseFollowup,
+        CreateInteractionResponseMessage, CreateMessage, EditMessage, Http, Interaction, Message,
+        ReactionType, ShardMessenger, UserId,
+    },
+    Context, CreateReply,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 
-use crate::UtcDateTime;
+use crate::{config::WordleConfig, UtcDateTime};
 
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 pub use error::Error;
 
+mod core;
+use core::{AsEmoji, Guess, Word};
+
 use mongodb::error::Error as MongoDbError;
 
+mod puzzle;
+use puzzle::Puzzle;
+
 type DbResult<T> = std::result::Result<T, MongoDbError>;
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, crate::errors::Error>;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub enum LetterState {
-    #[default]
-    NotPresent,
-    WrongPlace,
-    Correct,
-}
-
-impl LetterState {
-    fn emoji(&self) -> &'static str {
-        match self {
-            Self::Correct => "🟩",    // green square
-            Self::WrongPlace => "🟨", // yellow square
-            Self::NotPresent => "⬛", // black square
-        }
-    }
-}
-
-impl FromStr for LetterState {
-    type Err = ();
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(match s {
-            "O" => Self::Correct,
-            "o" => Self::WrongPlace,
-            "." => Self::NotPresent,
-            _ => Self::default(),
-        })
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Word {
-    word: Vec<char>,
-    letters: HashMap<char, usize>,
-}
-
-impl Word {
-    fn new(word: &str) -> Self {
-        let word = word.to_lowercase().chars().collect::<Vec<char>>();
-
-        assert!(word.len() == 5);
-
-        let mut letters: HashMap<char, usize> = HashMap::new();
-
-        for letter in word.iter() {
-            if letters.contains_key(letter) {
-                if let Some(count) = letters.get_mut(letter) {
-                    *count += 1
-                };
-            } else {
-                letters.insert(*letter, 1);
-            }
-        }
-
-        Self { word, letters }
-    }
-
-    fn iter(&self) -> Iter<'_, char> {
-        self.word.iter()
-    }
-
-    fn guess(&self, word: &str) -> Guess {
-        let mut guess: Guess = Guess::new(word);
-        debug!(?guess);
-        debug!(answer = self.to_string());
-        debug!(answer = ?self.letters);
-
-        let mut letters = self.letters.clone();
-
-        for (index, letter) in guess.clone().iter().copied().enumerate() {
-            if self[index] == letter {
-                guess.correct_at(index);
-                let count = letters.get_mut(&letter).expect("word has letter");
-                *count = count.saturating_sub(1);
-            }
-        }
-
-        debug!(word, r = ?letters.get_mut(&'r'));
-        debug!(word, o = ?letters.get_mut(&'o'));
-
-        for (index, letter) in guess.clone().iter().copied().enumerate() {
-            if letters.get(&letter).is_some_and(|count| *count > 0) {
-                trace!("{letter}: wrong place");
-
-                guess.has_letter_at(index);
-                *letters.get_mut(&letter).expect("word has letter") -= 1;
-            }
-        }
-
-        guess
-    }
-}
-
-impl std::fmt::Display for Word {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.word.iter().collect::<String>())
-    }
-}
-
-impl IntoIterator for Word {
-    type Item = char;
-    type IntoIter = std::vec::IntoIter<char>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.word.into_iter()
-    }
-}
-
-impl Index<usize> for Word {
-    type Output = char;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        self.word.index(index)
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Guess {
-    word: Vec<(char, LetterState)>,
-}
-
-impl Guess {
-    fn new(word: &str) -> Self {
-        let word = word
-            .to_lowercase()
-            .chars()
-            .map(|ch: char| (ch, LetterState::default()))
-            .collect::<Vec<(char, LetterState)>>();
-
-        Self { word }
-    }
-
-    fn correct_at(&mut self, index: usize) {
-        self[index].1 = LetterState::Correct;
-    }
-
-    fn has_letter_at(&mut self, index: usize) {
-        self[index].1 = LetterState::WrongPlace;
-    }
-
-    fn all_correct(&self) -> bool {
-        for letter in &self.word {
-            if letter.1 != LetterState::Correct {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    fn iter(&self) -> impl Iterator<Item = &char> + '_ {
-        self.word.iter().map(|letter| &letter.0)
-    }
-
-    pub fn emoji(&self) -> String {
-        self.word
-            .iter()
-            .fold(String::new(), |acc, (_, letter)| acc + letter.emoji())
-    }
-}
-
-impl Index<usize> for Guess {
-    type Output = (char, LetterState);
-
-    fn index(&self, index: usize) -> &Self::Output {
-        self.word.index(index)
-    }
-}
-
-impl IndexMut<usize> for Guess {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.word.index_mut(index)
-    }
-}
-
-impl ToString for LetterState {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Correct => "O",
-            Self::WrongPlace => "o",
-            Self::NotPresent => ".",
-        }
-        .to_owned()
-    }
-}
-
-impl ToString for Guess {
-    fn to_string(&self) -> String {
-        self.word
-            .iter()
-            .map(|letter| letter.1.to_string())
-            .collect()
-    }
-}
-
-impl PartialEq<&str> for Guess {
-    fn eq(&self, other: &&str) -> bool {
-        &self.to_string() == other
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Game {
-    pub user: UserId,
-    guesses: Vec<Guess>,
-    pub answer: Word,
-    pub started: StartTime,
-    pub number: Option<u32>,
-    pub ended: bool,
-}
-
-//const WORDS: &str = include_str!("wordle.txt");
-
-impl Game {
-    pub fn random(user: UserId, words: &WordsList) -> Self {
-        Self::from_word(user, words.get_random())
-    }
-
-    pub fn from_word(user: UserId, word: impl Into<String>) -> Self {
-        let word = word.into();
-
-        assert!(word.len() == 5);
-
-        Self {
-            user,
-            guesses: Vec::with_capacity(6),
-            answer: Word::new(&word),
-            started: StartTime::none(),
-            number: None,
-            ended: false,
-        }
-    }
-
-    pub fn guess(&mut self, word: &str) {
-        let guess = self.answer.guess(word);
-        self.guesses.push(guess);
-    }
-
-    pub fn guesses(&self) -> usize {
-        self.guesses.len()
-    }
-
-    pub fn last_guess(&self) -> Option<&Guess> {
-        self.guesses.last()
-    }
-
-    pub fn solved(&self) -> bool {
-        self.last_guess().is_some_and(|g| g.all_correct())
-    }
-
-    pub fn emoji(&self) -> String {
-        self.guesses
-            .iter()
-            .map(|guess| guess.as_emoji())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    fn results(&self, ended: bool) -> GameResult {
-        GameResult {
-            puzzle: self
-                .number
-                .expect("currently only supporting saving daily puzzles"),
-            user: self.user,
-            guesses: self.guesses.clone(),
-            num_guesses: self.guesses(),
-            solved: self.solved(),
-            ended,
-        }
-    }
-
-    pub fn is_daily(&self) -> bool {
-        self.number.is_some()
-    }
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GameResult {
-    pub puzzle: u32,
-    user: UserId,
-    guesses: Vec<Guess>,
-    num_guesses: usize,
-    solved: bool,
-    ended: bool,
-}
-
-impl AsEmoji for GameResult {
-    fn as_emoji(&self) -> Cow<str> {
-        self.guesses.as_emoji()
-    }
-}
-
+/*
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DailyPuzzle {
     #[serde(rename = "_id")]
     pub number: u32,
     pub started: StartTime,
     answer: String,
-    finished: Vec<GameResult>,
+    finished: Vec<WordleResults>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct WordleResults {
+    user: UserId,
+    guesses: Vec<Guess>,
+    num_guesses: usize,
+    solved: bool,
+    ended: bool,
 }
 
 impl DailyPuzzle {
@@ -462,12 +196,6 @@ impl WordsList {
         self.words
             .choose(&mut rand::thread_rng())
             .expect("words list should not be empty")
-    }
-}
-
-impl From<&str> for Word {
-    fn from(value: &str) -> Self {
-        Word::new(value)
     }
 }
 
@@ -656,29 +384,6 @@ impl DailyPuzzles {
     }
 }
 
-pub trait AsEmoji {
-    fn as_emoji(&self) -> Cow<str>;
-}
-
-impl<T> AsEmoji for Vec<T>
-where
-    T: AsEmoji,
-{
-    fn as_emoji(&self) -> Cow<str> {
-        self.iter()
-            .map(|t| t.as_emoji())
-            .collect::<Vec<_>>()
-            .join("\n")
-            .into()
-    }
-}
-
-impl AsEmoji for Guess {
-    fn as_emoji(&self) -> Cow<str> {
-        self.emoji().into()
-    }
-}
-
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct StartTime(Option<UtcDateTime>);
@@ -708,35 +413,695 @@ impl StartTime {
         self.age_hours().map(|age| age >= 2 * PUZZLE_ACTIVE_HOURS)
     }
 }
+*/
 
-#[cfg(test)]
-mod tests {
-    use super::Word;
-    use pretty_assertions::assert_eq;
-    use tracing_test::traced_test;
+use rand::prelude::SliceRandom;
 
-    #[test]
-    #[traced_test]
-    fn win() {
-        let word = Word::new("amber");
-        assert!(word.guess("amber").all_correct())
+#[derive(Debug, Clone)]
+pub struct WordsList {
+    guesses: Vec<String>,
+    answers: Vec<String>,
+}
+
+impl WordsList {
+    pub fn load(/*cfg: WordleConfig*/) -> Self {
+        let guesses = fs::read_to_string("./wordle/guesses.txt")
+            .unwrap_or_else(|_| {
+                fs::read_to_string("/wordle/guesses.txt")
+                    .expect("guesses should be at ./wordle/guesses.txt or /wordle/guesses.txt")
+            })
+            .lines()
+            .map(|s| s.to_owned())
+            .collect::<Vec<String>>();
+
+        assert!(!guesses.is_empty(), "guesses file should not be empty");
+
+        let answers = fs::read_to_string("./wordle/answers.txt")
+            .unwrap_or_else(|_| {
+                fs::read_to_string("/wordle/answers.txt")
+                    .expect("answers should be at ./wordle/answers.txt or /wordle/answers.txt")
+            })
+            .lines()
+            .map(|s| s.to_owned())
+            .collect::<Vec<String>>();
+
+        Self { guesses, answers }
     }
 
-    #[test]
-    #[traced_test]
-    fn display() {
-        let word = Word::new("amber");
-        let guess = word.guess("amber");
-        assert_eq!(guess, "OOOOO");
+    pub fn random_answer(&self) -> Word {
+        let word = self
+            .answers
+            .choose(&mut rand::thread_rng())
+            .expect("file should not be empty");
 
-        let guess = word.guess("arbor");
-        assert_eq!(guess, "O.O.O");
-
-        let guess = word.guess("handy");
-        assert_eq!(guess, ".o...");
-
-        let word = Word::new("addra");
-        let guess = word.guess("opals");
-        assert_eq!(guess, "..o..")
+        Word::from_str(word).expect("file should contain only valid (5-letter) words")
     }
+
+    pub fn valid_guess(&self, guess: &str) -> bool {
+        self.guesses.contains(&guess.to_owned()) || self.answers.contains(&guess.to_owned())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyWordles {
+    collection: Collection<DailyWordle>,
+}
+
+impl DailyWordles {
+    pub fn new(db: &Database) -> Self {
+        Self {
+            collection: db.collection("daily_wordles"),
+        }
+    }
+
+    pub async fn latest(&self) -> DbResult<Option<DailyWordle>> {
+        Ok(self
+            .collection
+            .find_one(
+                None,
+                FindOneOptions::builder()
+                    .sort(doc! { "puzzle.number": -1 })
+                    .build(),
+            )
+            .await?
+            .filter(|puzzle| !puzzle.is_expired()))
+    }
+
+    pub async fn new_daily(&self, word: &Word) -> DbResult<DailyWordle> {
+        let latest_number = self.latest().await?.map_or(0, |daily| daily.puzzle.number);
+
+        let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, word.clone());
+        let wordle = DailyWordle::new(puzzle);
+
+        self.collection.insert_one(&wordle, None).await?;
+
+        Ok(wordle)
+    }
+
+    pub async fn update(&self, puzzle: u32, game: GameState) -> DbResult<()> {
+        let user = mongodb::bson::ser::to_bson(&game.user).expect("implements serialize");
+        let game = mongodb::bson::ser::to_bson(&game).expect("implements serialize");
+
+        if self
+            .collection
+            .find_one(
+                doc! {
+                    "puzzle.number": puzzle,
+                    "games": { "$elemMatch": { "user": &user } }
+                },
+                None,
+            )
+            .await?
+            .is_some()
+        {
+            trace!("game exists in db");
+
+            self.collection
+                .update_one(
+                    doc! {
+                        "puzzle.number": puzzle,
+                        "games": { "$elemMatch": { "user": &user } }
+                    },
+                    doc! { "$set": { "games.$": game } },
+                    None,
+                )
+                .await?;
+        } else {
+            trace!("game does not exist in db");
+
+            self.collection
+                .update_one(
+                    doc! { "puzzle.number": puzzle },
+                    doc! { "$addToSet": {
+                        "games": game
+                    } },
+                    None,
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn not_expired(&self) -> DbResult<Vec<DailyWordle>> {
+        let mut vec = Vec::with_capacity(2);
+
+        let mut cursor = self
+            .collection
+            .find(
+                None,
+                FindOptions::builder()
+                    .sort(doc! { "puzzle.number":1 })
+                    .limit(2)
+                    .build(),
+            )
+            .await?;
+
+        while let Some(daily) = cursor.next().await {
+            if daily.as_ref().is_ok_and(|daily| daily.is_expired().not()) {
+                vec.push(daily?);
+            }
+        }
+
+        Ok(vec)
+    }
+
+    async fn playable_for(&self, user: UserId) -> DbResult<impl Iterator<Item = DailyWordle>> {
+        Ok(self
+            .not_expired()
+            .await?
+            .into_iter()
+            .filter(move |daily| daily.is_playable_for(user)))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyWordle {
+    puzzle: puzzle::DailyPuzzle,
+    games: Vec<GameState>,
+}
+
+impl DailyWordle {
+    fn new(puzzle: puzzle::DailyPuzzle) -> Self {
+        Self {
+            puzzle,
+            games: Vec::new(),
+        }
+    }
+
+    pub fn age_hours(&self) -> i64 {
+        let age = Utc::now() - self.puzzle.started;
+        age.num_hours()
+    }
+
+    pub fn is_recent(&self) -> bool {
+        self.age_hours() < 24
+    }
+
+    pub fn is_old(&self) -> bool {
+        self.age_hours() < 48 && !self.is_recent()
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.age_hours() >= 48
+    }
+
+    pub fn is_completed_by(&self, user: UserId) -> bool {
+        self.games.iter().any(|game| game.user == user)
+    }
+
+    pub fn is_playable_for(&self, user: UserId) -> bool {
+        self.is_expired().not() && self.is_completed_by(user).not()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameState {
+    user: UserId,
+    guesses: Vec<Guess>,
+}
+
+impl GameState {
+    fn new(owner: UserId, guesses: &Vec<Guess>) -> Self {
+        Self {
+            user: owner,
+            guesses: guesses.clone(),
+        }
+    }
+}
+
+impl AsEmoji for GameState {
+    fn as_emoji(&self) -> Cow<str> {
+        self.guesses.as_emoji()
+    }
+
+    fn emoji_with_letter(&self) -> String {
+        self.guesses.emoji_with_letter()
+    }
+}
+
+use tokio::sync::{mpsc, oneshot};
+
+use self::puzzle::DailyPuzzle;
+
+struct WordlePool {
+    rx: mpsc::Receiver<PoolMessage>,
+    games: Vec<u64>,
+}
+
+impl WordlePool {
+    fn create() -> (WordlePool, WordleHandle) {
+        let (tx, rx) = mpsc::channel(32);
+
+        let pool = WordlePool {
+            rx,
+            games: Vec::new(),
+        };
+        let handle = WordleHandle { tx };
+
+        (pool, handle)
+    }
+
+    /*
+    fn setup() -> (impl Future<Output = ()>, WordleHandle) {
+        let (pool, handle) = Self::create();
+
+        (Self::task(pool), handle)
+    }
+
+    async fn task(mut pool: WordlePool) {
+        while let Some(msg) = pool.rx.recv().await {
+            match msg {
+                PoolMessage::NewGame {
+                    tx,
+                    puzzle,
+                    channel,
+                } => {
+                    let result = if pool.game_in_channel(channel) {
+                        Err(anyhow!("channel already has game").into())
+                    } else {
+                        let (game, handle) = Game::create(puzzle, channel);
+                        pool.games.push(game);
+
+                        Ok(handle)
+                    };
+
+                    tx.send(result);
+                }
+            };
+        }
+    }
+    */
+
+    fn add_game(&mut self, id: u64) {
+        self.games.push(id)
+    }
+
+    fn game_in_channel(&self, id: ChannelId) -> bool {
+        self.games.iter().any(|game| *game == id.get())
+    }
+}
+
+struct WordleHandle {
+    tx: mpsc::Sender<PoolMessage>,
+}
+
+enum PoolMessage {
+    NewGame {
+        tx: oneshot::Sender<Result<Game>>,
+        puzzle: Puzzle,
+        channel: ChannelId,
+    },
+}
+
+struct Game {
+    puzzle: Puzzle,
+    channel: ChannelId,
+    owner: UserId,
+    guesses: Vec<Guess>,
+}
+
+async fn create_menu(
+    ctx: crate::discord::commands::Context<'_>,
+    channel: ChannelId,
+    daily_available: bool,
+) -> Result<Message> {
+    let menu_text = if daily_available {
+        "you have a daily wordle available!"
+    } else {
+        "you do not have a daily wordle available! play a random wordle?"
+    };
+
+    let builder = CreateMessage::new()
+        .content(menu_text)
+        .button(
+            CreateButton::new("daily")
+                .label("daily")
+                .emoji(ReactionType::Unicode("📅".to_owned()))
+                .style(poise::serenity_prelude::ButtonStyle::Primary)
+                .disabled(!daily_available),
+        )
+        .button(
+            CreateButton::new("random")
+                .label("random")
+                .emoji(ReactionType::Unicode("🎲".to_owned()))
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        )
+        .button(
+            CreateButton::new("cancel")
+                .label("cancel")
+                .emoji(ReactionType::Unicode("🚫".to_owned()))
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        );
+
+    Ok(channel.send_message(ctx, builder).await?)
+}
+
+pub async fn play(
+    ctx: crate::discord::commands::Context<'_>,
+    daily: bool,
+    words: WordsList,
+    dailies: DailyWordles,
+    anx: bool,
+) -> Result<()> {
+    let owner = ctx.author();
+
+    // refresh daily puzzle
+    let new_daily_word = words.random_answer();
+    if let Some(daily) = dailies.latest().await? {
+        if daily.is_old() {
+            dailies.new_daily(&new_daily_word).await?;
+        }
+    } else {
+        dailies.new_daily(&new_daily_word).await?;
+    }
+
+    let mut playable = dailies.playable_for(owner.id).await?.peekable();
+
+    let next_daily = playable.peek();
+
+    // menu goes HERE
+    let mut menu = create_menu(ctx, ctx.channel_id(), next_daily.is_some()).await?;
+
+    let play_daily = if let Some(interaction) = menu.await_component_interaction(ctx).await {
+        match interaction.data.custom_id.as_str() {
+            "daily" => {
+                interaction
+                    .create_response(
+                        ctx,
+                        CreateInteractionResponse::UpdateMessage(
+                            CreateInteractionResponseMessage::new()
+                                .content("loading daily wordle...")
+                                .components(Vec::new()),
+                        ),
+                    )
+                    .await?;
+
+                true
+            }
+            "random" => {
+                interaction
+                    .create_response(
+                        ctx,
+                        CreateInteractionResponse::UpdateMessage(
+                            CreateInteractionResponseMessage::new()
+                                .content("loading daily wordle...")
+                                .components(Vec::new()),
+                        ),
+                    )
+                    .await?;
+
+                false
+            }
+            "cancel" => {
+                interaction
+                    .create_response(
+                        ctx,
+                        CreateInteractionResponse::UpdateMessage(
+                            CreateInteractionResponseMessage::new()
+                                .content("canceled!")
+                                .components(Vec::new()),
+                        ),
+                    )
+                    .await?;
+
+                return Err(crate::errors::Error::Manual(anyhow!("fghkjfdhkdgjfghd")));
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        panic!()
+    };
+
+    let puzzle = if !play_daily {
+        Puzzle::random(&words)
+    } else {
+        playable
+            .next()
+            .expect("daily puzzle should be available")
+            .puzzle
+            .into()
+    };
+
+    let title = match puzzle {
+        Puzzle::Random(_) => "random wordle".to_owned(),
+        Puzzle::Daily(DailyPuzzle { number, .. }) => format!("wordle {number}"),
+    };
+
+    let mut buttons = Vec::with_capacity(2);
+
+    buttons.push(if daily {
+        CreateButton::new("pause")
+            .emoji(ReactionType::Unicode("⏸️".to_owned()))
+            .label("pause")
+            .style(poise::serenity_prelude::ButtonStyle::Primary)
+    } else {
+        CreateButton::new("cancel")
+            .emoji(ReactionType::Unicode("🚫".to_owned()))
+            .label("cancel")
+            .style(poise::serenity_prelude::ButtonStyle::Secondary)
+    });
+
+    buttons.push(
+        CreateButton::new("give_up")
+            .emoji(ReactionType::Unicode("🏳️".to_owned()))
+            .label("give up")
+            .style(poise::serenity_prelude::ButtonStyle::Danger),
+    );
+
+    let action_row = CreateActionRow::Buttons(buttons.clone());
+
+    let game_msg = EditMessage::new()
+        .content(format!("{title}\nno guesses yet!"))
+        .components(vec![action_row]);
+
+    menu.edit(ctx, game_msg).await?;
+    let mut game_msg = menu;
+
+    let mut messages = ctx.channel_id().await_replies(ctx).stream();
+    let mut interactions = game_msg.await_component_interactions(ctx).stream();
+
+    let mut guesses: Vec<Guess> = Vec::new();
+
+    loop {
+        tokio::select! {
+            Some(msg) = messages.next() => {
+                if let Some(guess) = handle_message(ctx, &msg, &words, &puzzle).await? {
+                    guesses.push(guess.clone());
+                    let state = GameState::new(owner.id, &guesses);
+                    let emojis = if anx {
+                        state.emoji_with_letter()
+                    } else {
+                        state.as_emoji().into_owned()
+                    };
+
+                    game_msg.edit(ctx, EditMessage::new().content(format!("{title} {}/6\n{emojis}", guesses.len()))).await?;
+
+                    if let Some(num) = puzzle.number() {
+                        dailies.update(num, state).await?;
+                    }
+
+                    if guess.is_correct() {
+                        msg.reply(ctx, "you win!").await?;
+                        break;
+                    }
+                }
+            },
+            Some(interaction) = interactions.next() => {
+                if let Some(cmd) = handle_interaction(ctx, interaction, owner.id, &puzzle).await? {
+                    break;
+                }
+            }
+        }
+    }
+
+    let disabled_buttons = buttons
+        .iter()
+        .cloned()
+        .map(|button| button.disabled(true))
+        .collect::<Vec<_>>();
+
+    game_msg
+        .edit(
+            ctx,
+            EditMessage::new().components(vec![CreateActionRow::Buttons(disabled_buttons)]),
+        )
+        .await?;
+
+    if playable.next().is_some() {
+        ctx.reply("you have a new daily puzzle available! play it with `!!wordle daily`")
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn handle_message(
+    cache_http: impl CacheHttp,
+    msg: &Message,
+    words: &WordsList,
+    puzzle: &Puzzle,
+) -> Result<Option<Guess>> {
+    let content = msg.content.as_str();
+
+    let QUESTION_MARK_REACT: ReactionType = ReactionType::Unicode("❓".to_owned());
+    let CHECK_MARK_REACT: ReactionType = ReactionType::Unicode("✅".to_owned());
+    let X_REACT: ReactionType = ReactionType::Unicode("❌".to_owned());
+
+    // no need to check anything that doesn't look like a word
+    if content.contains(" ").not() && content.chars().count() == 5 {
+        if words.valid_guess(content) {
+            msg.react(cache_http, CHECK_MARK_REACT).await?;
+            return Ok(Some(puzzle.guess(content)));
+        } else {
+            msg.react(cache_http, QUESTION_MARK_REACT).await?;
+        }
+    }
+
+    Ok(None)
+}
+
+async fn handle_interaction(
+    cache_http: impl CacheHttp + AsRef<Http> + AsRef<ShardMessenger>,
+    interaction: ComponentInteraction,
+    owner: impl AsRef<UserId>,
+    puzzle: &Puzzle,
+) -> Result<Option<WordleCommand>> {
+    let QUESTION_MARK_REACT: ReactionType = ReactionType::Unicode("❓".to_owned());
+    let CHECK_MARK_REACT: ReactionType = ReactionType::Unicode("✅".to_owned());
+    let X_REACT: ReactionType = ReactionType::Unicode("❌".to_owned());
+
+    let blank_confirm_message = CreateInteractionResponseMessage::new()
+        .button(
+            CreateButton::new("yes")
+                .emoji(CHECK_MARK_REACT)
+                .label("yes")
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        )
+        .button(
+            CreateButton::new("no")
+                .emoji(X_REACT)
+                .label("no")
+                .style(poise::serenity_prelude::ButtonStyle::Secondary),
+        )
+        .ephemeral(true);
+
+    Ok(if interaction.user.id == *owner.as_ref() {
+        match interaction.data.custom_id.as_str() {
+            "cancel" => {
+                let confirm_message = blank_confirm_message.content("really cancel?");
+
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(confirm_message),
+                    )
+                    .await?;
+
+                if interaction
+                    .get_response(&cache_http)
+                    .await?
+                    .await_component_interaction(&cache_http)
+                    .await
+                    .is_some()
+                {
+                    interaction.delete_response(&cache_http).await?;
+
+                    interaction
+                        .create_followup(
+                            &cache_http,
+                            CreateInteractionResponseFollowup::new().content("canceled!"),
+                        )
+                        .await?;
+
+                    Some(WordleCommand::Cancel)
+                } else {
+                    None
+                }
+            }
+            "pause" => Some(WordleCommand::Pause),
+            "give_up" => {
+                let confirm_message = blank_confirm_message.content("really give up?");
+
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(confirm_message),
+                    )
+                    .await?;
+
+                if interaction
+                    .get_response(&cache_http)
+                    .await?
+                    .await_component_interaction(&cache_http)
+                    .await
+                    .is_some()
+                {
+                    let give_up_text = format!("the word was: {}", puzzle.answer());
+
+                    interaction.delete_response(&cache_http).await?;
+
+                    interaction
+                        .create_followup(
+                            &cache_http,
+                            CreateInteractionResponseFollowup::new().content(give_up_text),
+                        )
+                        .await?;
+
+                    Some(WordleCommand::GiveUp)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    } else {
+        match interaction.data.custom_id.as_str() {
+            "cancel" => {
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .ephemeral(true)
+                                .content("you can only cancel games you started!"),
+                        ),
+                    )
+                    .await?
+            }
+            "pause" => {
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .ephemeral(true)
+                                .content("you can only pause games you started!"),
+                        ),
+                    )
+                    .await?
+            }
+            "give_up" => {
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .ephemeral(true)
+                                .content("you can only give up on games you started!"),
+                        ),
+                    )
+                    .await?
+            }
+            _ => (),
+        }
+
+        None
+    })
+}
+
+enum WordleCommand {
+    Cancel,
+    Pause,
+    GiveUp,
 }
