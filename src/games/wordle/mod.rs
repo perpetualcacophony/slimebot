@@ -195,7 +195,7 @@ pub async fn play(
                     ctx.channel_id(),
                 )
             }
-        } else {
+        } else if mode == GameType::Daily {
             ctx.reply(format!(
                 "you don't have a daily puzzle available! check back in {} hours",
                 24 - dailies
@@ -207,6 +207,12 @@ pub async fn play(
             .await?;
 
             return Ok(());
+        } else {
+            (
+                GameType::Random,
+                ctx.reply("loading...").await?.into_message().await?,
+                ctx.channel_id(),
+            )
         }
     } else {
         let menu_builder = create_menu(next_daily.is_some());
