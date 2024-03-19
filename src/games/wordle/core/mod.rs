@@ -1,16 +1,7 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    convert::Infallible,
-    ops::{Index, IndexMut},
-    slice::Iter,
-    str::FromStr,
-};
+use std::borrow::Cow;
 
 use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use tracing::{debug, trace};
 
 mod word;
 pub use word::Word;

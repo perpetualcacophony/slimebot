@@ -1,15 +1,5 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    fs,
-    future::Future,
-    ops::{Index, IndexMut, Not},
-    path::Path,
-    slice::Iter,
-    str::FromStr,
-};
+use std::{borrow::Cow, fs, ops::Not, str::FromStr};
 
-use anyhow::anyhow;
 use chrono::Utc;
 use mongodb::{
     bson::doc,
@@ -18,18 +8,15 @@ use mongodb::{
 };
 use poise::{
     serenity_prelude::{
-        futures::{Stream, StreamExt, TryFutureExt, TryStreamExt},
-        ButtonStyle, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
-        CreateInteractionResponse, CreateInteractionResponseFollowup,
-        CreateInteractionResponseMessage, CreateMessage, EditMessage, Http, Interaction, Message,
-        ReactionType, ShardMessenger, UserId,
+        futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
+        CreateButton, CreateInteractionResponse, CreateInteractionResponseFollowup,
+        CreateInteractionResponseMessage, CreateMessage, EditMessage, Http, Message, ReactionType,
+        ShardMessenger, UserId,
     },
     Context, CreateReply,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, instrument, trace};
-
-use crate::{config::WordleConfig, UtcDateTime};
+use tracing::trace;
 
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
@@ -46,374 +33,6 @@ use puzzle::Puzzle;
 
 type DbResult<T> = std::result::Result<T, MongoDbError>;
 type Result<T> = std::result::Result<T, crate::errors::Error>;
-
-/*
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct DailyPuzzle {
-    #[serde(rename = "_id")]
-    pub number: u32,
-    pub started: StartTime,
-    answer: String,
-    finished: Vec<WordleResults>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct WordleResults {
-    user: UserId,
-    guesses: Vec<Guess>,
-    num_guesses: usize,
-    solved: bool,
-    ended: bool,
-}
-
-impl DailyPuzzle {
-    fn new(words: &WordsList, number: u32) -> Self {
-        let word = words.get_random().to_owned();
-
-        Self {
-            number,
-            started: StartTime::now(),
-            answer: word,
-            ..Default::default()
-        }
-    }
-
-    pub fn play(&self, user: UserId) -> Game {
-        Game {
-            user,
-            guesses: Vec::with_capacity(6),
-            answer: Word::new(&self.answer),
-            started: self.started,
-            number: Some(self.number),
-            ended: false,
-        }
-    }
-
-    pub fn resume(&self, result: GameResult) -> Game {
-        Game {
-            user: result.user,
-            guesses: result.guesses,
-            answer: Word::new(&self.answer),
-            started: self.started,
-            number: Some(result.puzzle),
-            ended: false,
-        }
-    }
-
-    pub fn completed_by(&self, user: UserId) -> bool {
-        self.finished.iter().any(|game| game.user == user)
-    }
-
-    pub fn get_completion(&self, user: UserId) -> Option<&GameResult> {
-        self.finished.iter().find(|result| result.user == user)
-    }
-
-    fn completed(&mut self, completion: Game) {
-        //assert!(completion.solved(), "game should be completed");
-        assert!(
-            completion.answer == self.answer,
-            "completion should have the same answer"
-        );
-
-        let results = completion.results(true);
-
-        self.finished.push(results);
-    }
-
-    #[instrument(skip(self), fields(num = self.number))]
-    pub fn is_old(&self) -> bool {
-        self.started.is_old().map_or(false, |b| b) && !self.is_expired()
-    }
-
-    #[instrument(skip(self), fields(num = self.number))]
-    pub fn is_expired(&self) -> bool {
-        self.started.is_expired().map_or(false, |b| b)
-    }
-
-    #[instrument(skip(self), fields(num = self.number))]
-    pub fn is_playable(&self, user: UserId) -> bool {
-        debug!(
-            expired = self.is_expired(),
-            completed = self.completed_by(user)
-        );
-
-        !self.is_expired() && !self.completed_by(user)
-    }
-
-    #[instrument(skip_all)]
-    pub fn is_backlogged(&self, user: UserId) -> bool {
-        debug!(playable = self.is_playable(user), old = self.is_old());
-
-        self.is_playable(user) && self.is_old()
-    }
-}
-
-impl PartialEq<String> for Word {
-    fn eq(&self, other: &String) -> bool {
-        &self.to_string() == other
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct WordsList {
-    words: Vec<String>,
-}
-
-impl WordsList {
-    pub fn answers() -> Self {
-        let file = fs::read_to_string("./wordle_answers.txt").unwrap_or_else(|_| {
-            fs::read_to_string("/wordle_answers.txt")
-                .expect("words should be at ./wordle_answers.txt or /wordle_answers.txt")
-        });
-
-        let words = file.lines().map(|s| s.to_owned()).collect::<Vec<String>>();
-
-        Self { words }
-    }
-
-    pub fn guesses() -> Self {
-        let file = fs::read_to_string("./wordle_guesses.txt").unwrap_or_else(|_| {
-            fs::read_to_string("/wordle_guesses.txt")
-                .expect("words should be at ./wordle_guesses.txt or /wordle_guesses.txt")
-        });
-
-        let mut words = file.lines().map(|s| s.to_owned()).collect::<Vec<String>>();
-
-        let other = &mut WordsList::answers().words;
-
-        words.append(other);
-
-        Self { words }
-    }
-
-    pub fn contains(&self, word: &str) -> bool {
-        self.words.contains(&word.to_lowercase())
-    }
-
-    fn get_random(&self) -> &str {
-        use rand::prelude::SliceRandom;
-
-        self.words
-            .choose(&mut rand::thread_rng())
-            .expect("words list should not be empty")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DailyGames {
-    collection: Collection<GameResult>,
-}
-
-impl DailyGames {
-    pub fn get(db: &Database) -> Self {
-        let collection = db.collection("wordle_daily_games");
-        Self { collection }
-    }
-
-    fn collection(&self) -> &Collection<GameResult> {
-        &self.collection
-    }
-
-    pub async fn find_daily(&self, user: UserId, puzzle: u32) -> DbResult<Option<GameResult>> {
-        self.collection()
-            .find_one(doc! { "user": user.to_string(), "puzzle": puzzle }, None)
-            .await
-    }
-
-    pub async fn save_game(&self, game: &Game) -> DbResult<Result<()>> {
-        let number = if let Some(n) = game.number {
-            n
-        } else {
-            return Ok(Err(anyhow!("test").into()));
-        };
-
-        if let Some(daily) = self.find_daily(game.user, number).await? {
-            self.collection()
-                .delete_one(
-                    doc! { "user": daily.user.to_string(), "puzzle": daily.puzzle },
-                    None,
-                )
-                .await?;
-        }
-
-        self.collection()
-            .insert_one(game.results(game.solved()), None)
-            .await?;
-
-        Ok(Ok(()))
-    }
-
-    pub async fn find_uncompleted_daily(
-        &self,
-        user: UserId,
-        puzzle: u32,
-    ) -> DbResult<Option<GameResult>> {
-        self.collection()
-            .find_one(
-                doc! { "user": user.to_string(), "puzzle": puzzle, "completed": false },
-                None,
-            )
-            .await
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DailyPuzzles {
-    collection: Collection<DailyPuzzle>,
-    pub answers: WordsList,
-}
-
-impl DailyPuzzles {
-    pub fn get(db: &Database, words: WordsList) -> Self {
-        let collection = db.collection("wordle_daily_puzzles");
-        Self {
-            collection,
-            answers: words,
-        }
-    }
-
-    pub fn collection(&self) -> &Collection<DailyPuzzle> {
-        &self.collection
-    }
-
-    pub async fn latest(&self) -> DbResult<Option<DailyPuzzle>> {
-        self.collection()
-            .find_one(
-                None,
-                FindOneOptions::builder().sort(doc! { "_id": -1 }).build(),
-            )
-            .await
-    }
-
-    pub async fn new_puzzle(&self) -> DbResult<DailyPuzzle> {
-        let latest = self.latest().await?;
-
-        let number = if let Some(latest) = latest {
-            latest.number + 1
-        } else {
-            1
-        };
-
-        let puzzle = DailyPuzzle::new(&self.answers, number);
-
-        self.collection().insert_one(&puzzle, None).await?;
-
-        Ok(puzzle)
-    }
-
-    pub async fn previous(&self) -> DbResult<Result<DailyPuzzle>> {
-        let latest_num = self.latest().await?.map_or(1, |puzzle| puzzle.number);
-
-        Ok(if latest_num == 1 {
-            Err(Error::OnlyOnePuzzle)
-        } else {
-            let previous = self
-                .collection()
-                .find_one(doc! { "_id": latest_num - 1 }, None)
-                .await?
-                .expect("more than 1 puzzle, so previous puzzle should exist");
-
-            if !previous.is_expired() {
-                Ok(previous)
-            } else {
-                Err(Error::Expired(previous))
-            }
-        })
-    }
-
-    pub async fn completed(&self, game: Game) -> DbResult<()> {
-        let number = game.number.expect("scored game should have number");
-
-        // extremely clunky fix - can't use update functions because of bson limitation
-        let puzzle = self
-            .collection()
-            .find_one(doc! { "_id": number }, None)
-            .await?
-            .map(|mut puzzle| {
-                puzzle.completed(game);
-                puzzle
-            });
-
-        self.collection()
-            .delete_one(doc! { "_id": number }, None)
-            .await?;
-
-        if let Some(puzzle) = puzzle {
-            self.collection().insert_one(&puzzle, None).await?;
-        }
-
-        Ok(())
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    pub async fn not_expired(&self) -> DbResult<Vec<DailyPuzzle>> {
-        let mut cursor = self
-            .collection()
-            .find(
-                None,
-                FindOptions::builder()
-                    .sort(doc! {"_id":-1})
-                    .limit(2)
-                    .build(),
-            )
-            .await?;
-
-        let mut vec = Vec::new();
-
-        while let Some(doc) = cursor.next().await {
-            let puzzle = doc?;
-
-            if !puzzle.is_expired() {
-                trace!("puzzle {} not expired", puzzle.number);
-                vec.push(puzzle)
-            } else {
-                trace!("puzzle {} expired", puzzle.number);
-            }
-        }
-
-        Ok(vec)
-    }
-
-    pub async fn playable_for(&self, user: UserId) -> DbResult<impl Iterator<Item = DailyPuzzle>> {
-        Ok(self
-            .not_expired()
-            .await?
-            .into_iter()
-            .rev()
-            .filter(move |puzzle| !puzzle.completed_by(user)))
-    }
-}
-
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct StartTime(Option<UtcDateTime>);
-
-impl StartTime {
-    fn new(time: UtcDateTime) -> Self {
-        Self(Some(time))
-    }
-
-    fn now() -> Self {
-        Self(Some(Utc::now()))
-    }
-
-    fn none() -> Self {
-        Self(None)
-    }
-
-    pub fn age_hours(&self) -> Option<i64> {
-        self.0.map(|start| (Utc::now() - start).num_hours())
-    }
-
-    pub fn is_old(&self) -> Option<bool> {
-        self.age_hours().map(|age| age >= PUZZLE_ACTIVE_HOURS)
-    }
-
-    pub fn is_expired(&self) -> Option<bool> {
-        self.age_hours().map(|age| age >= 2 * PUZZLE_ACTIVE_HOURS)
-    }
-}
-*/
 
 use rand::prelude::SliceRandom;
 
@@ -637,10 +256,10 @@ pub struct GameState {
 }
 
 impl GameState {
-    fn new(owner: UserId, guesses: &Vec<Guess>, finished: bool) -> Self {
+    fn new(owner: UserId, guesses: &[Guess], finished: bool) -> Self {
         Self {
             user: owner,
-            guesses: guesses.clone(),
+            guesses: guesses.to_vec(),
             num_guesses: guesses.len(),
             finished,
             solved: guesses.last().map_or(false, |guess| guess.is_correct()),
@@ -653,11 +272,11 @@ impl GameState {
             .map_or(false, |guess| guess.is_correct())
     }
 
-    fn unfinished(owner: UserId, guesses: &Vec<Guess>) -> Self {
+    fn unfinished(owner: UserId, guesses: &[Guess]) -> Self {
         Self::new(owner, guesses, false)
     }
 
-    fn finished(owner: UserId, guesses: &Vec<Guess>) -> Self {
+    fn finished(owner: UserId, guesses: &[Guess]) -> Self {
         Self::new(owner, guesses, true)
     }
 
@@ -687,8 +306,6 @@ impl AsEmoji for GameState {
         self.guesses.emoji_with_letters_spaced()
     }
 }
-
-use tokio::sync::{mpsc, oneshot};
 
 use self::puzzle::DailyPuzzle;
 
@@ -1096,17 +713,16 @@ async fn handle_message(
 ) -> Result<Option<Guess>> {
     let content = msg.content.as_str();
 
-    let QUESTION_MARK_REACT: ReactionType = ReactionType::Unicode("❓".to_owned());
-    let CHECK_MARK_REACT: ReactionType = ReactionType::Unicode("✅".to_owned());
-    let X_REACT: ReactionType = ReactionType::Unicode("❌".to_owned());
+    let question_mark: ReactionType = ReactionType::Unicode("❓".to_owned());
+    let check_mark: ReactionType = ReactionType::Unicode("✅".to_owned());
 
     // no need to check anything that doesn't look like a word
-    if content.contains(" ").not() && content.chars().count() == 5 {
+    if content.contains(' ').not() && content.chars().count() == 5 {
         if words.valid_guess(content) {
-            msg.react(cache_http, CHECK_MARK_REACT).await?;
+            msg.react(cache_http, check_mark).await?;
             return Ok(Some(puzzle.guess(content)));
         } else {
-            msg.react(cache_http, QUESTION_MARK_REACT).await?;
+            msg.react(cache_http, question_mark).await?;
         }
     }
 
@@ -1119,20 +735,19 @@ async fn handle_interaction(
     owner: impl AsRef<UserId>,
     puzzle: &Puzzle,
 ) -> Result<Option<WordleCommand>> {
-    let QUESTION_MARK_REACT: ReactionType = ReactionType::Unicode("❓".to_owned());
-    let CHECK_MARK_REACT: ReactionType = ReactionType::Unicode("✅".to_owned());
-    let X_REACT: ReactionType = ReactionType::Unicode("❌".to_owned());
+    let check_mark: ReactionType = ReactionType::Unicode("✅".to_owned());
+    let x_emoji: ReactionType = ReactionType::Unicode("❌".to_owned());
 
     let blank_confirm_message = CreateInteractionResponseMessage::new()
         .button(
             CreateButton::new("yes")
-                .emoji(CHECK_MARK_REACT)
+                .emoji(check_mark)
                 .label("yes")
                 .style(poise::serenity_prelude::ButtonStyle::Secondary),
         )
         .button(
             CreateButton::new("no")
-                .emoji(X_REACT)
+                .emoji(x_emoji)
                 .label("no")
                 .style(poise::serenity_prelude::ButtonStyle::Secondary),
         )

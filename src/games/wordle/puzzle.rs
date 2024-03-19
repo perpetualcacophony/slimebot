@@ -20,17 +20,6 @@ impl Puzzle {
         Self::Random(answer)
     }
 
-    pub fn daily(number: u32, answer: Word) -> Self {
-        Self::Daily(DailyPuzzle::new(number, answer))
-    }
-
-    pub fn as_daily(&self) -> Option<&DailyPuzzle> {
-        match self {
-            Self::Daily(daily) => Some(daily),
-            _ => None,
-        }
-    }
-
     pub fn guess(&self, word: &str) -> Guess {
         self.answer().guess(word)
     }

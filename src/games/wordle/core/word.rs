@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    ops::{Index, Not},
-    slice::Iter,
-    str::FromStr,
-};
+use std::{collections::HashMap, ops::Index, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -21,10 +16,6 @@ pub struct Word {
 }
 
 impl Word {
-    fn iter(&self) -> Iter<'_, char> {
-        self.letters.iter()
-    }
-
     pub fn guess(&self, word: &str) -> Guess {
         let mut guess: Guess = Guess::new(word);
         debug!(?guess);
