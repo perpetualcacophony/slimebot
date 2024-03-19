@@ -1,16 +1,15 @@
 use tracing::debug;
 
 pub fn check_haiku(text: &str) -> Option<Vec<String>> {
-    //use hypher::hyphenate;
-
-    //let en_us = Standard::from_embedded(Language::EnglishUS).unwrap();
+    // completely ignore spoilered messages
+    if text.matches("||").count() >= 2 {
+        return None;
+    }
 
     let words = text.split_whitespace();
     let parsed = words.clone().map(syllables);
 
     let mut parsed = words.zip(parsed);
-
-    //dbg!(parsed.clone().map(|s| s.collect::<Vec<_>>()).collect::<Vec<_>>());
 
     let mut total_syllables = 0;
 
@@ -162,6 +161,7 @@ mod tests {
             bigfoot: "i got a picture with bigfoot and the ancient aliens dude slay",
             //cool: "look at all the cool things that you find when you are trying to help people",
             a: "a a a a a a a a a a a a a a a a a",
+            half_spoilered: "a a a a a a a a a a a a a a a a a||",
         }
 
         macro_rules! test_not_haiku {
@@ -179,6 +179,7 @@ mod tests {
             what: "what",
             birthday: "also it is my birthday because i fired my birthday beam and it created permanent birthday effect for me",
             storm_drain: "gonna go explore that storm drain i was talking about (if i can get in)",
+            spoilered: "||a a a a a a a a a a a a a a a a a||",
         }
     }
 
