@@ -35,7 +35,9 @@ pub struct Context<'a> {
 }
 
 impl Context<'_> {
-    async fn get_collection(db: Database) -> Collection<GuildConfig> {}
+    async fn get_collection(db: Database) -> Collection<GuildConfig> {
+        db.collection(name)
+    }
 
     async fn from_id(db: Database, id: GuildId) -> Self {
         let collection = db.collection(&format!("slimebot_{id}"));
