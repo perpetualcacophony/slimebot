@@ -43,6 +43,8 @@ impl WordsList {
     }
 
     pub fn valid_guess(&self, guess: &str) -> bool {
-        self.guesses.contains(&guess.to_owned()) || self.answers.contains(&guess.to_owned())
+        let guess = &guess.to_lowercase();
+
+        self.guesses.contains(guess) || self.answers.contains(guess)
     }
 }
