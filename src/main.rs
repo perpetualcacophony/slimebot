@@ -7,10 +7,12 @@ use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
-use discord::commands::wordle::{DailyGames, DailyPuzzles, WordsList};
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use mongodb::Database;
+
+pub mod games;
+use games::wordle::{DailyWordles, WordsList};
 
 /// Config file parsing and option access.
 mod config;
@@ -20,10 +22,14 @@ mod db;
 mod errors;
 
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
+    serenity_prelude::{
+        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, Message,
+        MessageId,
+    },
     PrefixFrameworkOptions,
 };
 
+use tokio::sync::{Mutex, RwLock};
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
@@ -81,41 +87,34 @@ impl Data {
 
 #[derive(Debug, Clone)]
 struct WordleData {
-    answers: wordle::WordsList,
-    guesses: wordle::WordsList,
-    puzzles: DailyPuzzles,
-    games: DailyGames,
+    words: WordsList,
+    wordles: DailyWordles,
+    active_games: Arc<RwLock<Vec<(ChannelId, Message)>>>,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
-        let answers = WordsList::answers();
-        let guesses = WordsList::guesses();
-        let puzzles = DailyPuzzles::get(db, answers.clone());
-        let games = DailyGames::get(db);
+        let words = WordsList::load();
+        let wordles = DailyWordles::new(db);
+        let active_games = Arc::new(RwLock::new(Vec::new()));
 
         Self {
-            answers,
-            guesses,
-            puzzles,
-            games,
+            words,
+            wordles,
+            active_games,
         }
     }
 
-    const fn answers(&self) -> &wordle::WordsList {
-        &self.answers
+    const fn words(&self) -> &WordsList {
+        &self.words
     }
 
-    const fn guesses(&self) -> &wordle::WordsList {
-        &self.guesses
+    const fn wordles(&self) -> &DailyWordles {
+        &self.wordles
     }
 
-    const fn puzzles(&self) -> &DailyPuzzles {
-        &self.puzzles
-    }
-
-    const fn games(&self) -> &DailyGames {
-        &self.games
+    fn active_games(&self) -> Arc<RwLock<Vec<(ChannelId, Message)>>> {
+        self.active_games.clone()
     }
 }
 

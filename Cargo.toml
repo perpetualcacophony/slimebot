@@ -3,7 +3,7 @@ name = "slimebot"
 edition = "2021"
 readme = "README.md"
 license = "AGPL-3.0"
-version = "1.6.4"
+version = "1.6.5"
 build = "build.rs"
 
 [profile.release]
@@ -24,6 +24,7 @@ chrono = { version = "0.4.31", default-features = false }
 config = { version = "0.13.3", default-features = false, features = ["toml"] }
 mongodb = "2.8.1"
 openssl = { version = "0.10.62", features = ["vendored"] }
+paste = "1.0.14"
 poise = "0.6.1"
 rand = "0.8.5"
 regex = "1.10.3"

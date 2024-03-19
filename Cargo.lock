@@ -1457,6 +1457,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2235,7 +2241,7 @@ dependencies = [
 
 [[package]]
 name = "slimebot"
-version = "1.6.4"
+version = "1.6.5"
 dependencies = [
  "anyhow",
  "built",
@@ -2243,6 +2249,7 @@ dependencies = [
  "config",
  "mongodb",
  "openssl",
+ "paste",
  "poise",
  "pretty_assertions",
  "rand",
