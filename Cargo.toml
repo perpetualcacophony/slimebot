@@ -3,7 +3,7 @@ name = "slimebot"
 edition = "2021"
 readme = "README.md"
 license = "AGPL-3.0"
-version = "1.6.5"
+version = "1.6.6"
 build = "build.rs"
 
 [profile.release]
