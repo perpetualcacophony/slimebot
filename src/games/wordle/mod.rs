@@ -1,11 +1,6 @@
-use std::{borrow::Cow, fs, ops::Not, str::FromStr};
+use std::{borrow::Cow, ops::Not};
 
-use chrono::Utc;
-use mongodb::{
-    bson::doc,
-    options::{FindOneOptions, FindOptions},
-    Collection, Database,
-};
+use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
         futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
@@ -16,7 +11,6 @@ use poise::{
     Context, CreateReply,
 };
 use serde::{Deserialize, Serialize};
-use tracing::trace;
 
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
@@ -24,7 +18,7 @@ mod error;
 pub use error::Error;
 
 mod core;
-use core::{AsEmoji, Guess, Word};
+use core::{AsEmoji, Guess};
 
 use mongodb::error::Error as MongoDbError;
 
@@ -34,217 +28,17 @@ use puzzle::Puzzle;
 type DbResult<T> = std::result::Result<T, MongoDbError>;
 type Result<T> = std::result::Result<T, crate::errors::Error>;
 
-use rand::prelude::SliceRandom;
+mod words_list;
+pub use words_list::WordsList;
 
-#[derive(Debug, Clone)]
-pub struct WordsList {
-    guesses: Vec<String>,
-    answers: Vec<String>,
-}
+mod daily;
+pub use daily::{DailyWordle, DailyWordles};
 
-impl WordsList {
-    pub fn load(/*cfg: WordleConfig*/) -> Self {
-        let guesses = fs::read_to_string("./wordle/guesses.txt")
-            .unwrap_or_else(|_| {
-                fs::read_to_string("/wordle/guesses.txt")
-                    .expect("guesses should be at ./wordle/guesses.txt or /wordle/guesses.txt")
-            })
-            .lines()
-            .map(|s| s.to_owned())
-            .collect::<Vec<String>>();
+mod options;
+pub use options::{GameStyle, GameType};
 
-        assert!(!guesses.is_empty(), "guesses file should not be empty");
-
-        let answers = fs::read_to_string("./wordle/answers.txt")
-            .unwrap_or_else(|_| {
-                fs::read_to_string("/wordle/answers.txt")
-                    .expect("answers should be at ./wordle/answers.txt or /wordle/answers.txt")
-            })
-            .lines()
-            .map(|s| s.to_owned())
-            .collect::<Vec<String>>();
-
-        Self { guesses, answers }
-    }
-
-    pub fn random_answer(&self) -> Word {
-        let word = self
-            .answers
-            .choose(&mut rand::thread_rng())
-            .expect("file should not be empty");
-
-        Word::from_str(word).expect("file should contain only valid (5-letter) words")
-    }
-
-    pub fn valid_guess(&self, guess: &str) -> bool {
-        self.guesses.contains(&guess.to_owned()) || self.answers.contains(&guess.to_owned())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DailyWordles {
-    collection: Collection<DailyWordle>,
-}
-
-impl DailyWordles {
-    pub fn new(db: &Database) -> Self {
-        Self {
-            collection: db.collection("daily_wordles"),
-        }
-    }
-
-    pub async fn latest(&self) -> DbResult<Option<DailyWordle>> {
-        Ok(self
-            .collection
-            .find_one(
-                None,
-                FindOneOptions::builder()
-                    .sort(doc! { "puzzle.number": -1 })
-                    .build(),
-            )
-            .await?
-            .filter(|puzzle| !puzzle.is_expired()))
-    }
-
-    pub async fn new_daily(&self, word: &Word) -> DbResult<DailyWordle> {
-        let latest_number = self.latest().await?.map_or(0, |daily| daily.puzzle.number);
-
-        let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, word.clone());
-        let wordle = DailyWordle::new(puzzle);
-
-        self.collection.insert_one(&wordle, None).await?;
-
-        Ok(wordle)
-    }
-
-    pub async fn update(&self, puzzle: u32, game: GameState) -> DbResult<()> {
-        let user = mongodb::bson::ser::to_bson(&game.user).expect("implements serialize");
-        let game = mongodb::bson::ser::to_bson(&game).expect("implements serialize");
-
-        if self
-            .collection
-            .find_one(
-                doc! {
-                    "puzzle.number": puzzle,
-                    "games": { "$elemMatch": { "user": &user } }
-                },
-                None,
-            )
-            .await?
-            .is_some()
-        {
-            trace!("game exists in db");
-
-            self.collection
-                .update_one(
-                    doc! {
-                        "puzzle.number": puzzle,
-                        "games": { "$elemMatch": { "user": &user } }
-                    },
-                    doc! { "$set": { "games.$": game } },
-                    None,
-                )
-                .await?;
-        } else {
-            trace!("game does not exist in db");
-
-            self.collection
-                .update_one(
-                    doc! { "puzzle.number": puzzle },
-                    doc! { "$addToSet": {
-                        "games": game
-                    } },
-                    None,
-                )
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn not_expired(&self) -> DbResult<Vec<DailyWordle>> {
-        let mut vec = Vec::with_capacity(2);
-
-        let mut cursor = self
-            .collection
-            .find(
-                None,
-                FindOptions::builder()
-                    .sort(doc! { "puzzle.number":1 })
-                    .limit(2)
-                    .build(),
-            )
-            .await?;
-
-        while let Some(daily) = cursor.next().await {
-            if daily.as_ref().is_ok_and(|daily| daily.is_expired().not()) {
-                vec.push(daily?);
-            }
-        }
-
-        Ok(vec)
-    }
-
-    async fn playable_for(&self, user: UserId) -> DbResult<impl Iterator<Item = DailyWordle>> {
-        Ok(self
-            .not_expired()
-            .await?
-            .into_iter()
-            .filter(move |daily| daily.is_playable_for(user)))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DailyWordle {
-    puzzle: puzzle::DailyPuzzle,
-    games: Vec<GameState>,
-}
-
-impl DailyWordle {
-    fn new(puzzle: puzzle::DailyPuzzle) -> Self {
-        Self {
-            puzzle,
-            games: Vec::new(),
-        }
-    }
-
-    pub fn age_hours(&self) -> i64 {
-        let age = Utc::now() - self.puzzle.started;
-        age.num_hours()
-    }
-
-    pub fn is_recent(&self) -> bool {
-        self.age_hours() < 24
-    }
-
-    pub fn is_old(&self) -> bool {
-        self.age_hours() < 48 && !self.is_recent()
-    }
-
-    pub fn is_expired(&self) -> bool {
-        self.age_hours() >= 48
-    }
-
-    pub fn user_game(&self, user: UserId) -> Option<&GameState> {
-        self.games.iter().find(|game| game.user == user)
-    }
-
-    pub fn played_by(&self, user: UserId) -> bool {
-        self.user_game(user).is_some()
-    }
-
-    pub fn finished_by(&self, user: UserId) -> bool {
-        self.user_game(user).is_some_and(|game| game.is_finished())
-    }
-
-    pub fn is_playable_for(&self, user: UserId) -> bool {
-        self.is_expired().not() && self.finished_by(user).not()
-    }
-
-    pub fn in_progress_for(&self, user: UserId) -> bool {
-        self.user_game(user).is_some_and(|game| game.in_progress())
-    }
-}
+mod utils;
+use utils::CreateReplyExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -615,6 +409,14 @@ pub async fn play(
         }
     };
 
+    let mut write = active_games.write().await;
+    for (i, game) in write.clone().into_iter().enumerate() {
+        if game.0 == channel {
+            write.remove(i);
+        }
+    }
+    drop(write);
+
     let disabled_buttons = buttons
         .iter()
         .cloned()
@@ -692,13 +494,6 @@ pub async fn play(
             } else {
                 notif.delete(ctx).await?;
             }
-        }
-    }
-
-    let mut write = active_games.write().await;
-    for (i, game) in write.clone().into_iter().enumerate() {
-        if game.0 == channel {
-            write.remove(i);
         }
     }
 
@@ -883,74 +678,4 @@ enum WordleCommand {
     Cancel,
     Pause,
     GiveUp,
-}
-
-#[derive(poise::ChoiceParameter, Debug, Clone, Copy, PartialEq)]
-pub enum GameType {
-    #[name = "daily"]
-    Daily,
-    #[name = "random"]
-    Random,
-}
-
-#[derive(poise::ChoiceParameter, Debug, Clone, Copy, Default)]
-pub enum GameStyle {
-    #[name = "colors only"]
-    #[name = "colors"]
-    #[name = "colors_only"]
-    #[name = "hidden"]
-    Colors,
-    #[name = "with letters"]
-    #[name = "letters"]
-    #[name = "with_letters"]
-    #[name = "anx"]
-    #[default]
-    Letters,
-    #[name = "spaced letters"]
-    #[name = "spaced_letters"]
-    #[name = "spaced"]
-    #[name = "with spaces"]
-    #[name = "with_spaces"]
-    #[name = "letters with spaces"]
-    #[name = "letters_with_spaces"]
-    #[name = "fix flags"]
-    #[name = "fix_flags"]
-    SpacedLetters,
-}
-
-impl GameStyle {
-    fn parse(style: Option<Self>, fix_flags: bool) -> Self {
-        if fix_flags {
-            Self::SpacedLetters
-        } else {
-            style.unwrap_or_default()
-        }
-    }
-}
-
-trait CreateReplyExt: Default {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn button(self, button: CreateButton) -> Self;
-}
-
-impl CreateReplyExt for CreateReply {
-    fn button(mut self, button: CreateButton) -> Self {
-        if let Some(ref mut rows) = self.components {
-            if let Some(buttons) = rows.iter_mut().find_map(|row| match row {
-                CreateActionRow::Buttons(b) => Some(b),
-                _ => None,
-            }) {
-                buttons.push(button);
-            } else {
-                rows.push(CreateActionRow::Buttons(vec![button]));
-            }
-        } else {
-            self = self.components(vec![CreateActionRow::Buttons(vec![button])]);
-        }
-
-        self
-    }
 }
