@@ -34,13 +34,9 @@ impl Guess {
     }
 
     pub fn is_correct(&self) -> bool {
-        for letter in &self.letters {
-            if letter.1 != LetterState::Correct {
-                return false;
-            }
-        }
-
-        true
+        self.letters
+            .iter()
+            .all(|(_, state)| *state == LetterState::Correct)
     }
 
     pub fn is_correct_at(&self, index: usize) -> bool {
@@ -67,7 +63,7 @@ impl AsEmoji for Guess {
             .into()
     }
 
-    fn emoji_with_letter(&self) -> String {
+    fn emoji_with_letters(&self) -> String {
         let (letters, states) = self.letters.iter().fold(
             (String::new(), String::new()),
             |(letters, states), (letter, state)| {
@@ -79,6 +75,20 @@ impl AsEmoji for Guess {
         );
 
         letters + "\n" + &states
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        let (letters, states) = self.letters.iter().fold(
+            (String::new(), String::new()),
+            |(letters, states), (letter, state)| {
+                (
+                    letters + " " + &letter.as_emoji(),
+                    states + " " + &state.as_emoji(),
+                )
+            },
+        );
+
+        letters.trim().to_owned() + "\n" + states.trim()
     }
 }
 

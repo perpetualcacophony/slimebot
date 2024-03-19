@@ -19,7 +19,7 @@ use mongodb::{
 use poise::{
     serenity_prelude::{
         futures::{Stream, StreamExt, TryFutureExt, TryStreamExt},
-        CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
+        ButtonStyle, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
         CreateInteractionResponse, CreateInteractionResponseFollowup,
         CreateInteractionResponseMessage, CreateMessage, EditMessage, Http, Interaction, Message,
         ReactionType, ShardMessenger, UserId,
@@ -606,12 +606,24 @@ impl DailyWordle {
         self.age_hours() >= 48
     }
 
-    pub fn is_completed_by(&self, user: UserId) -> bool {
-        self.games.iter().any(|game| game.user == user)
+    pub fn user_game(&self, user: UserId) -> Option<&GameState> {
+        self.games.iter().find(|game| game.user == user)
+    }
+
+    pub fn played_by(&self, user: UserId) -> bool {
+        self.user_game(user).is_some()
+    }
+
+    pub fn finished_by(&self, user: UserId) -> bool {
+        self.user_game(user).is_some_and(|game| game.is_finished())
     }
 
     pub fn is_playable_for(&self, user: UserId) -> bool {
-        self.is_expired().not() && self.is_completed_by(user).not()
+        self.is_expired().not() && self.finished_by(user).not()
+    }
+
+    pub fn in_progress_for(&self, user: UserId) -> bool {
+        self.user_game(user).is_some_and(|game| game.in_progress())
     }
 }
 
@@ -619,14 +631,46 @@ impl DailyWordle {
 pub struct GameState {
     user: UserId,
     guesses: Vec<Guess>,
+    num_guesses: usize,
+    finished: bool,
+    solved: bool,
 }
 
 impl GameState {
-    fn new(owner: UserId, guesses: &Vec<Guess>) -> Self {
+    fn new(owner: UserId, guesses: &Vec<Guess>, finished: bool) -> Self {
         Self {
             user: owner,
             guesses: guesses.clone(),
+            num_guesses: guesses.len(),
+            finished,
+            solved: guesses.last().map_or(false, |guess| guess.is_correct()),
         }
+    }
+
+    fn is_solved(&self) -> bool {
+        self.guesses
+            .last()
+            .map_or(false, |guess| guess.is_correct())
+    }
+
+    fn unfinished(owner: UserId, guesses: &Vec<Guess>) -> Self {
+        Self::new(owner, guesses, false)
+    }
+
+    fn finished(owner: UserId, guesses: &Vec<Guess>) -> Self {
+        Self::new(owner, guesses, true)
+    }
+
+    fn into_finished(mut self) -> Self {
+        self.finished = true;
+        self
+    }
+    fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    fn in_progress(&self) -> bool {
+        self.is_finished().not()
     }
 }
 
@@ -635,8 +679,12 @@ impl AsEmoji for GameState {
         self.guesses.as_emoji()
     }
 
-    fn emoji_with_letter(&self) -> String {
-        self.guesses.emoji_with_letter()
+    fn emoji_with_letters(&self) -> String {
+        self.guesses.emoji_with_letters()
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.guesses.emoji_with_letters_spaced()
     }
 }
 
@@ -644,95 +692,14 @@ use tokio::sync::{mpsc, oneshot};
 
 use self::puzzle::DailyPuzzle;
 
-struct WordlePool {
-    rx: mpsc::Receiver<PoolMessage>,
-    games: Vec<u64>,
-}
-
-impl WordlePool {
-    fn create() -> (WordlePool, WordleHandle) {
-        let (tx, rx) = mpsc::channel(32);
-
-        let pool = WordlePool {
-            rx,
-            games: Vec::new(),
-        };
-        let handle = WordleHandle { tx };
-
-        (pool, handle)
-    }
-
-    /*
-    fn setup() -> (impl Future<Output = ()>, WordleHandle) {
-        let (pool, handle) = Self::create();
-
-        (Self::task(pool), handle)
-    }
-
-    async fn task(mut pool: WordlePool) {
-        while let Some(msg) = pool.rx.recv().await {
-            match msg {
-                PoolMessage::NewGame {
-                    tx,
-                    puzzle,
-                    channel,
-                } => {
-                    let result = if pool.game_in_channel(channel) {
-                        Err(anyhow!("channel already has game").into())
-                    } else {
-                        let (game, handle) = Game::create(puzzle, channel);
-                        pool.games.push(game);
-
-                        Ok(handle)
-                    };
-
-                    tx.send(result);
-                }
-            };
-        }
-    }
-    */
-
-    fn add_game(&mut self, id: u64) {
-        self.games.push(id)
-    }
-
-    fn game_in_channel(&self, id: ChannelId) -> bool {
-        self.games.iter().any(|game| *game == id.get())
-    }
-}
-
-struct WordleHandle {
-    tx: mpsc::Sender<PoolMessage>,
-}
-
-enum PoolMessage {
-    NewGame {
-        tx: oneshot::Sender<Result<Game>>,
-        puzzle: Puzzle,
-        channel: ChannelId,
-    },
-}
-
-struct Game {
-    puzzle: Puzzle,
-    channel: ChannelId,
-    owner: UserId,
-    guesses: Vec<Guess>,
-}
-
-async fn create_menu(
-    ctx: crate::discord::commands::Context<'_>,
-    channel: ChannelId,
-    daily_available: bool,
-) -> Result<Message> {
+fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {
         "you have a daily wordle available!"
     } else {
         "you do not have a daily wordle available! play a random wordle?"
     };
 
-    let builder = CreateMessage::new()
+    CreateReply::new()
         .content(menu_text)
         .button(
             CreateButton::new("daily")
@@ -752,19 +719,37 @@ async fn create_menu(
                 .label("cancel")
                 .emoji(ReactionType::Unicode("🚫".to_owned()))
                 .style(poise::serenity_prelude::ButtonStyle::Secondary),
-        );
-
-    Ok(channel.send_message(ctx, builder).await?)
+        )
+        .reply(true)
 }
 
 pub async fn play(
     ctx: crate::discord::commands::Context<'_>,
-    daily: bool,
+    mode: Option<GameType>,
     words: WordsList,
     dailies: DailyWordles,
-    anx: bool,
+    style: Option<GameStyle>,
+    fix_flags: bool,
 ) -> Result<()> {
+    let active_games = ctx.data().wordle().active_games();
+    let read = active_games.read().await;
+    if let Some((_, msg)) = read
+        .iter()
+        .find(|(channel, _)| *channel == ctx.channel_id())
+    {
+        ctx.reply(format!(
+            "there's already a wordle game being played in this channel! [jump?]({})",
+            msg.link()
+        ))
+        .await?;
+
+        return Ok(());
+    }
+
+    drop(read);
+
     let owner = ctx.author();
+    let in_guild = ctx.guild_id().is_some();
 
     // refresh daily puzzle
     let new_daily_word = words.random_answer();
@@ -778,69 +763,138 @@ pub async fn play(
 
     let mut playable = dailies.playable_for(owner.id).await?.peekable();
 
+    // only peeking at the value for now because the user might not consume it
     let next_daily = playable.peek();
 
-    // menu goes HERE
-    let mut menu = create_menu(ctx, ctx.channel_id(), next_daily.is_some()).await?;
+    let (mode, mut menu, channel) = if let Some(mode) = mode {
+        if next_daily.is_some() {
+            if mode == GameType::Daily && in_guild {
+                ctx.send(
+                    CreateReply::new()
+                        .content("you can't play a daily wordle in a server - check your dms!"),
+                )
+                .await?;
+                let dm = owner.create_dm_channel(ctx).await?;
 
-    let play_daily = if let Some(interaction) = menu.await_component_interaction(ctx).await {
-        match interaction.data.custom_id.as_str() {
-            "daily" => {
-                interaction
-                    .create_response(
-                        ctx,
-                        CreateInteractionResponse::UpdateMessage(
-                            CreateInteractionResponseMessage::new()
-                                .content("loading daily wordle...")
-                                .components(Vec::new()),
-                        ),
-                    )
-                    .await?;
-
-                true
+                (mode, dm.say(ctx, "loading...").await?, dm.id)
+            } else {
+                (
+                    mode,
+                    ctx.reply("loading...").await?.into_message().await?,
+                    ctx.channel_id(),
+                )
             }
-            "random" => {
-                interaction
-                    .create_response(
-                        ctx,
-                        CreateInteractionResponse::UpdateMessage(
-                            CreateInteractionResponseMessage::new()
-                                .content("loading daily wordle...")
-                                .components(Vec::new()),
-                        ),
-                    )
-                    .await?;
+        } else {
+            ctx.reply(format!(
+                "you don't have a daily puzzle available! check back in {} hours",
+                24 - dailies
+                    .latest()
+                    .await?
+                    .expect("at least one puzzle exists by now")
+                    .age_hours()
+            ))
+            .await?;
 
-                false
-            }
-            "cancel" => {
-                interaction
-                    .create_response(
-                        ctx,
-                        CreateInteractionResponse::UpdateMessage(
-                            CreateInteractionResponseMessage::new()
-                                .content("canceled!")
-                                .components(Vec::new()),
-                        ),
-                    )
-                    .await?;
-
-                return Err(crate::errors::Error::Manual(anyhow!("fghkjfdhkdgjfghd")));
-            }
-            _ => unreachable!(),
+            return Ok(());
         }
     } else {
-        panic!()
+        let menu_builder = create_menu(next_daily.is_some());
+        let menu = ctx.send(menu_builder).await?.into_message().await?;
+
+        if let Some(interaction) = menu.await_component_interaction(ctx).await {
+            let channel = if interaction.data.custom_id.as_str() == "daily" && in_guild {
+                owner.create_dm_channel(ctx).await?.id
+            } else {
+                ctx.channel_id()
+            };
+
+            let (mode, menu) = match interaction.data.custom_id.as_str() {
+                "daily" => {
+                    let message = if in_guild {
+                        interaction
+                            .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                            .await?;
+
+                        ctx.send(
+                            CreateReply::new()
+                                .content(
+                                    "you can't play a daily wordle in a server - check your dms!",
+                                )
+                                .ephemeral(true),
+                        )
+                        .await?;
+
+                        menu.delete(ctx).await?;
+
+                        channel.say(ctx, "loading daily wordle...").await?
+                    } else {
+                        interaction
+                            .create_response(
+                                ctx,
+                                CreateInteractionResponse::UpdateMessage(
+                                    CreateInteractionResponseMessage::new()
+                                        .content("loading daily wordle...")
+                                        .components(Vec::new()),
+                                ),
+                            )
+                            .await?;
+
+                        menu
+                    };
+
+                    (GameType::Daily, message)
+                }
+                "random" => {
+                    interaction
+                        .create_response(
+                            ctx,
+                            CreateInteractionResponse::UpdateMessage(
+                                CreateInteractionResponseMessage::new()
+                                    .content("loading random wordle...")
+                                    .components(Vec::new()),
+                            ),
+                        )
+                        .await?;
+
+                    (GameType::Random, menu)
+                }
+                "cancel" => {
+                    interaction
+                        .create_response(
+                            ctx,
+                            CreateInteractionResponse::UpdateMessage(
+                                CreateInteractionResponseMessage::new()
+                                    .content("canceled!")
+                                    .components(Vec::new()),
+                            ),
+                        )
+                        .await?;
+
+                    return Ok(());
+                }
+                _ => unreachable!(),
+            };
+
+            (mode, menu, channel)
+        } else {
+            panic!()
+        }
     };
 
-    let puzzle = if !play_daily {
-        Puzzle::random(&words)
-    } else {
-        playable
-            .next()
+    let style = GameStyle::parse(style, fix_flags);
+
+    let daily = match mode {
+        GameType::Daily => playable.next(), // now we're consuming the playable puzzle, because the user wants it
+        _ => None,
+    };
+
+    let puzzle = match mode {
+        GameType::Random => Puzzle::random(&words),
+        GameType::Daily => daily
+            .clone()
             .expect("daily puzzle should be available")
             .puzzle
-            .into()
+            .into(),
     };
 
     let title = match puzzle {
@@ -848,72 +902,101 @@ pub async fn play(
         Puzzle::Daily(DailyPuzzle { number, .. }) => format!("wordle {number}"),
     };
 
-    let mut buttons = Vec::with_capacity(2);
-
-    buttons.push(if daily {
-        CreateButton::new("pause")
+    let pause_cancel_button = match mode {
+        GameType::Daily => CreateButton::new("pause")
             .emoji(ReactionType::Unicode("⏸️".to_owned()))
             .label("pause")
-            .style(poise::serenity_prelude::ButtonStyle::Primary)
-    } else {
-        CreateButton::new("cancel")
+            .style(poise::serenity_prelude::ButtonStyle::Primary),
+        GameType::Random => CreateButton::new("cancel")
             .emoji(ReactionType::Unicode("🚫".to_owned()))
             .label("cancel")
-            .style(poise::serenity_prelude::ButtonStyle::Secondary)
-    });
+            .style(poise::serenity_prelude::ButtonStyle::Secondary),
+    };
 
-    buttons.push(
-        CreateButton::new("give_up")
-            .emoji(ReactionType::Unicode("🏳️".to_owned()))
-            .label("give up")
-            .style(poise::serenity_prelude::ButtonStyle::Danger),
-    );
+    let give_up_button = CreateButton::new("give_up")
+        .emoji(ReactionType::Unicode("🏳️".to_owned()))
+        .label("give up")
+        .style(poise::serenity_prelude::ButtonStyle::Danger);
+
+    let buttons = vec![pause_cancel_button, give_up_button];
 
     let action_row = CreateActionRow::Buttons(buttons.clone());
 
+    let resumed = daily.and_then(|d| d.user_game(owner.id).cloned());
+
+    let mut guesses = if let Some(ref resumed) = resumed {
+        resumed.guesses.clone()
+    } else {
+        Vec::with_capacity(6)
+    };
+
+    let starting_emojis = resumed.map_or("no guesses yet!".to_owned(), |r| {
+        r.emoji_with_style(style).into()
+    });
+
     let game_msg = EditMessage::new()
-        .content(format!("{title}\nno guesses yet!"))
+        .content(format!("{title} {}/6\n{starting_emojis}", guesses.len()))
         .components(vec![action_row]);
 
     menu.edit(ctx, game_msg).await?;
     let mut game_msg = menu;
 
-    let mut messages = ctx.channel_id().await_replies(ctx).stream();
+    let mut write = active_games.write().await;
+    write.push((channel, game_msg.clone()));
+    drop(write);
+
+    let mut messages = channel.await_replies(ctx).stream();
     let mut interactions = game_msg.await_component_interactions(ctx).stream();
 
-    let mut guesses: Vec<Guess> = Vec::new();
-
-    loop {
+    let game_won = loop {
         tokio::select! {
             Some(msg) = messages.next() => {
                 if let Some(guess) = handle_message(ctx, &msg, &words, &puzzle).await? {
                     guesses.push(guess.clone());
-                    let state = GameState::new(owner.id, &guesses);
-                    let emojis = if anx {
-                        state.emoji_with_letter()
-                    } else {
-                        state.as_emoji().into_owned()
-                    };
+                    let state = GameState::unfinished(owner.id, &guesses);
+                    let emojis = state.emoji_with_style(style);
 
                     game_msg.edit(ctx, EditMessage::new().content(format!("{title} {}/6\n{emojis}", guesses.len()))).await?;
 
                     if let Some(num) = puzzle.number() {
-                        dailies.update(num, state).await?;
-                    }
-
-                    if guess.is_correct() {
+                        if state.is_solved() {
+                            dailies.update(num, state.into_finished()).await?;
+                            msg.reply(ctx, "you win!").await?;
+                            break true;
+                        } else {
+                            dailies.update(num, state).await?;
+                        }
+                    } else if state.is_solved() {
                         msg.reply(ctx, "you win!").await?;
-                        break;
+                        break true;
                     }
                 }
             },
             Some(interaction) = interactions.next() => {
                 if let Some(cmd) = handle_interaction(ctx, interaction, owner.id, &puzzle).await? {
-                    break;
+                    match cmd {
+                        WordleCommand::Pause => {
+                            let state = GameState::unfinished(owner.id, &guesses);
+                            dailies.update(puzzle.number()
+                                .expect("this option is only available for daily puzzles"), state)
+                                .await?;
+
+                            break false;
+                        }
+                        WordleCommand::Cancel => { /* nothing to save */ break false; }
+                        WordleCommand::GiveUp => {
+                            if let Some(num) = puzzle.number() {
+                                let state = GameState::finished(owner.id, &guesses);
+                                dailies.update(num, state).await?;
+                            }
+
+                            break false;
+                        }
+                    }
                 }
             }
         }
-    }
+    };
 
     let disabled_buttons = buttons
         .iter()
@@ -921,16 +1004,85 @@ pub async fn play(
         .map(|button| button.disabled(true))
         .collect::<Vec<_>>();
 
+    let final_content = &game_msg.content;
+    let end_text = match game_won {
+        true => "you win!",
+        false => "game over!",
+    };
+
     game_msg
         .edit(
             ctx,
-            EditMessage::new().components(vec![CreateActionRow::Buttons(disabled_buttons)]),
+            EditMessage::new()
+                .components(vec![CreateActionRow::Buttons(disabled_buttons)])
+                .content(format!("{final_content}\n{end_text}")),
         )
         .await?;
 
     if playable.next().is_some() {
-        ctx.reply("you have a new daily puzzle available! play it with `!!wordle daily`")
-            .await?;
+        let notif_text = format!(
+            "you have a new daily puzzle available! play it with `{}wordle daily`",
+            ctx.prefix()
+        );
+
+        let mut components = Vec::with_capacity(1);
+
+        // if the message is called in an application context,
+        // this notification will be ephemeral, and can be dismissed.
+        // however, if it's called with a prefix,
+        // a way to delete the message must be added
+        if matches!(ctx, Context::Prefix(_)) {
+            let delete_button = CreateButton::new("delete")
+                .emoji(ReactionType::Unicode("🗑️".to_owned()))
+                .style(ButtonStyle::Secondary);
+
+            components.push(CreateActionRow::Buttons(vec![delete_button]));
+        }
+
+        let notif = if channel == ctx.channel_id() {
+            let notif_builder = CreateReply::default()
+                .ephemeral(true)
+                .content(notif_text)
+                .components(components)
+                .reply(true);
+
+            ctx.send(notif_builder).await?.into_message().await?
+        } else {
+            let notif_builder = CreateMessage::default()
+                .content(notif_text)
+                .components(components);
+
+            channel.send_message(ctx, notif_builder).await?
+        };
+
+        // handles the delete button if needed
+        // times out after iter15m to avoid leaking memory
+        if matches!(ctx, Context::Prefix(_)) {
+            let notif_fut = async {
+                if let Some(interaction) = notif.await_component_interaction(ctx).await {
+                    if interaction.data.custom_id.as_str() == "delete" {
+                        notif.delete(ctx).await?;
+                    }
+                }
+
+                Ok::<(), crate::errors::Error>(())
+            };
+
+            if let Ok(fut) =
+                tokio::time::timeout(tokio::time::Duration::from_secs(5 * 60), notif_fut).await
+            {
+                fut?;
+            } else {
+                notif.delete(ctx).await?;
+            }
+        }
+    }
+
+    let mut write = active_games.write().await;
+    for (i, game) in write.clone().into_iter().enumerate() {
+        if game.0 == channel {
+            write.remove(i);
+        }
     }
 
     Ok(())
@@ -1019,7 +1171,19 @@ async fn handle_interaction(
                     None
                 }
             }
-            "pause" => Some(WordleCommand::Pause),
+            "pause" => {
+                interaction
+                    .create_response(
+                        &cache_http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .content("your game has been saved!"),
+                        ),
+                    )
+                    .await?;
+
+                Some(WordleCommand::Pause)
+            }
             "give_up" => {
                 let confirm_message = blank_confirm_message.content("really give up?");
 
@@ -1104,4 +1268,74 @@ enum WordleCommand {
     Cancel,
     Pause,
     GiveUp,
+}
+
+#[derive(poise::ChoiceParameter, Debug, Clone, Copy, PartialEq)]
+pub enum GameType {
+    #[name = "daily"]
+    Daily,
+    #[name = "random"]
+    Random,
+}
+
+#[derive(poise::ChoiceParameter, Debug, Clone, Copy, Default)]
+pub enum GameStyle {
+    #[name = "colors only"]
+    #[name = "colors"]
+    #[name = "colors_only"]
+    #[name = "hidden"]
+    Colors,
+    #[name = "with letters"]
+    #[name = "letters"]
+    #[name = "with_letters"]
+    #[name = "anx"]
+    #[default]
+    Letters,
+    #[name = "spaced letters"]
+    #[name = "spaced_letters"]
+    #[name = "spaced"]
+    #[name = "with spaces"]
+    #[name = "with_spaces"]
+    #[name = "letters with spaces"]
+    #[name = "letters_with_spaces"]
+    #[name = "fix flags"]
+    #[name = "fix_flags"]
+    SpacedLetters,
+}
+
+impl GameStyle {
+    fn parse(style: Option<Self>, fix_flags: bool) -> Self {
+        if fix_flags {
+            Self::SpacedLetters
+        } else {
+            style.unwrap_or_default()
+        }
+    }
+}
+
+trait CreateReplyExt: Default {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn button(self, button: CreateButton) -> Self;
+}
+
+impl CreateReplyExt for CreateReply {
+    fn button(mut self, button: CreateButton) -> Self {
+        if let Some(ref mut rows) = self.components {
+            if let Some(buttons) = rows.iter_mut().find_map(|row| match row {
+                CreateActionRow::Buttons(b) => Some(b),
+                _ => None,
+            }) {
+                buttons.push(button);
+            } else {
+                rows.push(CreateActionRow::Buttons(vec![button]));
+            }
+        } else {
+            self = self.components(vec![CreateActionRow::Buttons(vec![button])]);
+        }
+
+        self
+    }
 }

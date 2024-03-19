@@ -22,10 +22,14 @@ mod db;
 mod errors;
 
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
+    serenity_prelude::{
+        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, Message,
+        MessageId,
+    },
     PrefixFrameworkOptions,
 };
 
+use tokio::sync::{Mutex, RwLock};
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
@@ -85,14 +89,20 @@ impl Data {
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
+    active_games: Arc<RwLock<Vec<(ChannelId, Message)>>>,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
         let wordles = DailyWordles::new(db);
+        let active_games = Arc::new(RwLock::new(Vec::new()));
 
-        Self { words, wordles }
+        Self {
+            words,
+            wordles,
+            active_games,
+        }
     }
 
     const fn words(&self) -> &WordsList {
@@ -101,6 +111,10 @@ impl WordleData {
 
     const fn wordles(&self) -> &DailyWordles {
         &self.wordles
+    }
+
+    fn active_games(&self) -> Arc<RwLock<Vec<(ChannelId, Message)>>> {
+        self.active_games.clone()
     }
 }
 

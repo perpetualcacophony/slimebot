@@ -20,6 +20,8 @@ pub use guess::Guess;
 
 use self::guess::LetterState;
 
+use super::GameStyle;
+
 /*
 #[derive(Debug, Clone, Default)]
 pub struct Game {
@@ -112,8 +114,24 @@ pub struct GameResult {
 pub trait AsEmoji {
     fn as_emoji(&self) -> Cow<str>;
 
-    fn emoji_with_letter(&self) -> String {
+    fn emoji_with_letters(&self) -> String {
         self.as_emoji().into()
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.emoji_with_letters()
+    }
+
+    fn emoji_with_style(&self, style: GameStyle) -> Cow<str> {
+        match style {
+            GameStyle::Colors => self.as_emoji(),
+            GameStyle::Letters => self.emoji_with_letters().into(),
+            GameStyle::SpacedLetters => self.emoji_with_letters_spaced().into(),
+        }
+    }
+
+    fn emoji_default_style(&self) -> String {
+        self.emoji_with_style(GameStyle::default()).into()
     }
 }
 
@@ -150,9 +168,16 @@ impl AsEmoji for Vec<Guess> {
             .into()
     }
 
-    fn emoji_with_letter(&self) -> String {
+    fn emoji_with_letters(&self) -> String {
         self.iter()
-            .map(|g| g.emoji_with_letter())
+            .map(|g| g.emoji_with_letters())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters_spaced())
             .collect::<Vec<_>>()
             .join("\n")
     }

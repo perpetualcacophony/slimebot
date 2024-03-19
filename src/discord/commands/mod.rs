@@ -796,11 +796,16 @@ use crate::games::wordle::{self, *};
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
     //subcommands("display", "daily", "random")
 )]
-pub async fn wordle(ctx: Context<'_>) -> CommandResult {
+pub async fn wordle(
+    ctx: Context<'_>,
+    mode: Option<wordle::GameType>,
+    style: Option<wordle::GameStyle>,
+    #[flag] fix_flags: bool,
+) -> CommandResult {
     let words = ctx.data().wordle.words();
     let dailies = ctx.data().wordle.wordles();
 
-    crate::games::wordle::play(ctx, false, words.clone(), dailies.clone(), true).await?;
+    crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
 
     /*let typing = ctx.defer_or_broadcast().await?;
 
