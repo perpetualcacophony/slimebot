@@ -1,5 +1,5 @@
 use poise::{
-    serenity_prelude::{CreateActionRow, CreateButton},
+    serenity_prelude::{self as serenity, CacheHttp, CreateActionRow, CreateButton},
     CreateReply,
 };
 
@@ -27,5 +27,44 @@ impl CreateReplyExt for CreateReply {
         }
 
         self
+    }
+}
+
+pub trait ComponentInteractionExt {
+    async fn acknowledge(&self, cache_http: impl CacheHttp) -> serenity::Result<()>;
+    async fn respond(
+        &self,
+        cache_http: impl CacheHttp,
+        message: serenity::CreateInteractionResponseMessage,
+    ) -> serenity::Result<()>;
+    async fn update_message(
+        &self,
+        cache_http: impl CacheHttp,
+        builder: serenity::CreateInteractionResponseMessage,
+    ) -> serenity::Result<()>;
+}
+
+impl ComponentInteractionExt for serenity::ComponentInteraction {
+    async fn acknowledge(&self, cache_http: impl CacheHttp) -> serenity::Result<()> {
+        let builder = serenity::CreateInteractionResponse::Acknowledge;
+        self.create_response(cache_http, builder).await
+    }
+
+    async fn respond(
+        &self,
+        cache_http: impl CacheHttp,
+        message: serenity::CreateInteractionResponseMessage,
+    ) -> serenity::Result<()> {
+        let builder = serenity::CreateInteractionResponse::Message(message);
+        self.create_response(cache_http, builder).await
+    }
+
+    async fn update_message(
+        &self,
+        cache_http: impl CacheHttp,
+        builder: serenity::CreateInteractionResponseMessage,
+    ) -> serenity::Result<()> {
+        let builder = serenity::CreateInteractionResponse::UpdateMessage(builder);
+        self.create_response(cache_http, builder).await
     }
 }

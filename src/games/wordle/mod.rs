@@ -101,7 +101,7 @@ impl AsEmoji for GameState {
     }
 }
 
-use self::puzzle::DailyPuzzle;
+use self::{puzzle::DailyPuzzle, utils::ComponentInteractionExt};
 
 fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {
@@ -228,9 +228,7 @@ pub async fn play(
             let (mode, menu) = match interaction.data.custom_id.as_str() {
                 "daily" => {
                     let message = if in_guild {
-                        interaction
-                            .create_response(ctx, CreateInteractionResponse::Acknowledge)
-                            .await?;
+                        interaction.acknowledge(ctx).await?;
 
                         ctx.send(
                             CreateReply::new()
@@ -246,13 +244,11 @@ pub async fn play(
                         channel.say(ctx, "loading daily wordle...").await?
                     } else {
                         interaction
-                            .create_response(
+                            .update_message(
                                 ctx,
-                                CreateInteractionResponse::UpdateMessage(
-                                    CreateInteractionResponseMessage::new()
-                                        .content("loading daily wordle...")
-                                        .components(Vec::new()),
-                                ),
+                                CreateInteractionResponseMessage::new()
+                                    .content("loading daily wordle...")
+                                    .components(Vec::new()),
                             )
                             .await?;
 
@@ -263,13 +259,11 @@ pub async fn play(
                 }
                 "random" => {
                     interaction
-                        .create_response(
+                        .update_message(
                             ctx,
-                            CreateInteractionResponse::UpdateMessage(
-                                CreateInteractionResponseMessage::new()
-                                    .content("loading random wordle...")
-                                    .components(Vec::new()),
-                            ),
+                            CreateInteractionResponseMessage::new()
+                                .content("loading random wordle...")
+                                .components(Vec::new()),
                         )
                         .await?;
 
@@ -277,13 +271,11 @@ pub async fn play(
                 }
                 "cancel" => {
                     interaction
-                        .create_response(
+                        .update_message(
                             ctx,
-                            CreateInteractionResponse::UpdateMessage(
-                                CreateInteractionResponseMessage::new()
-                                    .content("canceled!")
-                                    .components(Vec::new()),
-                            ),
+                            CreateInteractionResponseMessage::new()
+                                .content("canceled!")
+                                .components(Vec::new()),
                         )
                         .await?;
 
@@ -559,19 +551,14 @@ async fn handle_interaction(
             "cancel" => {
                 let confirm_message = blank_confirm_message.content("really cancel?");
 
-                interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(confirm_message),
-                    )
-                    .await?;
+                interaction.respond(&cache_http, confirm_message).await?;
 
                 if interaction
                     .get_response(&cache_http)
                     .await?
                     .await_component_interaction(&cache_http)
                     .await
-                    .is_some()
+                    .is_some_and(|interaction| interaction.data.custom_id.as_str() == "yes")
                 {
                     interaction.delete_response(&cache_http).await?;
 
@@ -584,6 +571,8 @@ async fn handle_interaction(
 
                     Some(WordleCommand::Cancel)
                 } else {
+                    interaction.delete_response(&cache_http).await?;
+
                     None
                 }
             }
@@ -603,19 +592,14 @@ async fn handle_interaction(
             "give_up" => {
                 let confirm_message = blank_confirm_message.content("really give up?");
 
-                interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(confirm_message),
-                    )
-                    .await?;
+                interaction.respond(&cache_http, confirm_message).await?;
 
                 if interaction
                     .get_response(&cache_http)
                     .await?
                     .await_component_interaction(&cache_http)
                     .await
-                    .is_some()
+                    .is_some_and(|interaction| interaction.data.custom_id.as_str() == "yes")
                 {
                     let give_up_text = format!("the word was: {}", puzzle.answer());
 
@@ -630,6 +614,8 @@ async fn handle_interaction(
 
                     Some(WordleCommand::GiveUp)
                 } else {
+                    interaction.delete_response(&cache_http).await?;
+
                     None
                 }
             }
