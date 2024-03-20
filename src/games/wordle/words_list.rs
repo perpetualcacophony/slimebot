@@ -1,6 +1,6 @@
 use super::core::Word;
 use rand::prelude::SliceRandom;
-use std::{fs, str::FromStr};
+use std::fs;
 
 #[derive(Debug, Clone)]
 pub struct WordsList {
@@ -39,12 +39,46 @@ impl WordsList {
             .choose(&mut rand::thread_rng())
             .expect("file should not be empty");
 
-        Word::from_str(word).expect("file should contain only valid (5-letter) words")
+        Word::parse(word)
     }
 
     pub fn valid_guess(&self, guess: &str) -> bool {
         let guess = &guess.to_lowercase();
 
         self.guesses.contains(guess) || self.answers.contains(guess)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WordsList;
+
+    #[test]
+    fn fetch_answers() {
+        let words = ["amber", "mummy", "opals", "sonar", "today"].map(|s| s.to_owned());
+
+        let list = WordsList {
+            guesses: Vec::new(),
+            answers: words.to_vec(),
+        };
+
+        for _ in 0..10 {
+            let answer = list.random_answer();
+            assert!(words.contains(&answer.to_string()))
+        }
+    }
+
+    #[test]
+    fn fetch_guesses() {
+        let words = ["amber", "mummy", "opals", "sonar", "today"];
+
+        let list = WordsList {
+            guesses: Vec::new(),
+            answers: words.map(|s| s.to_owned()).to_vec(),
+        };
+
+        for word in words {
+            assert!(list.valid_guess(word))
+        }
     }
 }

@@ -16,6 +16,26 @@ pub struct Word {
 }
 
 impl Word {
+    pub fn parse(s: &str) -> Word {
+        let letters = s.to_lowercase().chars().collect::<Vec<char>>();
+
+        assert!(letters.len() == 5, "word must have exactly 5 letters");
+
+        let mut letter_counts: HashMap<char, usize> = HashMap::new();
+        for letter in letters.iter() {
+            if let Some(count) = letter_counts.get_mut(letter) {
+                *count += 1;
+            } else {
+                letter_counts.insert(*letter, 1);
+            }
+        }
+
+        Self {
+            letters,
+            letter_counts,
+        }
+    }
+
     pub fn guess(&self, word: &str) -> Guess {
         let mut guess: Guess = Guess::new(word);
         debug!(?guess);
