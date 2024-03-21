@@ -1,5 +1,8 @@
 use poise::{
-    serenity_prelude::{self as serenity, CacheHttp, CreateActionRow, CreateButton},
+    serenity_prelude::{
+        self as serenity, CacheHttp, ComponentInteraction, CreateActionRow, CreateButton,
+        CreateInteractionResponseMessage,
+    },
     CreateReply,
 };
 
@@ -42,6 +45,32 @@ pub trait ComponentInteractionExt {
         cache_http: impl CacheHttp,
         builder: serenity::CreateInteractionResponseMessage,
     ) -> serenity::Result<()>;
+    fn custom_id(&self) -> &str;
+
+    async fn reply(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> serenity::Result<()> {
+        self.respond(
+            cache_http,
+            CreateInteractionResponseMessage::new().content(content),
+        )
+        .await
+    }
+    async fn reply_ephemeral(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> serenity::Result<()> {
+        self.respond(
+            cache_http,
+            CreateInteractionResponseMessage::new()
+                .content(content)
+                .ephemeral(true),
+        )
+        .await
+    }
 }
 
 impl ComponentInteractionExt for serenity::ComponentInteraction {
@@ -66,5 +95,19 @@ impl ComponentInteractionExt for serenity::ComponentInteraction {
     ) -> serenity::Result<()> {
         let builder = serenity::CreateInteractionResponse::UpdateMessage(builder);
         self.create_response(cache_http, builder).await
+    }
+
+    fn custom_id(&self) -> &str {
+        &self.data.custom_id
+    }
+}
+
+pub trait OptionComponentInteractionExt {
+    fn is_some_with_id(&self, custom_id: &str) -> bool;
+}
+
+impl OptionComponentInteractionExt for Option<ComponentInteraction> {
+    fn is_some_with_id(&self, custom_id: &str) -> bool {
+        self.as_ref().is_some_and(|ci| ci.custom_id() == custom_id)
     }
 }
