@@ -1,6 +1,8 @@
 mod ban;
 mod watch_fic;
 
+use std::ops::Not;
+
 use anyhow::anyhow;
 use mongodb::bson::doc;
 use poise::{
@@ -23,7 +25,10 @@ type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::{built_info, discord::commands::roll::DiceRoll, errors, roll::Die, FormatDuration};
+use crate::{
+    built_info, discord::commands::roll::DiceRoll, errors, games::wordle::core::AsEmoji, roll::Die,
+    FormatDuration,
+};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -795,6 +800,63 @@ pub async fn wordle(
     let dailies = ctx.data().wordle.wordles();
 
     crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn display_wordle(ctx: Context<'_>, wordle: u32, user: Option<User>) -> CommandResult {
+    let _typing = ctx.defer_or_broadcast().await?;
+
+    let wordles = ctx.data().wordle.wordles();
+
+    if wordles.wordle_exists(wordle).await?.not() {
+        ctx.send(
+            CreateReply::default()
+                .content("that wordle doesn't exist!")
+                .reply(true)
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let user = user.as_ref().unwrap_or_else(|| ctx.author());
+
+    if let Some(game) = wordles.find_game(user.id, wordle).await? {
+        if game.num_guesses == 0 {
+            ctx.send(
+                CreateReply::default()
+                    .content("that user has started the wordle but hasn't guessed anything!")
+                    .reply(true)
+                    .ephemeral(true),
+            )
+            .await?;
+        }
+
+        let text = format!(
+            "wordle {} (`{}`):\n>>> {}",
+            wordle,
+            user.name,
+            game.as_emoji()
+        );
+
+        ctx.reply(text).await?;
+    } else {
+        ctx.send(
+            CreateReply::default()
+                .content("that user hasn't started that wordle!")
+                .reply(true)
+                .ephemeral(true),
+        )
+        .await?;
+    }
 
     Ok(())
 }

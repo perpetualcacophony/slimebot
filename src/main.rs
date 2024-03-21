@@ -168,6 +168,7 @@ async fn main() {
                 d20(),
                 version(),
                 wordle(),
+                display_wordle(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),

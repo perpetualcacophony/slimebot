@@ -4,9 +4,8 @@ use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
         futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
-        CreateButton, CreateInteractionResponse, CreateInteractionResponseFollowup,
-        CreateInteractionResponseMessage, CreateMessage, EditMessage, Http, Message, ReactionType,
-        ShardMessenger, UserId,
+        CreateButton, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
+        CreateMessage, EditMessage, Http, Message, ReactionType, ShardMessenger, UserId,
     },
     Context, CreateReply,
 };
@@ -17,7 +16,7 @@ const PUZZLE_ACTIVE_HOURS: i64 = 24;
 mod error;
 pub use error::Error;
 
-mod core;
+pub mod core;
 use core::{AsEmoji, Guess};
 
 use mongodb::error::Error as MongoDbError;
@@ -44,7 +43,7 @@ use utils::CreateReplyExt;
 pub struct GameState {
     user: UserId,
     guesses: Vec<Guess>,
-    num_guesses: usize,
+    pub num_guesses: usize,
     finished: bool,
     solved: bool,
 }
@@ -101,7 +100,10 @@ impl AsEmoji for GameState {
     }
 }
 
-use self::{puzzle::DailyPuzzle, utils::ComponentInteractionExt};
+use self::{
+    puzzle::DailyPuzzle,
+    utils::{ComponentInteractionExt, OptionComponentInteractionExt},
+};
 
 fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {
@@ -523,7 +525,7 @@ async fn handle_message(
 }
 
 async fn handle_interaction(
-    cache_http: impl CacheHttp + AsRef<Http> + AsRef<ShardMessenger>,
+    cache_http: impl CacheHttp + AsRef<Http> + AsRef<ShardMessenger> + Copy,
     interaction: ComponentInteraction,
     owner: impl AsRef<UserId>,
     puzzle: &Puzzle,
@@ -556,11 +558,11 @@ async fn handle_interaction(
                 if interaction
                     .get_response(&cache_http)
                     .await?
-                    .await_component_interaction(&cache_http)
+                    .await_component_interaction(cache_http)
                     .await
-                    .is_some_and(|interaction| interaction.data.custom_id.as_str() == "yes")
+                    .is_some_with_id("yes")
                 {
-                    interaction.delete_response(&cache_http).await?;
+                    interaction.delete_response(cache_http).await?;
 
                     interaction
                         .create_followup(
@@ -571,20 +573,14 @@ async fn handle_interaction(
 
                     Some(WordleCommand::Cancel)
                 } else {
-                    interaction.delete_response(&cache_http).await?;
+                    interaction.delete_response(cache_http).await?;
 
                     None
                 }
             }
             "pause" => {
                 interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .content("your game has been saved!"),
-                        ),
-                    )
+                    .reply_ephemeral(cache_http, "your game has been saved!")
                     .await?;
 
                 Some(WordleCommand::Pause)
@@ -592,29 +588,29 @@ async fn handle_interaction(
             "give_up" => {
                 let confirm_message = blank_confirm_message.content("really give up?");
 
-                interaction.respond(&cache_http, confirm_message).await?;
+                interaction.respond(cache_http, confirm_message).await?;
 
                 if interaction
-                    .get_response(&cache_http)
+                    .get_response(cache_http)
                     .await?
-                    .await_component_interaction(&cache_http)
+                    .await_component_interaction(cache_http)
                     .await
-                    .is_some_and(|interaction| interaction.data.custom_id.as_str() == "yes")
+                    .is_some_with_id("yes")
                 {
                     let give_up_text = format!("the word was: {}", puzzle.answer());
 
-                    interaction.delete_response(&cache_http).await?;
+                    interaction.delete_response(cache_http).await?;
 
                     interaction
                         .create_followup(
-                            &cache_http,
+                            cache_http,
                             CreateInteractionResponseFollowup::new().content(give_up_text),
                         )
                         .await?;
 
                     Some(WordleCommand::GiveUp)
                 } else {
-                    interaction.delete_response(&cache_http).await?;
+                    interaction.delete_response(cache_http).await?;
 
                     None
                 }
@@ -625,38 +621,17 @@ async fn handle_interaction(
         match interaction.data.custom_id.as_str() {
             "cancel" => {
                 interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .ephemeral(true)
-                                .content("you can only cancel games you started!"),
-                        ),
-                    )
+                    .reply_ephemeral(cache_http, "you can only cancel games you started!")
                     .await?
             }
             "pause" => {
                 interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .ephemeral(true)
-                                .content("you can only pause games you started!"),
-                        ),
-                    )
+                    .reply_ephemeral(cache_http, "you can only pause games you started!")
                     .await?
             }
             "give_up" => {
                 interaction
-                    .create_response(
-                        &cache_http,
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .ephemeral(true)
-                                .content("you can only give up on games you started!"),
-                        ),
-                    )
+                    .reply_ephemeral(cache_http, "you can only pause games you started!")
                     .await?
             }
             _ => (),
