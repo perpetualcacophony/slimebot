@@ -16,7 +16,7 @@ const PUZZLE_ACTIVE_HOURS: i64 = 24;
 mod error;
 pub use error::Error;
 
-mod core;
+pub mod core;
 use core::{AsEmoji, Guess};
 
 use mongodb::error::Error as MongoDbError;
@@ -43,7 +43,7 @@ use utils::CreateReplyExt;
 pub struct GameState {
     user: UserId,
     guesses: Vec<Guess>,
-    num_guesses: usize,
+    pub num_guesses: usize,
     finished: bool,
     solved: bool,
 }

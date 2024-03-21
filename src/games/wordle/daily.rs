@@ -123,6 +123,21 @@ impl DailyWordles {
             .into_iter()
             .filter(move |daily| daily.is_playable_for(user)))
     }
+
+    pub async fn wordle_exists(&self, number: u32) -> DbResult<bool> {
+        self.collection
+            .find_one(doc! { "puzzle.number": number }, None)
+            .await
+            .map(|daily| daily.is_some())
+    }
+
+    pub async fn find_game(&self, user: UserId, wordle: u32) -> DbResult<Option<GameState>> {
+        Ok(self
+            .collection
+            .find_one(doc! { "puzzle.number": wordle }, None)
+            .await?
+            .and_then(|daily| daily.user_game(user).cloned()))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
