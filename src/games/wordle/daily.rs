@@ -8,7 +8,7 @@ use mongodb::{
 };
 use poise::serenity_prelude::{futures::StreamExt, UserId};
 use serde::{Deserialize, Serialize};
-use tracing::trace;
+use tracing::{debug, instrument, trace};
 
 use super::{core::Word, puzzle, DbResult, GameState};
 
@@ -24,8 +24,9 @@ impl DailyWordles {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn latest(&self) -> DbResult<Option<DailyWordle>> {
-        Ok(self
+        let daily = self
             .collection
             .find_one(
                 None,
@@ -33,12 +34,21 @@ impl DailyWordles {
                     .sort(doc! { "puzzle.number": -1 })
                     .build(),
             )
-            .await?
-            .filter(|puzzle| !puzzle.is_expired()))
+            .await?;
+
+        debug!(?daily);
+
+        let puzzle = daily.clone().map(|d| d.puzzle.number);
+
+        debug!(?puzzle);
+
+        Ok(daily)
     }
 
     pub async fn new_daily(&self, word: &Word) -> DbResult<DailyWordle> {
         let latest_number = self.latest().await?.map_or(0, |daily| daily.puzzle.number);
+
+        debug!(latest_number);
 
         let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, word.clone());
         let wordle = DailyWordle::new(puzzle);
@@ -101,7 +111,8 @@ impl DailyWordles {
             .find(
                 None,
                 FindOptions::builder()
-                    .sort(doc! { "puzzle.number":1 })
+                    // anything beyond the first 2 wordles will always be expired
+                    .sort(doc! { "puzzle.number":-1 })
                     .limit(2)
                     .build(),
             )
