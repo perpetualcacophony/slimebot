@@ -1,7 +1,4 @@
-FROM clux/muslrust:stable AS chef
-USER root
-RUN cargo install cargo-chef
-WORKDIR /app
+FROM lukemathwalker/cargo-chef:latest-rust-alpine
 
 FROM chef AS planner
 COPY . .
