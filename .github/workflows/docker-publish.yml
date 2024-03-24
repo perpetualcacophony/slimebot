@@ -94,10 +94,11 @@ jobs:
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
   
   redeploy:
+    needs: build_push
     runs-on: ubuntu-latest
 
     steps:
       - name: Trigger redeploy webhook
         uses: distributhor/workflow-webhook@v3
         with:
-          webhook_url: ${{ secrets.WEBHOOK_URL }}
+          webhook_url: ${{ secrets.REDEPLOY_WEBHOOK_URL }}
