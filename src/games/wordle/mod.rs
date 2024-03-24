@@ -15,6 +15,7 @@ const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 pub use error::Error;
+use tracing::{debug, trace};
 
 pub mod core;
 use core::{AsEmoji, Guess};
@@ -167,14 +168,23 @@ pub async fn play(
     // refresh daily puzzle
     let new_daily_word = words.random_answer();
     if let Some(daily) = dailies.latest().await? {
-        if daily.is_old() {
+        trace!("latest puzzle exists");
+
+        if daily.is_recent().not() {
+            trace!("latest puzzle is old");
             dailies.new_daily(&new_daily_word).await?;
+        } else {
+            trace!("latest puzzle not old");
         }
     } else {
+        trace!("no latest puzzle exists");
+
         dailies.new_daily(&new_daily_word).await?;
     }
 
     let mut playable = dailies.playable_for(owner.id).await?.peekable();
+
+    debug!(playable = ?dailies.playable_for(owner.id).await?.collect::<Vec<_>>());
 
     // only peeking at the value for now because the user might not consume it
     let next_daily = playable.peek();
