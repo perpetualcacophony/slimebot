@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Not};
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
+        self, futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
         CreateButton, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
         CreateMessage, EditMessage, Http, Message, ReactionType, ShardMessenger, UserId,
     },
@@ -103,7 +103,7 @@ impl AsEmoji for GameState {
 
 use self::{
     puzzle::DailyPuzzle,
-    utils::{ComponentInteractionExt, OptionComponentInteractionExt},
+    utils::{ComponentInteractionExt, ContextExt, OptionComponentInteractionExt},
 };
 
 fn create_menu(daily_available: bool) -> CreateReply {
@@ -135,6 +135,80 @@ fn create_menu(daily_available: bool) -> CreateReply {
                 .style(poise::serenity_prelude::ButtonStyle::Secondary),
         )
         .reply(true)
+}
+
+async fn mode_select_menu(
+    ctx: crate::discord::commands::Context<'_>,
+) -> Result<(GameType, Message)> {
+    let menu_builder = create_menu(next_daily.is_some());
+    let menu = ctx.send(menu_builder).await?.into_message().await?;
+
+    if let Some(interaction) = menu.await_component_interaction(ctx).await {
+        let channel = if interaction.data.custom_id.as_str() == "daily" && in_guild {
+            owner.create_dm_channel(ctx).await?.id
+        } else {
+            ctx.channel_id()
+        };
+
+        let (mode, menu) = match interaction.data.custom_id.as_str() {
+            "daily" => {
+                let message = if ctx.in_guild() {
+                    interaction
+                        .reply_ephemeral(
+                            ctx,
+                            "you can't play a daily wordle in a server - check your dms!",
+                        )
+                        .await?;
+
+                    menu.delete(ctx).await?;
+
+                    channel.say(ctx, "loading daily wordle...").await?
+                } else {
+                    interaction
+                        .update_message(
+                            ctx,
+                            CreateInteractionResponseMessage::new()
+                                .content("loading daily wordle...")
+                                .components(Vec::new()),
+                        )
+                        .await?;
+
+                    menu
+                };
+
+                (GameType::Daily, message)
+            }
+            "random" => {
+                interaction
+                    .update_message(
+                        ctx,
+                        CreateInteractionResponseMessage::new()
+                            .content("loading random wordle...")
+                            .components(Vec::new()),
+                    )
+                    .await?;
+
+                (GameType::Random, menu)
+            }
+            "cancel" => {
+                interaction
+                    .update_message(
+                        ctx,
+                        CreateInteractionResponseMessage::new()
+                            .content("canceled!")
+                            .components(Vec::new()),
+                    )
+                    .await?;
+
+                return Ok(());
+            }
+            _ => unreachable!(),
+        };
+
+        Ok((mode, menu))
+    } else {
+        panic!()
+    }
 }
 
 pub async fn play(
@@ -366,58 +440,18 @@ pub async fn play(
     write.push((channel, game_msg.clone()));
     drop(write);
 
-    let mut messages = channel.await_replies(ctx).stream();
-    let mut interactions = game_msg.await_component_interactions(ctx).stream();
-
-    let game_won = loop {
-        tokio::select! {
-            Some(msg) = messages.next() => {
-                if let Some(guess) = handle_message(ctx, &msg, &words, &puzzle).await? {
-                    guesses.push(guess.clone());
-                    let state = GameState::unfinished(owner.id, &guesses);
-                    let emojis = state.emoji_with_style(style);
-
-                    game_msg.edit(ctx, EditMessage::new().content(format!("{title} {}/6\n{emojis}", guesses.len()))).await?;
-
-                    if let Some(num) = puzzle.number() {
-                        if state.is_solved() {
-                            dailies.update(num, state.into_finished()).await?;
-                            msg.reply(ctx, "you win!").await?;
-                            break true;
-                        } else {
-                            dailies.update(num, state).await?;
-                        }
-                    } else if state.is_solved() {
-                        msg.reply(ctx, "you win!").await?;
-                        break true;
-                    }
-                }
-            },
-            Some(interaction) = interactions.next() => {
-                if let Some(cmd) = handle_interaction(ctx, interaction, owner.id, &puzzle).await? {
-                    match cmd {
-                        WordleCommand::Pause => {
-                            let state = GameState::unfinished(owner.id, &guesses);
-                            dailies.update(puzzle.number()
-                                .expect("this option is only available for daily puzzles"), state)
-                                .await?;
-
-                            break false;
-                        }
-                        WordleCommand::Cancel => { /* nothing to save */ break false; }
-                        WordleCommand::GiveUp => {
-                            if let Some(num) = puzzle.number() {
-                                let state = GameState::finished(owner.id, &guesses);
-                                dailies.update(num, state).await?;
-                            }
-
-                            break false;
-                        }
-                    }
-                }
-            }
-        }
-    };
+    let game_won = game_loop(
+        ctx,
+        &mut game_msg,
+        &mut guesses,
+        puzzle,
+        style,
+        owner.id,
+        dailies,
+        &words,
+        &title,
+    )
+    .await?;
 
     let mut write = active_games.write().await;
     for (i, game) in write.clone().into_iter().enumerate() {
@@ -508,6 +542,79 @@ pub async fn play(
     }
 
     Ok(())
+}
+
+async fn game_loop(
+    ctx: crate::discord::commands::Context<'_>,
+    game_msg: &mut Message,
+    guesses: &mut Vec<Guess>,
+    puzzle: Puzzle,
+    style: GameStyle,
+    owner: UserId,
+    dailies: DailyWordles,
+    words: &WordsList,
+    title: &str,
+) -> Result<bool> {
+    let mut messages = game_msg.channel_id.await_replies(ctx).stream();
+    let mut interactions = game_msg.await_component_interactions(ctx).stream();
+
+    Ok(loop {
+        tokio::select! {
+            Some(msg) = messages.next() => {
+                if let Some(guess) = handle_message(ctx, &msg, &words, &puzzle).await? {
+                    guesses.push(guess.clone());
+                    let state = GameState::unfinished(owner, &guesses);
+                    let emojis = state.emoji_with_style(style);
+
+                    game_msg.edit(ctx, EditMessage::new().content(format!("{title} {}/6\n{emojis}", guesses.len()))).await?;
+
+                    if let Some(num) = puzzle.number() {
+                        if state.is_solved() {
+                            dailies.update(num, state.into_finished()).await?;
+                            msg.reply(ctx, "you win!").await?;
+                            break true;
+                        } else {
+                            dailies.update(num, state).await?;
+                        }
+                    } else if state.is_solved() {
+                        msg.reply(ctx, "you win!").await?;
+                        break true;
+                    }
+                }
+            },
+            Some(interaction) = interactions.next() => {
+                if let Some(cmd) = handle_interaction(ctx, interaction, owner, &puzzle).await? {
+                    match cmd {
+                        WordleCommand::Pause => {
+                            let state = GameState::unfinished(owner, &guesses);
+                            dailies.update(puzzle.number()
+                                .expect("this option is only available for daily puzzles"), state)
+                                .await?;
+
+                            break false;
+                        }
+                        WordleCommand::Cancel => { /* nothing to save */ break false; }
+                        WordleCommand::GiveUp => {
+                            if let Some(num) = puzzle.number() {
+                                let state = GameState::finished(owner, &guesses);
+                                dailies.update(num, state).await?;
+                            }
+
+                            break false;
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
+async fn redirect_to_dm(
+    ctx: crate::discord::commands::Context<'_>,
+) -> serenity_prelude::Result<Message> {
+    ctx.author()
+        .dm(ctx, CreateMessage::new().content("loading..."))
+        .await
 }
 
 async fn handle_message(

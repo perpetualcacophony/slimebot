@@ -6,6 +6,8 @@ use poise::{
     CreateReply,
 };
 
+use crate::Context;
+
 pub trait CreateReplyExt: Default {
     fn new() -> Self {
         Self::default()
@@ -109,5 +111,15 @@ pub trait OptionComponentInteractionExt {
 impl OptionComponentInteractionExt for Option<ComponentInteraction> {
     fn is_some_with_id(&self, custom_id: &str) -> bool {
         self.as_ref().is_some_and(|ci| ci.custom_id() == custom_id)
+    }
+}
+
+pub trait ContextExt {
+    fn in_guild(&self) -> bool;
+}
+
+impl ContextExt for Context<'_> {
+    fn in_guild(&self) -> bool {
+        self.guild_id().is_some()
     }
 }
