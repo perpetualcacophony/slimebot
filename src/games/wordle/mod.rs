@@ -40,6 +40,8 @@ pub use options::{GameStyle, GameType};
 mod utils;
 use utils::CreateReplyExt;
 
+mod game;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     user: UserId,
