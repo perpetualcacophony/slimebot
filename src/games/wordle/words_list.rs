@@ -1,11 +1,11 @@
 use super::core::Word;
-use rand::prelude::SliceRandom;
-use std::fs;
+use rand::{prelude::SliceRandom, seq::IteratorRandom};
+use std::{collections::HashSet, fs, hash::Hash};
 
 #[derive(Debug, Clone)]
 pub struct WordsList {
-    guesses: Vec<String>,
-    answers: Vec<String>,
+    guesses: HashSet<String>,
+    answers: HashSet<String>,
 }
 
 impl WordsList {
@@ -17,7 +17,7 @@ impl WordsList {
             })
             .lines()
             .map(|s| s.to_owned())
-            .collect::<Vec<String>>();
+            .collect::<HashSet<String>>();
 
         assert!(!guesses.is_empty(), "guesses file should not be empty");
 
@@ -28,7 +28,7 @@ impl WordsList {
             })
             .lines()
             .map(|s| s.to_owned())
-            .collect::<Vec<String>>();
+            .collect::<HashSet<String>>();
 
         Self { guesses, answers }
     }
@@ -36,6 +36,7 @@ impl WordsList {
     pub fn random_answer(&self) -> Word {
         let word = self
             .answers
+            .iter()
             .choose(&mut rand::thread_rng())
             .expect("file should not be empty");
 
@@ -55,20 +56,22 @@ impl WordsList {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::WordsList;
 
     #[test]
     fn fetch_answers() {
-        let words = ["amber", "mummy", "opals", "sonar", "today"].map(|s| s.to_owned());
+        let words = ["amber", "mummy", "opals", "sonar", "today"];
 
         let list = WordsList {
-            guesses: Vec::new(),
-            answers: words.to_vec(),
+            guesses: HashSet::new(),
+            answers: HashSet::from_iter(words.map(|s| s.to_owned())),
         };
 
         for _ in 0..10 {
             let answer = list.random_answer();
-            assert!(words.contains(&answer.to_string()))
+            assert!(words.contains(&answer.to_string().as_str()))
         }
     }
 
@@ -77,8 +80,8 @@ mod tests {
         let words = ["amber", "mummy", "opals", "sonar", "today"];
 
         let list = WordsList {
-            guesses: Vec::new(),
-            answers: words.map(|s| s.to_owned()).to_vec(),
+            guesses: HashSet::new(),
+            answers: HashSet::from_iter(words.map(|s| s.to_owned())),
         };
 
         for word in words {
