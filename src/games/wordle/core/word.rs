@@ -6,12 +6,15 @@ use tracing::{debug, trace};
 
 use crate::games::wordle::core::guess::LetterState;
 
-use super::guess::Guess;
+use super::{
+    guess::{Guess, PartialGuess},
+    AsLetters,
+};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct Word {
-    letters: Vec<char>,
+    pub letters: Vec<char>,
     letter_counts: HashMap<char, usize>,
 }
 
@@ -36,8 +39,35 @@ impl Word {
         }
     }
 
-    pub fn guess(&self, word: &str) -> Guess {
-        let mut guess: Guess = Guess::new(word);
+    pub fn guess(&self, partial: PartialGuess) -> Guess {
+        let mut letter_counts = self.letter_counts.clone();
+
+        let mut guess = Guess::new(partial);
+
+        for (index, (letter, state)) in guess.iter_mut().enumerate() {
+            if self[index] == *letter {
+                *state = LetterState::Correct;
+                let count = letter_counts.get_mut(letter).expect("word has letter");
+                *count = count.saturating_sub(1);
+            }
+        }
+
+        for (letter, state) in guess.iter_mut() {
+            if *state != LetterState::Correct
+                && letter_counts.get(letter).is_some_and(|count| *count > 0)
+            {
+                trace!("{}: wrong place", letter);
+
+                *state = LetterState::WrongPlace;
+                *letter_counts.get_mut(letter).expect("word has letter") -= 1;
+            }
+        }
+
+        guess
+    }
+
+    pub fn guess_str(&self, word: &impl AsLetters) -> Guess {
+        let mut guess: Guess = Guess::from_str(word);
         debug!(?guess);
         debug!(answer = self.to_string());
         debug!(answer = ?self.letter_counts);
@@ -52,9 +82,6 @@ impl Word {
             }
         }
 
-        debug!(word, r = ?letter_counts.get_mut(&'r'));
-        debug!(word, o = ?letter_counts.get_mut(&'o'));
-
         for (letter, state) in guess.iter_mut() {
             if *state != LetterState::Correct
                 && letter_counts.get(letter).is_some_and(|count| *count > 0)
@@ -67,6 +94,14 @@ impl Word {
         }
 
         guess
+    }
+
+    pub fn as_str(&self) -> String {
+        self.letters
+            .iter()
+            .map(|ch| ch.to_string())
+            .collect::<Vec<_>>()
+            .join("")
     }
 }
 

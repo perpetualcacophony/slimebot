@@ -1,5 +1,7 @@
+use std::borrow::Cow;
+
 use super::{
-    core::{Guess, Word},
+    core::{AsLetters, Guess, PartialGuess, Word},
     WordsList,
 };
 use chrono::Utc;
@@ -20,8 +22,16 @@ impl Puzzle {
         Self::Random(answer)
     }
 
-    pub fn guess(&self, word: &str) -> Guess {
-        self.answer().guess(word)
+    pub fn guess_str(&self, word: &impl AsLetters) -> Guess {
+        self.answer().guess_str(word)
+    }
+
+    pub fn guess(&self, partial: PartialGuess) -> Guess {
+        self.answer().guess(partial)
+    }
+
+    pub fn is_daily(&self) -> bool {
+        matches!(self, Self::Daily(..))
     }
 
     pub fn answer(&self) -> &Word {
@@ -35,6 +45,13 @@ impl Puzzle {
         match self {
             Self::Random(_) => None,
             Self::Daily(daily) => Some(daily.number),
+        }
+    }
+
+    pub fn title(&self) -> Cow<str> {
+        match self {
+            Self::Random(..) => "random wordle".into(),
+            Self::Daily(DailyPuzzle { number, .. }) => format!("daily wordle {number}").into(),
         }
     }
 }

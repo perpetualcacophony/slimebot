@@ -26,7 +26,11 @@ type CommandResult = Result<(), Error>;
 pub use watch_fic::watch_fic;
 
 use crate::{
-    built_info, discord::commands::roll::DiceRoll, errors, games::wordle::core::AsEmoji, roll::Die,
+    built_info,
+    discord::{commands::roll::DiceRoll, utils::poise::ContextExt},
+    errors,
+    games::wordle::core::AsEmoji,
+    roll::Die,
     FormatDuration,
 };
 
@@ -788,7 +792,8 @@ use crate::games::wordle;
     slash_command,
     prefix_command,
     discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
+    subcommands("daily", "random")
 )]
 pub async fn wordle(
     ctx: Context<'_>,
@@ -800,6 +805,78 @@ pub async fn wordle(
     let dailies = ctx.data().wordle.wordles();
 
     crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn daily(ctx: Context<'_>) -> CommandResult {
+    let wordles = ctx.data().wordle.wordles();
+    let mut playable = wordles.playable_for(ctx.author().id).await?;
+
+    if let Some(daily) = playable.next() {
+        if let Some(message_id) = ctx.data().wordle().game_in_channel(ctx.channel_id()).await {
+            ctx.reply_ephemeral(format!(
+                "there's already a game being played in this channel! {}",
+                message_id.link(ctx.channel_id(), ctx.guild_id()),
+            ))
+            .await?;
+
+            return Ok(());
+        } else {
+            // play game
+            todo!()
+        }
+    } else {
+        ctx.reply_ephemeral("you don't have a daily wordle available!")
+            .await?;
+
+        return Ok(());
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn random(ctx: Context<'_>) -> CommandResult {
+    let wordle = ctx.data().wordle();
+
+    if let Some(msg) = wordle.game_in_channel(ctx.channel_id()).await {
+        ctx.reply_ephemeral(format!(
+            "there's already a game being played in this channel! {}",
+            msg.link(ctx.channel_id(), ctx.guild_id()),
+        ))
+        .await?;
+
+        return Ok(());
+    } else {
+        let mut game_msg = ctx.reply("loading...").await?.into_message().await?;
+        wordle.add_game(ctx.channel_id(), game_msg.id).await;
+
+        let puzzle = wordle::Puzzle::random(wordle.words());
+
+        let mut game =
+            wordle::Game::new(ctx, &mut game_msg, wordle.words(), wordle.wordles(), puzzle);
+
+        game.setup().await?;
+
+        // play game
+        game.run().await?;
+
+        wordle.remove_game(ctx.channel_id()).await;
+    }
 
     Ok(())
 }

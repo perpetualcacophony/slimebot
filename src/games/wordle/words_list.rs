@@ -47,6 +47,10 @@ impl WordsList {
 
         self.guesses.contains(guess) || self.answers.contains(guess)
     }
+
+    pub fn get_word(&self, s: &str) -> Option<Word> {
+        self.valid_guess(s).then_some(Word::parse(s))
+    }
 }
 
 #[cfg(test)]

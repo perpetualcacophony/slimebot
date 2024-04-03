@@ -23,7 +23,7 @@ use core::{AsEmoji, Guess};
 use mongodb::error::Error as MongoDbError;
 
 mod puzzle;
-use puzzle::Puzzle;
+pub use puzzle::Puzzle;
 
 type DbResult<T> = std::result::Result<T, MongoDbError>;
 type Result<T> = std::result::Result<T, crate::errors::Error>;
@@ -41,6 +41,7 @@ mod utils;
 use utils::CreateReplyExt;
 
 mod game;
+pub use game::Game;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -139,9 +140,16 @@ fn create_menu(daily_available: bool) -> CreateReply {
         .reply(true)
 }
 
-async fn mode_select_menu(
-    ctx: crate::discord::commands::Context<'_>,
+/*async fn mode_select_menu(
+    ctx: crate::Context<'_>,
+    daily_wordles: DailyWordles,
+    options: GameOptions,
 ) -> Result<(GameType, Message)> {
+    let in_guild = ctx.in_guild();
+    let playable = daily_wordles.playable_for(options.owner).await?;
+
+    let next_daily = playable.next();
+
     let menu_builder = create_menu(next_daily.is_some());
     let menu = ctx.send(menu_builder).await?.into_message().await?;
 
@@ -211,7 +219,7 @@ async fn mode_select_menu(
     } else {
         panic!()
     }
-}
+}*/
 
 pub async fn play(
     ctx: crate::discord::commands::Context<'_>,
@@ -223,13 +231,10 @@ pub async fn play(
 ) -> Result<()> {
     let active_games = ctx.data().wordle().active_games();
     let read = active_games.read().await;
-    if let Some((_, msg)) = read
-        .iter()
-        .find(|(channel, _)| *channel == ctx.channel_id())
-    {
+    if let Some(msg) = read.get(&ctx.channel_id()) {
         ctx.reply(format!(
             "there's already a wordle game being played in this channel! [jump?]({})",
-            msg.link()
+            msg.link(ctx.channel_id(), ctx.guild_id())
         ))
         .await?;
 
@@ -439,7 +444,7 @@ pub async fn play(
     let mut game_msg = menu;
 
     let mut write = active_games.write().await;
-    write.push((channel, game_msg.clone()));
+    write.insert(channel, game_msg.id);
     drop(write);
 
     let game_won = game_loop(
@@ -456,10 +461,8 @@ pub async fn play(
     .await?;
 
     let mut write = active_games.write().await;
-    for (i, game) in write.clone().into_iter().enumerate() {
-        if game.0 == channel {
-            write.remove(i);
-        }
+    if write.get_mut(&channel).is_some() {
+        write.remove(&channel);
     }
     drop(write);
 
@@ -634,7 +637,7 @@ async fn handle_message(
     if content.contains(' ').not() && content.chars().count() == 5 {
         if words.valid_guess(content) {
             msg.react(cache_http, check_mark).await?;
-            return Ok(Some(puzzle.guess(content)));
+            return Ok(Some(puzzle.guess_str(&content)));
         } else {
             msg.react(cache_http, question_mark).await?;
         }

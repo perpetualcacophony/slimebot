@@ -3,7 +3,7 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 /// Functionality called from Discord.
 mod discord;
@@ -89,14 +89,14 @@ impl Data {
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
-    active_games: Arc<RwLock<Vec<(ChannelId, Message)>>>,
+    active_games: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
         let wordles = DailyWordles::new(db);
-        let active_games = Arc::new(RwLock::new(Vec::new()));
+        let active_games = Arc::new(RwLock::new(HashMap::new()));
 
         Self {
             words,
@@ -113,8 +113,26 @@ impl WordleData {
         &self.wordles
     }
 
-    fn active_games(&self) -> Arc<RwLock<Vec<(ChannelId, Message)>>> {
+    fn active_games(&self) -> Arc<RwLock<HashMap<ChannelId, MessageId>>> {
         self.active_games.clone()
+    }
+
+    async fn game_in_channel(&self, id: ChannelId) -> Option<MessageId> {
+        let games = self.active_games();
+        let guard = games.read().await;
+        guard.get(&id).copied()
+    }
+
+    async fn add_game(&self, channel_id: ChannelId, message_id: MessageId) {
+        let games = self.active_games();
+        let mut guard = games.write().await;
+        guard.insert(channel_id, message_id);
+    }
+
+    async fn remove_game(&self, channel_id: ChannelId) {
+        let games = self.active_games();
+        let mut guard = games.write().await;
+        guard.remove(&channel_id);
     }
 }
 
