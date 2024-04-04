@@ -7,7 +7,8 @@ use anyhow::anyhow;
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateMessage, Member, MessageId,
+        User,
     },
     CreateReply,
 };
@@ -804,7 +805,7 @@ pub async fn wordle(
     let words = ctx.data().wordle.words();
     let dailies = ctx.data().wordle.wordles();
 
-    crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
+    //crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
 
     Ok(())
 }
@@ -817,7 +818,9 @@ pub async fn wordle(
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn daily(ctx: Context<'_>) -> CommandResult {
-    let wordles = ctx.data().wordle.wordles();
+    let wordle = ctx.data().wordle();
+    let wordles = wordle.wordles();
+    wordles.refresh(wordle.words()).await?;
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
@@ -830,8 +833,31 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
 
             return Ok(());
         } else {
+            let mut message = if ctx.guild_id().is_some() {
+                ctx.reply("loading...").await?.into_message().await?
+            } else {
+                ctx.author()
+                    .dm(ctx, CreateMessage::new().content("loading..."))
+                    .await?
+            };
+
+            wordle.add_game(message.channel_id, message.id).await;
+
             // play game
-            todo!()
+            let mut game = wordle::Game::new(
+                ctx,
+                &mut message,
+                ctx.data().wordle.words(),
+                wordles,
+                daily.puzzle,
+            );
+
+            game.setup().await?;
+            game.run().await?;
+
+            wordle.remove_game(ctx.channel_id()).await;
+
+            return Ok(());
         }
     } else {
         ctx.reply_ephemeral("you don't have a daily wordle available!")
@@ -852,6 +878,8 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
 )]
 pub async fn random(ctx: Context<'_>) -> CommandResult {
     let wordle = ctx.data().wordle();
+
+    debug!(?wordle.active_games);
 
     if let Some(msg) = wordle.game_in_channel(ctx.channel_id()).await {
         ctx.reply_ephemeral(format!(

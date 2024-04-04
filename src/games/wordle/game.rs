@@ -39,10 +39,10 @@ impl<'a> Game<'a> {
         msg: &'a mut Message,
         words: &'a WordsList,
         dailies: &'a DailyWordles,
-        puzzle: Puzzle,
+        puzzle: impl Into<Puzzle>,
     ) -> Self {
         Self {
-            puzzle,
+            puzzle: puzzle.into(),
             guesses: Vec::with_capacity(6),
             ctx,
             msg,
@@ -52,7 +52,7 @@ impl<'a> Game<'a> {
     }
 
     pub async fn setup(&mut self) -> SerenityResult<()> {
-        self.update_message().await;
+        self.update_message().await?;
         self.add_buttons().await
     }
 
@@ -65,7 +65,7 @@ impl<'a> Game<'a> {
             .await
     }
 
-    pub fn context(&self) -> GameContext<'a> {
+    fn context(&self) -> GameContext<'a> {
         GameContext {
             poise: self.ctx,
             words_list: self.words,
@@ -88,11 +88,10 @@ impl<'a> Game<'a> {
         format!("{}\n{}", self.title(), self.guesses.as_emoji())
     }
 
-    pub async fn update_message(&mut self) {
+    pub async fn update_message(&mut self) -> SerenityResult<()> {
         self.msg
             .edit(self.ctx, EditMessage::new().content(self.content()))
             .await
-            .unwrap();
     }
 
     pub fn puzzle(&self) -> &Puzzle {
@@ -165,7 +164,7 @@ impl<'a> Game<'a> {
                     if let Some(partial) = msg.find_guess(ctx).await? {
                         self.guess(partial);
 
-                        self.update_message().await;
+                        self.update_message().await?;
 
                         if let Some(num) = self.puzzle.number() {
                             self.dailies.update(num, self.get_state(self.is_solved())).await?;
@@ -182,9 +181,10 @@ impl<'a> Game<'a> {
                             "pause" => {
                                 let number = self.puzzle().number().expect("this option is only available for daily puzzles");
                                 self.dailies.update(number, self.get_state(false)).await?;
+                                break;
                             }
                             "cancel" => {
-
+                                break;
                             }
                             "give_up" => {
                                 if let Some(num) = self.puzzle().number() {
@@ -192,6 +192,7 @@ impl<'a> Game<'a> {
                                 }
 
                                 self.finish("game over!").await?;
+                                break;
                             }
                             _ => unreachable!()
                         }
@@ -199,6 +200,8 @@ impl<'a> Game<'a> {
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -238,7 +241,7 @@ trait ComponentInteractionExt {
 
     async fn await_yes_no(
         &self,
-        shard_http: impl AsRef<Http> + AsRef<ShardMessenger> + Copy,
+        shard_cache_http: impl AsRef<Http> + AsRef<ShardMessenger> + CacheHttp + Copy,
     ) -> serenity_prelude::Result<Option<bool>>;
 }
 
@@ -263,19 +266,28 @@ impl ComponentInteractionExt for ComponentInteraction {
             .yes_no_buttons();
 
         self.respond(ctx, builder).await?;
-        self.await_yes_no(ctx).await.map(|op| op.unwrap())
+        let response = self
+            .await_yes_no(ctx)
+            .await
+            .map(|op| op.unwrap_or_default());
+
+        //self.delete_response(ctx).await?;
+
+        response
     }
 
     async fn await_yes_no(
         &self,
-        shard_http: impl AsRef<Http> + AsRef<ShardMessenger> + Copy,
+        shard_cache_http: impl AsRef<Http> + AsRef<ShardMessenger> + CacheHttp + Copy,
     ) -> serenity_prelude::Result<Option<bool>> {
         if let Some(interaction) = self
-            .get_response(shard_http)
+            .get_response(shard_cache_http)
             .await?
-            .await_component_interaction(shard_http)
+            .await_component_interaction(shard_cache_http)
             .await
         {
+            interaction.acknowledge(shard_cache_http).await?;
+
             let result = match interaction.custom_id() {
                 "yes" => Some(true),
                 "no" => Some(false),

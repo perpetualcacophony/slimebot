@@ -54,6 +54,12 @@ impl WordsList {
     }
 }
 
+impl AsRef<WordsList> for WordsList {
+    fn as_ref(&self) -> &WordsList {
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
