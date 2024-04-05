@@ -788,28 +788,32 @@ pub async fn version(ctx: Context<'_>) -> CommandResult {
 
 use crate::games::wordle;
 
+/// play wordle right from discord!
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("daily", "random")
+    subcommands("daily", "random", "display")
 )]
-pub async fn wordle(
-    ctx: Context<'_>,
-    mode: Option<wordle::GameType>,
-    style: Option<wordle::GameStyle>,
-    #[flag] fix_flags: bool,
-) -> CommandResult {
-    let words = ctx.data().wordle.words();
-    let dailies = ctx.data().wordle.wordles();
+pub async fn wordle(ctx: Context<'_>) -> CommandResult {
+    //let words = ctx.data().wordle.words();
+    //let dailies = ctx.data().wordle.wordles();
 
     //crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
+
+    poise::builtins::help(
+        ctx,
+        Some("wordle"),
+        poise::builtins::HelpConfiguration::default(),
+    )
+    .await?;
 
     Ok(())
 }
 
+/// play a daily wordle in DMs
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -834,11 +838,13 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
             return Ok(());
         } else {
             let mut message = if ctx.guild_id().is_some() {
-                ctx.reply("loading...").await?.into_message().await?
-            } else {
+                ctx.reply("you can't play a daily wordle in a server - check your dms!")
+                    .await?;
                 ctx.author()
                     .dm(ctx, CreateMessage::new().content("loading..."))
                     .await?
+            } else {
+                ctx.reply("loading...").await?.into_message().await?
             };
 
             wordle.add_game(message.channel_id, message.id).await;
@@ -856,19 +862,16 @@ pub async fn daily(ctx: Context<'_>) -> CommandResult {
             game.run().await?;
 
             wordle.remove_game(ctx.channel_id()).await;
-
-            return Ok(());
         }
     } else {
         ctx.reply_ephemeral("you don't have a daily wordle available!")
             .await?;
-
-        return Ok(());
     }
 
     Ok(())
 }
 
+/// practice with a random wordle
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -909,6 +912,7 @@ pub async fn random(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
+/// display your own results for a given wordle, or someone else's
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -916,12 +920,16 @@ pub async fn random(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn display_wordle(ctx: Context<'_>, wordle: u32, user: Option<User>) -> CommandResult {
+pub async fn display(
+    ctx: Context<'_>,
+    #[description = "the wordle's number"] number: u32,
+    #[description = "the user to show results for (defaults to you)"] user: Option<User>,
+) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
     let wordles = ctx.data().wordle.wordles();
 
-    if wordles.wordle_exists(wordle).await?.not() {
+    if wordles.wordle_exists(number).await?.not() {
         ctx.send(
             CreateReply::default()
                 .content("that wordle doesn't exist!")
@@ -934,7 +942,7 @@ pub async fn display_wordle(ctx: Context<'_>, wordle: u32, user: Option<User>) -
 
     let user = user.as_ref().unwrap_or_else(|| ctx.author());
 
-    if let Some(game) = wordles.find_game(user.id, wordle).await? {
+    if let Some(game) = wordles.find_game(user.id, number).await? {
         if game.num_guesses == 0 {
             ctx.send(
                 CreateReply::default()
@@ -947,7 +955,7 @@ pub async fn display_wordle(ctx: Context<'_>, wordle: u32, user: Option<User>) -
 
         let text = format!(
             "wordle {} (`{}`):\n>>> {}",
-            wordle,
+            number,
             user.name,
             game.as_emoji()
         );
