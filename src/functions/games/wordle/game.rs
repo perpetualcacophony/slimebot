@@ -9,9 +9,8 @@ use poise::serenity_prelude::{
 };
 
 use crate::{
-    games::wordle::{
-        core::AsEmoji, handle_interaction, handle_message,
-        utils::ComponentInteractionExt as UtilsComponentInteractionExt,
+    functions::games::wordle::{
+        core::AsEmoji, utils::ComponentInteractionExt as UtilsComponentInteractionExt,
     },
     Context,
 };

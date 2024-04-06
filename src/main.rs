@@ -12,9 +12,6 @@ mod discord;
 use discord::commands::*;
 use mongodb::Database;
 
-pub mod games;
-use games::wordle::{DailyWordles, WordsList};
-
 /// Config file parsing and option access.
 mod config;
 
@@ -91,6 +88,8 @@ impl Data {
         &self.wordle
     }
 }
+
+use functions::games::wordle::{DailyWordles, WordsList};
 
 #[derive(Debug, Clone)]
 struct WordleData {

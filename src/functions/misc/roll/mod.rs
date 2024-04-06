@@ -248,7 +248,7 @@ mod tests {
     use tracing::trace;
     use tracing_test::traced_test;
 
-    use crate::discord::commands::roll::NaturalI8;
+    use super::natural::NaturalI8;
 
     use super::{natural::NaturalI8Constants, DiceRoll, Die};
 

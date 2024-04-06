@@ -8,7 +8,7 @@ use std::{
 use poise::serenity_prelude::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::games::wordle::WordsList;
+use super::super::words_list::WordsList;
 
 use super::{AsEmoji, AsLetters};
 
