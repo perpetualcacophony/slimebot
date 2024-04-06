@@ -1,5 +1,6 @@
 #![warn(clippy::perf)]
 #![warn(clippy::unwrap_used)]
+#![feature(macro_metavar_expr)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
