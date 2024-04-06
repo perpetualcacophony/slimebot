@@ -187,6 +187,7 @@ async fn main() {
                 version(),
                 wordle(),
                 help(),
+                eightball(),
             ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),

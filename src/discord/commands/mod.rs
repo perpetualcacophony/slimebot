@@ -995,3 +995,6 @@ pub async fn help(
 
     Ok(())
 }
+
+mod eightball;
+pub use eightball::eightball;
