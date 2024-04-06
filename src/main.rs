@@ -22,6 +22,8 @@ mod db;
 
 mod errors;
 
+mod functions;
+
 use poise::{
     serenity_prelude::{
         self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, Message,
@@ -168,28 +170,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![
-                ping(),
-                pong(),
-                pfp(),
-                watch_fic(),
-                echo(),
-                ban(),
-                banban(),
-                uptime(),
-                //purge_after(),
-                borzoi(),
-                cat(),
-                fox(),
-                minecraft(),
-                roll(),
-                flip(),
-                d20(),
-                version(),
-                wordle(),
-                help(),
-                eightball(),
-            ],
+            commands: discord::commands::list(),
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()

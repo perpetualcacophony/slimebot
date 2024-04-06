@@ -28,7 +28,7 @@ pub use watch_fic::watch_fic;
 
 use crate::{
     built_info,
-    discord::{commands::roll::DiceRoll, utils::poise::ContextExt},
+    discord::{commands::roll::DiceRoll, utils::ContextExt},
     errors,
     games::wordle::core::AsEmoji,
     roll::Die,
@@ -996,5 +996,8 @@ pub async fn help(
     Ok(())
 }
 
-mod eightball;
-pub use eightball::eightball;
+mod misc;
+pub use misc::eightball;
+
+mod list;
+pub use list::list;

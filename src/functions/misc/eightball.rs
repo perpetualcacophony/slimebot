@@ -1,7 +1,6 @@
 use core::fmt;
 use std::{collections::HashMap, ops::Div};
 
-use super::CommandResult;
 use crate::Context;
 use rand::{
     distributions::{
@@ -41,7 +40,7 @@ create_tone_macros! {
 
 macro_rules! create_answer_consts {
     ( $($answer:expr )+ ) => {
-        const ANSWERS: Answers = Answers(&[
+        pub const ANSWERS: Answers = Answers(&[
             $( $answer ),+
         ]);
     }
@@ -76,25 +75,8 @@ create_answer_consts! {
     neg!("No. Banned" 0.1)
 }
 
-#[instrument(skip_all)]
-#[poise::command(
-    slash_command,
-    prefix_command,
-    rename = "8ball",
-    discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
-)]
-pub async fn eightball(ctx: Context<'_>) -> CommandResult {
-    use rand::prelude::thread_rng;
-
-    let answer = ANSWERS.get(&mut thread_rng());
-    ctx.reply(answer).await?;
-
-    Ok(())
-}
-
 #[derive(PartialEq, Debug, Copy, Clone)]
-struct Answer {
+pub struct Answer {
     tone: AnswerTone,
     text: &'static str,
     weight: f32,
@@ -129,14 +111,14 @@ impl fmt::Display for Answer {
     }
 }
 
-struct Answers(&'static [Answer]);
+pub struct Answers(&'static [Answer]);
 
 impl Answers {
     fn weighted_dist(&self) -> WeightedIndex<f32> {
         WeightedIndex::new(self.0.iter().map(|ans| ans.weight)).unwrap()
     }
 
-    fn get(&self, rng: &mut impl Rng) -> Answer {
+    pub fn get(&self, rng: &mut impl Rng) -> Answer {
         let weights = self.weighted_dist();
         self.0[weights.sample(rng)]
     }
@@ -172,7 +154,7 @@ mod tests {
     mod stability {
         use std::collections::HashMap;
 
-        use crate::discord::commands::eightball::AnswerTone;
+        use super::super::AnswerTone;
 
         use super::super::ANSWERS;
 

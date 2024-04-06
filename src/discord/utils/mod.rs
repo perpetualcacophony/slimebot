@@ -1,2 +1,2 @@
-pub mod poise;
-pub use poise::CreateReplyExt;
+mod poise;
+pub use poise::{ContextExt, CreateReplyExt};
