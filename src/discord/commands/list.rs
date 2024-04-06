@@ -1,6 +1,8 @@
 use crate::*;
 
-pub fn list() -> Vec<poise::Command<crate::Data, crate::errors::Error>> {
+use super::utils::Command;
+
+pub fn list() -> Vec<Command> {
     vec![
         ping(),
         pong(),

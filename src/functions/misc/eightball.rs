@@ -1,16 +1,8 @@
 use core::fmt;
-use std::{collections::HashMap, ops::Div};
-
-use crate::Context;
 use rand::{
-    distributions::{
-        uniform::{SampleBorrow, SampleUniform},
-        Distribution, Standard, WeightedIndex,
-    },
-    seq::SliceRandom,
+    distributions::{Distribution, WeightedIndex},
     Rng,
 };
-use tracing::instrument;
 
 macro_rules! create_tone_macros {
     ($($name:ident $tone:expr)+) => {

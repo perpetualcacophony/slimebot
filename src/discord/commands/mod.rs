@@ -18,11 +18,8 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-//type Error = Box<dyn std::error::Error + Send + Sync>;
 type Error = errors::Error;
 pub type Context<'a> = poise::Context<'a, crate::Data, Error>;
-
-type CommandResult = Result<(), Error>;
 
 pub use watch_fic::watch_fic;
 
@@ -34,6 +31,9 @@ use crate::{
     roll::Die,
     FormatDuration,
 };
+
+mod utils;
+use utils::CommandResult;
 
 trait LogCommands {
     async fn log_command(&self);

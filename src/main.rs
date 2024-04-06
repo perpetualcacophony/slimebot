@@ -21,8 +21,12 @@ mod config;
 mod db;
 
 mod errors;
+use errors::Error;
 
 mod functions;
+
+mod utils;
+use utils::Context;
 
 use poise::{
     serenity_prelude::{
