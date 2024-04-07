@@ -174,6 +174,7 @@ impl<'a> Game<'a> {
 
                         if self.is_solved() {
                             msg.reply(ctx, "you win!").await?;
+                            break;
                         }
                     }
                 },
