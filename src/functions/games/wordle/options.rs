@@ -1,11 +1,3 @@
-#[derive(poise::ChoiceParameter, Debug, Clone, Copy, PartialEq)]
-pub enum GameType {
-    #[name = "daily"]
-    Daily,
-    #[name = "random"]
-    Random,
-}
-
 #[derive(poise::ChoiceParameter, Debug, Clone, Copy, Default)]
 pub enum GameStyle {
     #[name = "colors only"]
