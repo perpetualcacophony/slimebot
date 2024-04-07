@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:    
+    - name: Checkout repository
+      uses: actions/checkout@v4
+  
     - name: Install rust
       uses: dtolnay/rust-toolchain@nightly
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v2
-
-    - name: Checkout repository
-      uses: actions/checkout@v4
 
     - name: Build
       run: cargo build --verbose
