@@ -8,7 +8,7 @@ use super::super::utils::CommandResult;
 use crate::functions::games::wordle::core::AsEmoji;
 use crate::{discord::utils::ContextExt, utils::Context};
 
-use crate::functions::games::wordle;
+use crate::functions::games::wordle::{self, GameStyle};
 
 /// play wordle right from discord!
 #[instrument(skip_all)]
@@ -43,7 +43,7 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn daily(ctx: Context<'_>) -> CommandResult {
+async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
     let wordles = wordle.wordles();
     wordles.refresh(wordle.words()).await?;
@@ -78,6 +78,7 @@ async fn daily(ctx: Context<'_>) -> CommandResult {
                 ctx.data().wordle.words(),
                 wordles,
                 daily.puzzle,
+                style,
             );
 
             game.setup().await?;
@@ -101,7 +102,7 @@ async fn daily(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn random(ctx: Context<'_>) -> CommandResult {
+async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
     debug!(?wordle.active_games);
@@ -120,8 +121,14 @@ async fn random(ctx: Context<'_>) -> CommandResult {
 
         let puzzle = wordle::Puzzle::random(wordle.words());
 
-        let mut game =
-            wordle::Game::new(ctx, &mut game_msg, wordle.words(), wordle.wordles(), puzzle);
+        let mut game = wordle::Game::new(
+            ctx,
+            &mut game_msg,
+            wordle.words(),
+            wordle.wordles(),
+            puzzle,
+            style,
+        );
 
         game.setup().await?;
 

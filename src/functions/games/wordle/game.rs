@@ -18,7 +18,7 @@ use crate::{
 use super::{
     core::{AsLetters, Guess, PartialGuess, PartialGuessError, ToPartialGuess, Word},
     puzzle::{DailyPuzzle, Puzzle},
-    DailyWordles, GameState, WordsList,
+    DailyWordles, GameState, GameStyle, WordsList,
 };
 
 type SerenityResult<T> = serenity_prelude::Result<T>;
@@ -30,6 +30,7 @@ pub struct Game<'a> {
     msg: &'a mut Message,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
+    style: GameStyle,
 }
 
 impl<'a> Game<'a> {
@@ -39,6 +40,7 @@ impl<'a> Game<'a> {
         words: &'a WordsList,
         dailies: &'a DailyWordles,
         puzzle: impl Into<Puzzle>,
+        style: Option<GameStyle>,
     ) -> Self {
         Self {
             puzzle: puzzle.into(),
@@ -47,6 +49,7 @@ impl<'a> Game<'a> {
             msg,
             words,
             dailies,
+            style: style.unwrap_or_default(),
         }
     }
 
