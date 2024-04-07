@@ -204,3 +204,18 @@ pub struct WordleConfig {
     pub role_id: RoleId,
     pub channel_id: ChannelId,
 }
+
+trait WordleConfigExt {
+    fn role_id(&self) -> Option<&RoleId>;
+    fn channel_id(&self) -> Option<&ChannelId>;
+}
+
+impl WordleConfigExt for WordleConfig {
+    fn role_id(&self) -> Option<&RoleId> {
+        Some(&self.role_id)
+    }
+
+    fn channel_id(&self) -> Option<&ChannelId> {
+        Some(&self.channel_id)
+    }
+}
