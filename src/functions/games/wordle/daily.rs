@@ -52,18 +52,18 @@ impl DailyWordles {
             .filter(|daily| daily.is_expired().not()))
     }
 
-    pub async fn refresh(&self, words: impl AsRef<WordsList>) -> DbResult<()> {
+    pub async fn refresh(&self, words: impl AsRef<WordsList>) -> DbResult<Option<DailyWordle>> {
         let new_word = words.as_ref().random_answer();
 
         if let Some(latest) = self.latest_not_expired().await? {
             if latest.is_old() {
-                self.new_daily(&new_word).await?;
+                return self.new_daily(&new_word).await.map(Some);
             }
         } else {
-            self.new_daily(&new_word).await?;
+            return self.new_daily(&new_word).await.map(Some);
         }
 
-        Ok(())
+        Ok(None)
     }
 
     pub async fn new_daily(&self, word: &Word) -> DbResult<DailyWordle> {

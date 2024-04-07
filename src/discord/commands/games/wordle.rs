@@ -1,6 +1,6 @@
 use std::ops::Not;
 
-use poise::serenity_prelude::{CreateMessage, User};
+use poise::serenity_prelude::{CreateMessage, Mentionable, User};
 use poise::CreateReply;
 use tracing::{debug, instrument};
 
@@ -17,7 +17,7 @@ use crate::functions::games::wordle::{self, GameStyle};
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("daily", "random", "display")
+    subcommands("daily", "random", "display", "role")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
     //let words = ctx.data().wordle.words();
@@ -46,7 +46,23 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
 async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
     let wordles = wordle.wordles();
-    wordles.refresh(wordle.words()).await?;
+
+    if let Some(new_daily) = wordles.refresh(wordle.words()).await?
+        && let Some(config) = &ctx.data().config().wordle
+    {
+        config
+            .channel_id
+            .say(
+                ctx,
+                format!(
+                    "{ping} **Daily wordle {number} now available!**\nPlay it with `/wordle daily`",
+                    ping = config.role_id.mention(),
+                    number = new_daily.puzzle.number
+                ),
+            )
+            .await?;
+    }
+
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
@@ -77,7 +93,7 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
                 &mut message,
                 ctx.data().wordle.words(),
                 wordles,
-                daily.puzzle,
+                daily.puzzle.clone(),
                 style,
             );
 
@@ -85,6 +101,26 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             game.run().await?;
 
             wordle.remove_game(ctx.channel_id()).await;
+
+            if let Some(completed) = wordle
+                .wordles
+                .find_game(ctx.author().id, daily.puzzle.number)
+                .await?
+                && let Some(config) = &ctx.data().config().wordle
+            {
+                config
+                    .channel_id
+                    .say(
+                        ctx,
+                        format!(
+                            "`{username}` **completed wordle {number}!**\n{emojis}",
+                            username = ctx.author().name,
+                            number = daily.puzzle.number,
+                            emojis = completed.as_emoji()
+                        ),
+                    )
+                    .await?;
+            }
         }
     } else {
         ctx.reply_ephemeral("you don't have a daily wordle available!")
@@ -198,6 +234,35 @@ async fn display(
                 .ephemeral(true),
         )
         .await?;
+    }
+
+    Ok(())
+}
+
+/// display your own results for a given wordle, or someone else's
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    guild_only,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL | MANAGE_ROLES"
+)]
+async fn role(ctx: Context<'_>) -> CommandResult {
+    let config = ctx.data().config();
+
+    if let Some(wordle) = &config.wordle {
+        let member = ctx.author_member().await.expect("command is guild-only");
+        if member.roles.contains(&wordle.role_id) {
+            member.remove_role(ctx, wordle.role_id).await?;
+            ctx.reply_ephemeral("Removed the wordle role!").await?;
+        } else {
+            member.add_role(ctx, wordle.role_id).await?;
+            ctx.reply_ephemeral("Gave you the wordle role!").await?;
+        }
+    } else {
+        ctx.reply_ephemeral("Error: there's no wordle role configured!")
+            .await?;
     }
 
     Ok(())
