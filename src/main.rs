@@ -1,9 +1,11 @@
 #![warn(clippy::perf)]
 #![warn(clippy::unwrap_used)]
+#![feature(macro_metavar_expr)]
+#![feature(let_chains)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 /// Functionality called from Discord.
 mod discord;
@@ -11,15 +13,18 @@ mod discord;
 use discord::commands::*;
 use mongodb::Database;
 
-pub mod games;
-use games::wordle::{DailyWordles, WordsList};
-
 /// Config file parsing and option access.
 mod config;
 
 mod db;
 
 mod errors;
+use errors::Error;
+
+mod functions;
+
+mod utils;
+use utils::Context;
 
 use poise::{
     serenity_prelude::{
@@ -85,18 +90,20 @@ impl Data {
     }
 }
 
+use functions::games::wordle::{DailyWordles, WordsList};
+
 #[derive(Debug, Clone)]
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
-    active_games: Arc<RwLock<Vec<(ChannelId, Message)>>>,
+    active_games: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
         let wordles = DailyWordles::new(db);
-        let active_games = Arc::new(RwLock::new(Vec::new()));
+        let active_games = Arc::new(RwLock::new(HashMap::new()));
 
         Self {
             words,
@@ -113,8 +120,26 @@ impl WordleData {
         &self.wordles
     }
 
-    fn active_games(&self) -> Arc<RwLock<Vec<(ChannelId, Message)>>> {
+    fn active_games(&self) -> Arc<RwLock<HashMap<ChannelId, MessageId>>> {
         self.active_games.clone()
+    }
+
+    async fn game_in_channel(&self, id: ChannelId) -> Option<MessageId> {
+        let games = self.active_games();
+        let guard = games.read().await;
+        guard.get(&id).copied()
+    }
+
+    async fn add_game(&self, channel_id: ChannelId, message_id: MessageId) {
+        let games = self.active_games();
+        let mut guard = games.write().await;
+        guard.insert(channel_id, message_id);
+    }
+
+    async fn remove_game(&self, channel_id: ChannelId) {
+        let games = self.active_games();
+        let mut guard = games.write().await;
+        guard.remove(&channel_id);
     }
 }
 
@@ -149,27 +174,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![
-                ping(),
-                pong(),
-                pfp(),
-                watch_fic(),
-                echo(),
-                ban(),
-                banban(),
-                uptime(),
-                //purge_after(),
-                borzoi(),
-                cat(),
-                fox(),
-                minecraft(),
-                roll(),
-                flip(),
-                d20(),
-                version(),
-                wordle(),
-                display_wordle(),
-            ],
+            commands: discord::commands::list(),
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(config.bot.prefix().to_string()),
                 ..Default::default()

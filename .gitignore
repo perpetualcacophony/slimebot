@@ -6,6 +6,7 @@
 
 /*.toml
 !example-slimebot.toml
+!rust-toolchain.toml
 
 /*.env
 !example-dotenv.env

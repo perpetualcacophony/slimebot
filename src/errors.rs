@@ -3,7 +3,7 @@ use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{roll::DiceRollError, Data};
+use crate::{functions::misc::roll::DiceRollError, Data};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -63,7 +63,7 @@ impl From<mongodb::error::Error> for Error {
     }
 }
 
-use crate::games::wordle;
+use crate::functions::games::wordle;
 impl From<wordle::Error> for Error {
     fn from(value: wordle::Error) -> Self {
         match value {

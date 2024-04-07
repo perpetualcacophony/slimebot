@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -9,13 +9,20 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v3
-    
+    steps:    
+    - name: Checkout repository
+      uses: actions/checkout@v4
+  
+    - name: Install rust
+      uses: dtolnay/rust-toolchain@nightly
+
+    - name: Cache rust
+      uses: Swatinem/rust-cache@v2
+
     - name: Build
       run: cargo build --verbose
+
     - name: Run tests
       run: cargo test --verbose

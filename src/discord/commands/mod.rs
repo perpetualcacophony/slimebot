@@ -7,7 +7,8 @@ use anyhow::anyhow;
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateMessage, Member, MessageId,
+        User,
     },
     CreateReply,
 };
@@ -17,18 +18,15 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-//type Error = Box<dyn std::error::Error + Send + Sync>;
 type Error = errors::Error;
 pub type Context<'a> = poise::Context<'a, crate::Data, Error>;
 
-type CommandResult = Result<(), Error>;
-
 pub use watch_fic::watch_fic;
 
-use crate::{
-    built_info, discord::commands::roll::DiceRoll, errors, games::wordle::core::AsEmoji, roll::Die,
-    FormatDuration,
-};
+use crate::{built_info, discord::utils::ContextExt, errors, FormatDuration};
+
+mod utils;
+use utils::CommandResult;
 
 trait LogCommands {
     async fn log_command(&self);
@@ -600,97 +598,6 @@ mod minecraft {
 #[poise::command(
     slash_command,
     prefix_command,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
-)]
-pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
-    let mut roll = DiceRoll::parse(&text)?;
-    let roll2 = roll.clone();
-
-    let rolls = roll.rolls();
-    let total = roll.total();
-
-    let faces = roll.dice.next().expect("at least one die").faces;
-
-    let total = if faces.get() == 1 || (faces.get() == 2 && rolls.clone().count() == 1) {
-        total.to_string()
-    } else {
-        match total {
-            t if t == roll2.clone().min() || t == roll2.clone().max() => format!("__{t}__"),
-            other => other.to_string(),
-        }
-    };
-
-    debug!(total);
-
-    let text = if roll.extra == 0 {
-        if roll.dice.len().get() == 1 {
-            format!("**{total}**")
-        } else {
-            #[allow(clippy::collapsible_else_if)]
-            let roll_text = if faces.get() > 2 {
-                rolls
-                    .map(|n| match n.get() {
-                        n if n == 1 || n == faces.get() => format!("__{n}__"),
-                        _ => n.to_string(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            } else {
-                rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
-            };
-
-            format!("**{total}** ({roll_text})")
-        }
-    } else {
-        let extra = match roll.extra {
-            n if n > 0 => format!(", +{n}"),
-            n if n < 0 => format!(", {n}"),
-            _ => unreachable!(),
-        };
-
-        #[allow(clippy::collapsible_else_if)]
-        let roll_text = if faces.get() > 2 {
-            rolls
-                .map(|n| match n.get() {
-                    n if n == 1 || n == faces.get() => format!("__{n}__"),
-                    _ => n.to_string(),
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        } else {
-            rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
-        };
-
-        format!("**{total}** ({roll_text}{extra})")
-    };
-
-    ctx.reply(text).await?;
-
-    Ok(())
-}
-
-#[instrument(skip_all)]
-#[poise::command(
-    slash_command,
-    prefix_command,
-    discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
-)]
-pub async fn d20(ctx: Context<'_>) -> CommandResult {
-    let _typing = ctx.defer_or_broadcast().await?;
-
-    let die = Die::d20();
-    let rolled = die.roll().get();
-
-    ctx.reply(format!("**{rolled}**")).await?;
-
-    Ok(())
-}
-
-#[instrument(skip_all)]
-#[poise::command(
-    slash_command,
-    prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
@@ -752,8 +659,6 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) ->
     Ok(())
 }
 
-pub mod roll;
-
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -781,8 +686,7 @@ pub async fn version(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-use crate::games::wordle;
-
+// displays command help text
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -790,73 +694,25 @@ use crate::games::wordle;
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn wordle(
+pub async fn help(
     ctx: Context<'_>,
-    mode: Option<wordle::GameType>,
-    style: Option<wordle::GameStyle>,
-    #[flag] fix_flags: bool,
+    #[description = "specific command to display help for"] command: Option<String>,
 ) -> CommandResult {
-    let words = ctx.data().wordle.words();
-    let dailies = ctx.data().wordle.wordles();
-
-    crate::games::wordle::play(ctx, mode, words.clone(), dailies.clone(), style, fix_flags).await?;
-
-    Ok(())
-}
-
-#[instrument(skip_all)]
-#[poise::command(
-    slash_command,
-    prefix_command,
-    discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
-)]
-pub async fn display_wordle(ctx: Context<'_>, wordle: u32, user: Option<User>) -> CommandResult {
-    let _typing = ctx.defer_or_broadcast().await?;
-
-    let wordles = ctx.data().wordle.wordles();
-
-    if wordles.wordle_exists(wordle).await?.not() {
-        ctx.send(
-            CreateReply::default()
-                .content("that wordle doesn't exist!")
-                .reply(true)
-                .ephemeral(true),
-        )
-        .await?;
-        return Ok(());
-    }
-
-    let user = user.as_ref().unwrap_or_else(|| ctx.author());
-
-    if let Some(game) = wordles.find_game(user.id, wordle).await? {
-        if game.num_guesses == 0 {
-            ctx.send(
-                CreateReply::default()
-                    .content("that user has started the wordle but hasn't guessed anything!")
-                    .reply(true)
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-
-        let text = format!(
-            "wordle {} (`{}`):\n>>> {}",
-            wordle,
-            user.name,
-            game.as_emoji()
-        );
-
-        ctx.reply(text).await?;
-    } else {
-        ctx.send(
-            CreateReply::default()
-                .content("that user hasn't started that wordle!")
-                .reply(true)
-                .ephemeral(true),
-        )
-        .await?;
-    }
+    poise::builtins::help(
+        ctx,
+        command.as_deref(),
+        poise::builtins::HelpConfiguration::default(),
+    )
+    .await?;
 
     Ok(())
 }
+
+mod misc;
+pub use misc::*;
+
+mod list;
+pub use list::list;
+
+mod games;
+pub use games::*;

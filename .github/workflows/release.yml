@@ -1,4 +1,4 @@
-name: Build & deploy
+name: Release
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -19,8 +19,7 @@ env:
 
 
 jobs:
-  build_push:
-
+  build_and_push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,11 +91,11 @@ jobs:
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
   
   redeploy:
-    needs: build_push
+    needs: build_and_push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger redeploy webhook
+      - name: Trigger webhook
         uses: distributhor/workflow-webhook@v3
         with:
           webhook_url: ${{ secrets.REDEPLOY_WEBHOOK_URL }}

@@ -1,6 +1,4 @@
-use std::path::Path;
-
-use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
+use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
@@ -201,6 +199,8 @@ impl BugReportsConfig {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct WordleConfig {
-    pub guesses_file: String,
-    pub answers_file: String,
+    //pub guesses_file: String,
+    //pub answers_file: String,
+    pub role_id: RoleId,
+    pub channel_id: ChannelId,
 }

@@ -1,26 +1,38 @@
 use std::{
     borrow::Cow,
     convert::Infallible,
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut, Not},
     str::FromStr,
 };
 
+use poise::serenity_prelude::Message;
 use serde::{Deserialize, Serialize};
 
-use super::AsEmoji;
+use super::super::words_list::WordsList;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+use super::{AsEmoji, AsLetters};
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Guess {
-    letters: Vec<(char, LetterState)>,
+    letters: [(char, LetterState); 5],
 }
 
 impl Guess {
-    pub fn new(word: &str) -> Self {
+    pub fn from_str(word: &impl AsLetters) -> Self {
         let letters = word
-            .to_lowercase()
-            .chars()
-            .map(|ch: char| (ch, LetterState::NotPresent))
-            .collect::<Vec<(char, LetterState)>>();
+            .as_letters()
+            .map(|ch: char| (ch.to_ascii_lowercase(), LetterState::NotPresent))
+            .collect::<Vec<(char, LetterState)>>()
+            .try_into()
+            .unwrap();
+
+        Self { letters }
+    }
+
+    pub fn new(partial: PartialGuess) -> Self {
+        let letters = partial
+            .letters
+            .map(|ch| (ch.to_ascii_lowercase(), LetterState::NotPresent));
 
         Self { letters }
     }
@@ -94,7 +106,7 @@ impl AsEmoji for Guess {
 
 impl IntoIterator for Guess {
     type Item = (char, LetterState);
-    type IntoIter = std::vec::IntoIter<(char, LetterState)>;
+    type IntoIter = std::array::IntoIter<(char, LetterState), 5>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.letters.into_iter()
@@ -173,6 +185,61 @@ impl ToString for LetterState {
     }
 }
 
+#[derive(Copy, Clone, Debug, Hash)]
+pub struct PartialGuess {
+    letters: [char; 5],
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum PartialGuessError {
+    #[error("str has {0} chars, should have exactly 5")]
+    WrongLength(usize),
+
+    #[error("none of the valid words have symbols")]
+    HasSymbols,
+
+    #[error("'{0}' is not in the list of valid words")]
+    NotInList(String),
+}
+
+pub trait ToPartialGuess {
+    fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError>;
+}
+
+impl ToPartialGuess for &str {
+    fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError> {
+        let arr: [char; 5] = self
+            .chars()
+            .collect::<Vec<char>>()
+            .try_into()
+            .map_err(|_| PartialGuessError::WrongLength(self.chars().count()))?;
+
+        for ch in arr {
+            if ch.is_alphabetic().not() {
+                return Err(PartialGuessError::HasSymbols);
+            }
+        }
+
+        if words.get_word(&self).is_none() {
+            return Err(PartialGuessError::NotInList(self.to_string()));
+        }
+
+        Ok(PartialGuess { letters: arr })
+    }
+}
+
+impl ToPartialGuess for String {
+    fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError> {
+        self.as_str().to_partial_guess(words)
+    }
+}
+
+impl ToPartialGuess for Message {
+    fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError> {
+        self.content.to_partial_guess(words)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use paste::paste;
@@ -186,7 +253,7 @@ mod tests {
                     #[test]
                     fn [<$word _ $guess>]() {
                         let word = super::super::Word::from_str(&stringify!($word)).unwrap();
-                        let guess = word.guess(&stringify!($guess));
+                        let guess = word.guess_str(&stringify!($guess));
                         pretty_assertions::assert_eq!(
                             guess, $result
                         )

@@ -7,7 +7,7 @@ mod word;
 pub use word::Word;
 
 mod guess;
-pub use guess::Guess;
+pub use guess::{Guess, PartialGuess, PartialGuessError, ToPartialGuess};
 
 use self::guess::LetterState;
 
@@ -181,4 +181,20 @@ pub struct GameResults {
     num_guesses: usize,
     solved: bool,
     ended: bool,
+}
+
+pub trait AsLetters {
+    fn as_letters(&self) -> impl Iterator<Item = char>;
+}
+
+impl AsLetters for &str {
+    fn as_letters(&self) -> impl Iterator<Item = char> {
+        self.chars()
+    }
+}
+
+impl AsLetters for Word {
+    fn as_letters(&self) -> impl Iterator<Item = char> {
+        self.letters.iter().copied()
+    }
 }
