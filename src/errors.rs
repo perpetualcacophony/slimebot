@@ -1,4 +1,3 @@
-use poise::serenity_prelude::Command;
 use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
 use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};

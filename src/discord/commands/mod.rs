@@ -1,13 +1,11 @@
 mod ban;
 mod watch_fic;
 
-use std::ops::Not;
 
-use anyhow::anyhow;
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, CreateMessage, Member, MessageId,
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId,
         User,
     },
     CreateReply,
@@ -24,7 +22,6 @@ pub type Context<'a> = poise::Context<'a, crate::Data, utils::Error>;
 
 use crate::{
     built_info,
-    discord::utils::ContextExt,
     errors::{self, ApiError},
     FormatDuration,
 };

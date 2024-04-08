@@ -1,5 +1,5 @@
 use super::CommandResult;
-use crate::errors::{self, CommandError};
+use crate::errors::{self};
 use crate::functions::misc::{self, DiceRoll};
 use crate::Context;
 use tracing::{debug, instrument};

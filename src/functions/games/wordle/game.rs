@@ -1,11 +1,8 @@
-use std::ops::{Add, Not};
 
 use poise::serenity_prelude::{
     self,
-    futures::{Stream, StreamExt},
-    ActionRow, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateInteractionResponseMessage, EditMessage, Http, Message, ReactionType, ShardMessenger,
-    User, UserId,
+    futures::{Stream, StreamExt}, CacheHttp, ComponentInteraction, CreateActionRow, CreateButton,
+    CreateInteractionResponseMessage, EditMessage, Http, Message, ReactionType, ShardMessenger, UserId,
 };
 
 use crate::{
@@ -16,8 +13,8 @@ use crate::{
 };
 
 use super::{
-    core::{AsLetters, Guess, PartialGuess, PartialGuessError, ToPartialGuess, Word},
-    puzzle::{DailyPuzzle, Puzzle},
+    core::{Guess, PartialGuess, PartialGuessError, ToPartialGuess},
+    puzzle::{Puzzle},
     DailyWordles, GameState, GameStyle, WordsList,
 };
 
@@ -275,14 +272,14 @@ impl ComponentInteractionExt for ComponentInteraction {
             .yes_no_buttons();
 
         self.respond(ctx, builder).await?;
-        let response = self
-            .await_yes_no(ctx)
-            .await
-            .map(|op| op.unwrap_or_default());
+        
 
         //self.delete_response(ctx).await?;
 
-        response
+        self
+            .await_yes_no(ctx)
+            .await
+            .map(|op| op.unwrap_or_default())
     }
 
     async fn await_yes_no(
@@ -365,7 +362,7 @@ trait AddButton: Sized + Clone {
     }
 
     fn add_button_in_place(&mut self, button: CreateButton) {
-        let mut cloned = self.clone();
+        let cloned = self.clone();
         *self = cloned.add_button(button);
     }
 
@@ -385,7 +382,7 @@ trait AddButton: Sized + Clone {
 }
 
 impl AddButton for CreateInteractionResponseMessage {
-    fn add_button(mut self, button: CreateButton) -> Self {
+    fn add_button(self, button: CreateButton) -> Self {
         self.button(button)
     }
 }
