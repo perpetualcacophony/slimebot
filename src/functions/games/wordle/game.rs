@@ -87,7 +87,11 @@ impl<'a> Game<'a> {
     }
 
     pub fn content(&self) -> String {
-        format!("{}\n{}", self.title(), self.guesses.as_emoji())
+        format!(
+            "{}\n{}",
+            self.title(),
+            self.guesses.emoji_with_style(self.style)
+        )
     }
 
     pub async fn update_message(&mut self) -> SerenityResult<()> {
