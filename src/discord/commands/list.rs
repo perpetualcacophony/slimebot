@@ -7,7 +7,7 @@ pub fn list() -> Vec<Command> {
         ping(),
         pong(),
         pfp(),
-        watch_fic(),
+        //watch_fic(),
         echo(),
         ban(),
         banban(),

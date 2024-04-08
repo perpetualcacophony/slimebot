@@ -20,7 +20,7 @@ use tracing::{debug, error, info, instrument};
 
 pub type Context<'a> = poise::Context<'a, crate::Data, utils::Error>;
 
-pub use watch_fic::watch_fic;
+//pub use watch_fic::watch_fic;
 
 use crate::{
     built_info,
