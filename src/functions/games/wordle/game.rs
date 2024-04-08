@@ -87,7 +87,11 @@ impl<'a> Game<'a> {
     }
 
     pub fn content(&self) -> String {
-        format!("{}\n{}", self.title(), self.guesses.as_emoji())
+        format!(
+            "{}\n{}",
+            self.title(),
+            self.guesses.emoji_with_style(self.style)
+        )
     }
 
     pub async fn update_message(&mut self) -> SerenityResult<()> {
@@ -154,7 +158,7 @@ impl<'a> Game<'a> {
         CreateActionRow::Buttons(buttons)
     }
 
-    pub async fn run(&mut self) -> Result<(), crate::errors::Error> {
+    pub async fn run(&mut self) -> Result<(), crate::errors::CommandError> {
         let ctx = self.context();
 
         let mut messages = self.messages_stream();
@@ -193,6 +197,8 @@ impl<'a> Game<'a> {
                                 if let Some(num) = self.puzzle().number() {
                                     self.dailies.update(num, self.get_state(true)).await?;
                                 }
+
+                                self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
 
                                 self.finish("game over!").await?;
                                 break;

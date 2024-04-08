@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
@@ -11,15 +13,18 @@ pub struct Config {
     pub bot: BotConfig,
     pub logs: LogsConfig,
     pub db: DbConfig,
+    #[serde(default)]
     pub watchers: WatchersConfig,
-    pub bug_reports: Option<BugReportsConfig>,
-    pub wordle: Option<WordleConfig>,
+    #[serde(default)]
+    pub bug_reports: BugReportsConfig,
+    #[serde(default)]
+    pub wordle: WordleConfig,
 }
 
 impl Config {
     pub fn bug_reports_channel(&self) -> Option<&ChannelId> {
-        if let Some(bug_reports_config) = &self.bug_reports {
-            Some(bug_reports_config.channel())
+        if let Some(channel) = self.bug_reports.channel() {
+            Some(channel)
         } else {
             warn!("bug reports not configured");
             None
@@ -152,9 +157,11 @@ impl DbConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct WatchersConfig {
+    #[serde(default)]
     allow_by_default: bool,
+    #[serde(default)]
     channels: Option<Vec<WatchersChannelConfig>>,
 }
 
@@ -186,36 +193,22 @@ pub struct WatchersChannelConfig {
     allow: bool,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct BugReportsConfig {
-    channel: ChannelId,
+    channel: Option<ChannelId>,
 }
 
 impl BugReportsConfig {
-    fn channel(&self) -> &ChannelId {
-        &self.channel
+    fn channel(&self) -> Option<&ChannelId> {
+        self.channel.as_ref()
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct WordleConfig {
     //pub guesses_file: String,
     //pub answers_file: String,
-    pub role_id: RoleId,
-    pub channel_id: ChannelId,
-}
-
-trait WordleConfigExt {
-    fn role_id(&self) -> Option<&RoleId>;
-    fn channel_id(&self) -> Option<&ChannelId>;
-}
-
-impl WordleConfigExt for WordleConfig {
-    fn role_id(&self) -> Option<&RoleId> {
-        Some(&self.role_id)
-    }
-
-    fn channel_id(&self) -> Option<&ChannelId> {
-        Some(&self.channel_id)
-    }
+    pub role_id: Option<RoleId>,
+    pub channel_id: Option<ChannelId>,
 }

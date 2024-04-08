@@ -1,11 +1,11 @@
-use std::time::Duration;
+/*use std::time::Duration;
 
 use anyhow::{anyhow, bail};
 use poise::serenity_prelude::{Channel, Role};
 use scraper::{Html, Selector};
 use tracing::{error, info, instrument};
 
-use super::Error;
+use super::errors::CommandError as Error;
 use crate::Data;
 
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -145,3 +145,4 @@ fn read_chapter_count(work_id: usize) -> Result<usize, Error> {
     //Ok(fs::read_to_string(format!("works/{}.len", work_id))?.parse()?)
     Ok(0)
 }
+*/

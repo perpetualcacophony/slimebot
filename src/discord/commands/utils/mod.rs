@@ -1,2 +1,2 @@
 mod poise;
-pub use poise::{Command, CommandResult};
+pub use poise::{Command, CommandResult, Error};

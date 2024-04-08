@@ -1,3 +1,3 @@
 use crate::Data;
 
-pub type Context<'a> = poise::Context<'a, Data, crate::Error>;
+pub type Context<'a> = poise::Context<'a, Data, crate::errors::CommandError>;
