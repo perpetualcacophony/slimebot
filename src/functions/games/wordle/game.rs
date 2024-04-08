@@ -194,6 +194,8 @@ impl<'a> Game<'a> {
                                     self.dailies.update(num, self.get_state(true)).await?;
                                 }
 
+                                self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
+
                                 self.finish("game over!").await?;
                                 break;
                             }
