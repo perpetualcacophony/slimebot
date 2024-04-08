@@ -5,7 +5,8 @@ use serde_json::json;
 use tracing::warn;
 use tracing_unwrap::ResultExt;
 
-use super::{Context, Error};
+use super::Context;
+use crate::errors::CommandError as Error;
 
 pub async fn joke_ban(
     ctx: Context<'_>,

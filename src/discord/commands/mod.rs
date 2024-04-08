@@ -18,12 +18,16 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-type Error = errors::Error;
-pub type Context<'a> = poise::Context<'a, crate::Data, Error>;
+pub type Context<'a> = poise::Context<'a, crate::Data, utils::Error>;
 
 pub use watch_fic::watch_fic;
 
-use crate::{built_info, discord::utils::ContextExt, errors, FormatDuration};
+use crate::{
+    built_info,
+    discord::utils::ContextExt,
+    errors::{self, ApiError},
+    FormatDuration,
+};
 
 mod utils;
 use utils::CommandResult;
@@ -425,7 +429,9 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
     if response.status().is_server_error() {
         ctx.reply("sorry, dog api is down!").await?;
 
-        return Err(Error::Manual(anyhow!("dog api down")));
+        return Err(errors::CommandError::Internal(errors::InternalError::Api(
+            ApiError::DogCeo(response.status().as_u16()),
+        )));
     }
 
     let image_url = response.json::<DogApiResponse>().await?.message;

@@ -154,7 +154,7 @@ impl<'a> Game<'a> {
         CreateActionRow::Buttons(buttons)
     }
 
-    pub async fn run(&mut self) -> Result<(), crate::errors::Error> {
+    pub async fn run(&mut self) -> Result<(), crate::errors::CommandError> {
         let ctx = self.context();
 
         let mut messages = self.messages_stream();

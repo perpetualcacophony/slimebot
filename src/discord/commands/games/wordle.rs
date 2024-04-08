@@ -48,15 +48,15 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordles = wordle.wordles();
 
     if let Some(new_daily) = wordles.refresh(wordle.words()).await?
-        && let Some(config) = &ctx.data().config().wordle
+        && let Some(channel) = ctx.data().config().wordle.channel_id
+        && let Some(role) = ctx.data().config().wordle.role_id
     {
-        config
-            .channel_id
+        channel
             .say(
                 ctx,
                 format!(
                     "{ping} **Daily wordle {number} now available!**\nPlay it with `/wordle daily`",
-                    ping = config.role_id.mention(),
+                    ping = role.mention(),
                     number = new_daily.puzzle.number
                 ),
             )
@@ -106,10 +106,9 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
                 .wordles
                 .find_game(ctx.author().id, daily.puzzle.number)
                 .await?
-                && let Some(config) = &ctx.data().config().wordle
+                && let Some(channel) = &ctx.data().config().wordle.channel_id
             {
-                config
-                    .channel_id
+                channel
                     .say(
                         ctx,
                         format!(
@@ -251,13 +250,13 @@ async fn display(
 async fn role(ctx: Context<'_>) -> CommandResult {
     let config = ctx.data().config();
 
-    if let Some(wordle) = &config.wordle {
+    if let Some(role_id) = &config.wordle.role_id {
         let member = ctx.author_member().await.expect("command is guild-only");
-        if member.roles.contains(&wordle.role_id) {
-            member.remove_role(ctx, wordle.role_id).await?;
+        if member.roles.contains(role_id) {
+            member.remove_role(ctx, role_id).await?;
             ctx.reply_ephemeral("Removed the wordle role!").await?;
         } else {
-            member.add_role(ctx, wordle.role_id).await?;
+            member.add_role(ctx, role_id).await?;
             ctx.reply_ephemeral("Gave you the wordle role!").await?;
         }
     } else {

@@ -5,7 +5,7 @@ use poise::serenity_prelude::{Channel, Role};
 use scraper::{Html, Selector};
 use tracing::{error, info, instrument};
 
-use super::Error;
+use super::errors::CommandError as Error;
 use crate::Data;
 
 type Context<'a> = poise::Context<'a, Data, Error>;
