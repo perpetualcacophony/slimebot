@@ -6,12 +6,8 @@ use regex::Regex;
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
-pub mod natural;
-use natural::{NaturalI8, NaturalI8Constants, NaturalI8Error};
 #[derive(Debug, Error, PartialEq)]
 pub enum DiceRollError {
-    #[error(transparent)]
-    InvalidNumber(#[from] NaturalI8Error),
     #[error("")]
     NoFaces,
     #[error("")]
@@ -24,37 +20,33 @@ pub enum DiceRollError {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Die {
-    pub faces: NaturalI8,
+    pub faces: u8,
 }
 
 impl Die {
-    fn new(faces: NaturalI8) -> Self {
+    fn new(faces: u8) -> Self {
+        assert!(faces > 0, "die cannot have 0 faces");
         Self { faces }
     }
 
-    pub fn roll(&self) -> NaturalI8 {
+    pub fn roll(&self) -> u8 {
         self.roll_with(&mut rand::thread_rng())
     }
 
-    fn roll_with(&self, rng: &mut impl Rng) -> NaturalI8 {
-        let range = 1..=self.faces.get();
-
-        range
-            .choose(rng)
-            .expect("should have at least one face")
-            .try_into()
-            .expect("faces is a valid NaturalI8")
+    fn roll_with(&self, rng: &mut impl Rng) -> u8 {
+        let range = 1..=self.faces;
+        range.choose(rng).expect("should have at least one face")
     }
 
     pub fn d20() -> Self {
-        Self::new(NaturalI8::twenty())
+        Self::new(20)
     }
 
-    fn min(&self) -> NaturalI8 {
-        NaturalI8::min()
+    fn min(&self) -> u8 {
+        1
     }
 
-    pub fn max(&self) -> NaturalI8 {
+    pub fn max(&self) -> u8 {
         self.faces
     }
 }
@@ -66,9 +58,8 @@ pub struct Dice {
 }
 
 impl Dice {
-    pub fn new(count: NaturalI8, faces: NaturalI8) -> Self {
+    pub fn new(count: usize, faces: u8) -> Self {
         let vec = vec![Die::new(faces); count.into()];
-
         Self { vec, index: 0 }
     }
 
@@ -76,38 +67,23 @@ impl Dice {
         Roll::new(self.clone(), rng)
     }
 
-    pub fn len(&self) -> NaturalI8 {
+    pub fn len(&self) -> usize {
         ExactSizeIterator::len(self)
-            .try_into()
-            .expect("number of dice should not be 0")
     }
 
     #[instrument]
-    pub fn lowest_roll(&self) -> NaturalI8 {
+    pub fn lowest_roll(&self) -> usize {
         debug!(len = ?self.len());
         self.len()
     }
 
     #[instrument]
-    pub fn highest_roll(&self) -> i16 {
-        let highest = self
-            .clone()
-            .fold(0, |sum, die| sum + die.max().get() as i16);
+    pub fn highest_roll(&self) -> usize {
+        let highest = self.clone().fold(0, |sum, die| sum + die.max());
 
         debug!(highest);
 
-        highest
-    }
-}
-
-impl TryFrom<usize> for NaturalI8 {
-    type Error = NaturalI8Error;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        let int: i8 = value.try_into()?;
-        let non_zero: NonZeroI8 = int.try_into()?;
-
-        non_zero.try_into()
+        highest as usize
     }
 }
 
@@ -138,13 +114,13 @@ impl<It: Iterator<Item = Die>> Roll<It> {
         Self { iter, rng }
     }
 
-    fn total(self, extra: i8) -> i16 {
-        self.sum::<i16>() + extra as i16
+    fn total(self, extra: i8) -> isize {
+        self.sum::<u8>() as isize + extra as isize
     }
 }
 
 impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
-    type Item = NaturalI8;
+    type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
         let die = self.iter.next();
@@ -160,10 +136,7 @@ pub struct DiceRoll {
 }
 
 impl DiceRoll {
-    pub fn new(count: i8, faces: i8, extra: i8) -> Result<Self, DiceRollError> {
-        let faces = faces.try_into()?;
-        let count = count.try_into()?;
-
+    pub fn new(count: usize, faces: u8, extra: i8) -> Result<Self, DiceRollError> {
         let dice = Dice::new(count, faces);
 
         let seed: [u8; 32] = rand::random();
@@ -177,9 +150,9 @@ impl DiceRoll {
         self.dice.roll(self.rng.clone())
     }
 
-    pub fn total(&self) -> i16 {
-        let sum = self.rolls().sum::<i16>();
-        sum + self.extra as i16
+    pub fn total(&self) -> isize {
+        let sum = self.rolls().sum::<u8>() as isize;
+        sum + self.extra as isize
     }
 
     #[instrument]
@@ -194,14 +167,15 @@ impl DiceRoll {
 
                 let count = caps
                     .get(1)
-                    .map_or(Ok(NaturalI8::default()), |mat| mat.as_str().parse())
+                    .map_or(Ok(1), |mat| mat.as_str().parse())
                     .unwrap_or_default();
                 trace!(?count);
-                let faces: NaturalI8 = caps
+                let faces: u8 = caps
                     .get(2)
                     .ok_or(DiceRollError::NoFaces)?
                     .as_str()
-                    .parse()?;
+                    .parse()
+                    .unwrap();
                 trace!(?faces);
 
                 let extra_unsigned = caps.get(4).map(|mat| {
@@ -224,7 +198,7 @@ impl DiceRoll {
                 .unwrap_or_default();
                 debug!(?extra);
 
-                DiceRoll::new(count.get(), faces.get(), extra)
+                DiceRoll::new(count, faces, extra)
             })
             .ok_or(DiceRollError::NoMatch(text.to_owned()))?;
 
@@ -233,13 +207,13 @@ impl DiceRoll {
         roll
     }
 
-    pub fn min(&self) -> i16 {
-        self.dice.lowest_roll().get() as i16 + self.extra as i16
+    pub fn min(&self) -> isize {
+        self.dice.lowest_roll() as isize + self.extra as isize
     }
 
-    pub fn max(&self) -> i16 {
-        let highest: i16 = self.dice.highest_roll();
-        highest + self.extra as i16
+    pub fn max(&self) -> isize {
+        let highest = self.dice.highest_roll() as isize;
+        highest + self.extra as isize
     }
 }
 
@@ -248,9 +222,9 @@ mod tests {
     use tracing::trace;
     use tracing_test::traced_test;
 
-    use super::natural::NaturalI8;
+    use crate::functions::misc::DiceRoll;
 
-    use super::{natural::NaturalI8Constants, DiceRoll, Die};
+    use super::Die;
 
     macro_rules! test_parse {
         ($name:ident: $text:expr => $parsed:expr$(,)?) => {
@@ -284,11 +258,11 @@ mod tests {
     #[test]
     fn roll_die() {
         let die = Die::d20();
-        let range = NaturalI8::one()..=NaturalI8::twenty();
+        let range = 1..=20;
         let mut rng = rand::thread_rng();
 
         for _ in 1..1000 {
-            let rolled: NaturalI8 = die.roll_with(&mut rng);
+            let rolled = die.roll_with(&mut rng);
             assert!(range.contains(&rolled))
         }
     }
@@ -301,7 +275,7 @@ mod tests {
 
         for _ in 1..1000 {
             let rolls = roll.rolls();
-            let sum: i8 = rolls.clone().sum();
+            let sum: u8 = rolls.clone().sum();
             trace!(sum, ?rolls);
             assert!(range.contains(&sum))
         }
@@ -316,7 +290,7 @@ mod tests {
 
         for _ in 1..2 {
             let roll = roll.clone();
-            let sum: i16 = roll.total();
+            let sum = roll.total();
             let rolls = roll.rolls();
             trace!(sum, ?rolls, extra);
             assert!(range.contains(&sum))

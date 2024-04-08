@@ -36,7 +36,7 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
 
     let faces = roll.dice.next().expect("at least one die").faces;
 
-    let total = if faces.get() == 1 || (faces.get() == 2 && rolls.clone().count() == 1) {
+    let total = if faces == 1 || (faces == 2 && rolls.clone().count() == 1) {
         total.to_string()
     } else {
         match total {
@@ -48,14 +48,14 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     debug!(total);
 
     let text = if roll.extra == 0 {
-        if roll.dice.len().get() == 1 {
+        if roll.dice.len() == 1 {
             format!("**{total}**")
         } else {
             #[allow(clippy::collapsible_else_if)]
-            let roll_text = if faces.get() > 2 {
+            let roll_text = if faces > 2 {
                 rolls
-                    .map(|n| match n.get() {
-                        n if n == 1 || n == faces.get() => format!("__{n}__"),
+                    .map(|n| match n {
+                        n if n == 1 || n == faces => format!("__{n}__"),
                         _ => n.to_string(),
                     })
                     .collect::<Vec<_>>()
@@ -74,10 +74,10 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
         };
 
         #[allow(clippy::collapsible_else_if)]
-        let roll_text = if faces.get() > 2 {
+        let roll_text = if faces > 2 {
             rolls
-                .map(|n| match n.get() {
-                    n if n == 1 || n == faces.get() => format!("__{n}__"),
+                .map(|n| match n {
+                    n if n == 1 || n == faces => format!("__{n}__"),
                     _ => n.to_string(),
                 })
                 .collect::<Vec<_>>()
@@ -105,7 +105,7 @@ pub async fn d20(ctx: Context<'_>) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
     let die = misc::Die::d20();
-    let rolled = die.roll().get();
+    let rolled = die.roll();
 
     ctx.reply(format!("**{rolled}**")).await?;
 
