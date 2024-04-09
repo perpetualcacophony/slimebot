@@ -28,68 +28,10 @@ pub async fn eightball(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
-    let mut roll: DiceRoll = misc::DiceRoll::parse(&text).map_err(errors::InputError::DiceRoll)?;
-    let roll2 = roll.clone();
+    let roll: DiceRoll = misc::DiceRoll::parse(&text).map_err(errors::InputError::DiceRoll)?;
+    let result = roll.result();
 
-    let rolls = roll.rolls();
-    let total = roll.total();
-
-    let faces = roll.dice.next().expect("at least one die").faces;
-
-    let total = if faces == 1 || (faces == 2 && rolls.clone().count() == 1) {
-        total.to_string()
-    } else {
-        match total {
-            t if t == roll2.clone().min() || t == roll2.clone().max() => format!("__{t}__"),
-            other => other.to_string(),
-        }
-    };
-
-    debug!(total);
-
-    let text = if roll.extra == 0 {
-        if roll.dice.len() == 1 {
-            format!("**{total}**")
-        } else {
-            #[allow(clippy::collapsible_else_if)]
-            let roll_text = if faces > 2 {
-                rolls
-                    .map(|n| match n {
-                        n if n == 1 || n == faces => format!("__{n}__"),
-                        _ => n.to_string(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            } else {
-                rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
-            };
-
-            format!("**{total}** ({roll_text})")
-        }
-    } else {
-        let extra = match roll.extra {
-            n if n > 0 => format!(", +{n}"),
-            n if n < 0 => format!(", {n}"),
-            _ => unreachable!(),
-        };
-
-        #[allow(clippy::collapsible_else_if)]
-        let roll_text = if faces > 2 {
-            rolls
-                .map(|n| match n {
-                    n if n == 1 || n == faces => format!("__{n}__"),
-                    _ => n.to_string(),
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        } else {
-            rolls.map(|n| n.to_string()).collect::<Vec<_>>().join(", ")
-        };
-
-        format!("**{total}** ({roll_text}{extra})")
-    };
-
-    ctx.reply(text).await?;
+    ctx.reply(result.to_string()).await?;
 
     Ok(())
 }
@@ -104,10 +46,10 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
 pub async fn d20(ctx: Context<'_>) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
-    let die = misc::Die::d20();
-    let rolled = die.roll();
+    let roll = misc::DiceRoll::new(1, 20, 0).expect("hard-coded");
+    let result = roll.result();
 
-    ctx.reply(format!("**{rolled}**")).await?;
+    ctx.reply(format!("**{result}**")).await?;
 
     Ok(())
 }

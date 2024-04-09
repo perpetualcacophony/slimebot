@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Neg};
+use std::{fmt::Display, iter::Sum, ops::Neg};
 
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use regex::Regex;
@@ -29,17 +29,26 @@ impl Die {
         Self { faces }
     }
 
-    pub fn roll(&self) -> u8 {
+    fn as_rolled(&self, value: u8) -> RolledDie {
+        RolledDie { die: *self, value }
+    }
+
+    pub fn roll(&self) -> RolledDie {
         self.roll_with(&mut rand::thread_rng())
     }
 
-    fn roll_with(&self, rng: &mut impl Rng) -> u8 {
+    fn roll_with(&self, rng: &mut impl Rng) -> RolledDie {
         let range = 1..=self.faces;
-        range.choose(rng).expect("should have at least one face")
+        let value = range.choose(rng).expect("should have at least one face");
+        self.as_rolled(value)
     }
 
     pub fn d20() -> Self {
         Self::new(20)
+    }
+
+    pub const fn min(&self) -> u8 {
+        1
     }
 
     pub fn max(&self) -> u8 {
@@ -50,6 +59,24 @@ impl Die {
 impl Default for Die {
     fn default() -> Self {
         Self { faces: 1 }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct RolledDie {
+    die: Die,
+    value: u8,
+}
+
+impl RolledDie {
+    fn is_max(&self) -> bool {
+        // doesn't make any sense for a d1 or d2 to have a max or min
+        self.value == self.die.max() && self.die.faces != 1 && self.die.faces != 2
+    }
+
+    fn is_min(&self) -> bool {
+        // doesn't make any sense for a d1 or d2 to have a max or min
+        self.value == self.die.min() && self.die.faces != 1 && self.die.faces != 2
     }
 }
 
@@ -122,11 +149,17 @@ impl<It: Iterator<Item = Die>> Roll<It> {
 }
 
 impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
-    type Item = u8;
+    type Item = RolledDie;
 
     fn next(&mut self) -> Option<Self::Item> {
         let die = self.iter.next();
         die.map(|die| die.roll_with(&mut self.rng))
+    }
+}
+
+impl Sum<RolledDie> for u8 {
+    fn sum<I: Iterator<Item = RolledDie>>(iter: I) -> Self {
+        iter.map(|roll| roll.value).sum()
     }
 }
 
@@ -203,15 +236,17 @@ impl DiceRoll {
                 });
                 trace!(?extra_unsigned);
 
-                let extra_sign = caps
-                    .get(3)
-                    .ok_or(DiceRollError::InvalidExtraSign(String::new()))
-                    .map(|mat| mat.as_str())?;
+                let extra_sign = caps.get(3).map(|s| s.as_str());
 
                 let extra = match extra_sign {
-                    "+" => extra_unsigned,
-                    "-" => extra_unsigned.map(|int| int.neg()),
-                    _ => return Err(DiceRollError::InvalidExtraSign(extra_sign.to_owned())),
+                    Some("+") => extra_unsigned,
+                    Some("-") => extra_unsigned.map(|int| int.neg()),
+                    None => None,
+                    _ => {
+                        return Err(DiceRollError::InvalidExtraSign(
+                            extra_sign.unwrap_or_default().to_owned(),
+                        ))
+                    }
                 }
                 .unwrap_or_default();
                 debug!(?extra);
@@ -237,15 +272,15 @@ impl DiceRoll {
 
 pub struct RollResult {
     dice_roll: DiceRoll,
-    rolls: Vec<u8>,
+    rolls: Vec<RolledDie>,
     extra: i8,
     total: isize,
 }
 
 impl RollResult {
-    fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<u8>>, extra: i8) -> Self {
+    fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
         let rolls = rolls.into();
-        let total = rolls.iter().sum::<u8>() as isize + extra as isize;
+        let total = rolls.iter().copied().sum::<u8>() as isize + extra as isize;
 
         Self {
             dice_roll,
@@ -266,8 +301,12 @@ impl RollResult {
 
 impl Display for RollResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut text = if self.is_min() || self.is_max() {
-            format!("**__{total}__**", total = self.total)
+        let mut text = if (self.is_min() || self.is_max()) && self.rolls[0].die.faces != 1 {
+            if self.rolls.len() == 1 && self.rolls[0].die.faces == 2 {
+                format!("**{total}**", total = self.total)
+            } else {
+                format!("**__{total}__**", total = self.total)
+            }
         } else {
             format!("**{total}**", total = self.total)
         };
@@ -278,7 +317,13 @@ impl Display for RollResult {
             let rolls = self
                 .rolls
                 .iter()
-                .map(|n| n.to_string())
+                .map(|n| {
+                    if n.is_max() || n.is_min() {
+                        format!("__{num}__", num = n.value)
+                    } else {
+                        n.value.to_string()
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
 
@@ -350,7 +395,7 @@ mod tests {
 
         for _ in 1..1000 {
             let rolled = die.roll_with(&mut rng);
-            assert!(range.contains(&rolled))
+            assert!(range.contains(&rolled.value))
         }
     }
 
@@ -407,8 +452,13 @@ mod tests {
                         let extra = or_else!($($extra)? ; 0);
                         let count = ${count($rolls)};
 
+                        let rolls = vec![$($rolls),+].into_iter();
+                        let dice = rolls.clone().map(|_| super::Die::new($faces));
+                        let rolled_dice = rolls.zip(dice).map(|(roll, die)| die.as_rolled(roll));
+                        let vec: Vec<crate::functions::misc::RolledDie> = rolled_dice.collect();
+
                         let dice_roll = super::DiceRoll::new(count, $faces, extra).unwrap();
-                        let result = super::RollResult::new(dice_roll, [$($rolls),+], extra);
+                        let result = super::RollResult::new(dice_roll, vec, extra);
 
                         // super dumb fix for broken tests
                         pretty_assertions::assert_eq!(
@@ -421,15 +471,19 @@ mod tests {
         }
 
         generate_tests! {
-            two_d_ten: 10[10, 15] => "**25** (10, 15)",
+            two_d_ten: 10[10, 5] => "**15** (__10__, 5)",
             d_twenty: 20[19] => "**19**",
             three_d_six_plus_three: 6[4, 2, 3] +3 => "**12** (4, 2, 3, +3)",
             three_d_six_minus_three: 6[4, 2, 3] -3 => "**6** (4, 2, 3, -3)",
-            d_twenty_plus_three: 20[20] +3 => "**__23__** (20, +3)",
+            d_twenty_plus_three: 20[20] +3 => "**__23__** (__20__, +3)",
             d_twenty_minus_ten: 20[5] -10 => "**-5** (5, -10)",
             nat_twenty: 20[20] => "**__20__**",
             nat_one: 20[1] => "**__1__**",
-            nat_one_minus_ten: 20[1] -10 => "**__-9__** (1, -10)"
+            nat_one_minus_ten: 20[1] -10 => "**__-9__** (__1__, -10)",
+            d_one: 1[1] => "**1**",
+            two_d_one: 1[1, 1] => "**2** (1, 1)",
+            d_two: 2[1] => "**1**",
+            two_d_two: 2[2, 2] => "**__4__** (2, 2)"
         }
     }
 }
