@@ -1,4 +1,4 @@
-use std::{num::NonZeroI8, ops::Neg};
+use std::{fmt::Display, ops::Neg};
 
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use regex::Regex;
@@ -42,12 +42,14 @@ impl Die {
         Self::new(20)
     }
 
-    fn min(&self) -> u8 {
-        1
-    }
-
     pub fn max(&self) -> u8 {
         self.faces
+    }
+}
+
+impl Default for Die {
+    fn default() -> Self {
+        Self { faces: 1 }
     }
 }
 
@@ -59,7 +61,7 @@ pub struct Dice {
 
 impl Dice {
     pub fn new(count: usize, faces: u8) -> Self {
-        let vec = vec![Die::new(faces); count.into()];
+        let vec = vec![Die::new(faces); count];
         Self { vec, index: 0 }
     }
 
@@ -155,6 +157,19 @@ impl DiceRoll {
         sum + self.extra as isize
     }
 
+    pub fn result(self) -> RollResult {
+        let rolls = self.rolls().collect();
+        let extra = self.extra;
+        let total = self.total();
+
+        RollResult {
+            dice_roll: self,
+            rolls,
+            extra,
+            total,
+        }
+    }
+
     #[instrument]
     pub fn parse(text: &str) -> Result<Self, DiceRollError> {
         let regex = Regex::new(r"([0-9]*)d([0-9]+)\s*(?:(\+|-)\s*([0-9]+))?")
@@ -168,14 +183,14 @@ impl DiceRoll {
                 let count = caps
                     .get(1)
                     .map_or(Ok(1), |mat| mat.as_str().parse())
-                    .unwrap_or_default();
+                    .unwrap_or(1);
                 trace!(?count);
                 let faces: u8 = caps
                     .get(2)
                     .ok_or(DiceRollError::NoFaces)?
                     .as_str()
                     .parse()
-                    .unwrap();
+                    .map_err(|_| DiceRollError::NoFaces)?;
                 trace!(?faces);
 
                 let extra_unsigned = caps.get(4).map(|mat| {
@@ -188,12 +203,15 @@ impl DiceRoll {
                 });
                 trace!(?extra_unsigned);
 
-                let extra_sign = caps.get(3).map_or("", |mat| mat.as_str());
+                let extra_sign = caps
+                    .get(3)
+                    .ok_or(DiceRollError::InvalidExtraSign(String::new()))
+                    .map(|mat| mat.as_str())?;
 
                 let extra = match extra_sign {
                     "+" => extra_unsigned,
                     "-" => extra_unsigned.map(|int| int.neg()),
-                    _ => None,
+                    _ => return Err(DiceRollError::InvalidExtraSign(extra_sign.to_owned())),
                 }
                 .unwrap_or_default();
                 debug!(?extra);
@@ -217,42 +235,111 @@ impl DiceRoll {
     }
 }
 
+pub struct RollResult {
+    dice_roll: DiceRoll,
+    rolls: Vec<u8>,
+    extra: i8,
+    total: isize,
+}
+
+impl RollResult {
+    fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<u8>>, extra: i8) -> Self {
+        let rolls = rolls.into();
+        let total = rolls.iter().sum::<u8>() as isize + extra as isize;
+
+        Self {
+            dice_roll,
+            rolls,
+            extra,
+            total,
+        }
+    }
+
+    fn is_min(&self) -> bool {
+        self.total == self.dice_roll.min()
+    }
+
+    fn is_max(&self) -> bool {
+        self.total == self.dice_roll.max()
+    }
+}
+
+impl Display for RollResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut text = if self.is_min() || self.is_max() {
+            format!("**__{total}__**", total = self.total)
+        } else {
+            format!("**{total}**", total = self.total)
+        };
+
+        if self.rolls.len() > 1 || self.extra != 0 {
+            text += " (";
+
+            let rolls = self
+                .rolls
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            text += &rolls;
+
+            if self.extra != 0 {
+                let extra_text = if self.extra.is_positive() {
+                    format!(", +{num}", num = self.extra)
+                } else {
+                    format!(", {num}", num = self.extra)
+                };
+
+                text += &extra_text;
+            }
+
+            text += ")";
+        }
+
+        f.write_str(&text)
+    }
+}
+
 mod tests {
     #![allow(unused_imports)]
     use tracing::trace;
     use tracing_test::traced_test;
 
-    use crate::functions::misc::DiceRoll;
+    use crate::functions::misc::{DiceRoll, RollResult};
 
     use super::Die;
 
-    macro_rules! test_parse {
-        ($name:ident: $text:expr => $parsed:expr$(,)?) => {
-            #[test]
-            #[traced_test]
-            fn $name() {
-                tracing::debug!("{:?}", super::DiceRoll::parse($text));
-                tracing::debug!("{:?}", $parsed);
+    mod parse {
+        use super::DiceRoll;
 
-                // super dumb fix for broken tests
-                pretty_assertions::assert_eq!(
-                    format!("{:?}", super::DiceRoll::parse($text)),
-                    format!("{:?}", $parsed)
-                )
-            }
-        };
+        macro_rules! generate_tests {
+            ($($name:ident: $text:expr => $parsed:expr),+) => {
+                paste::paste! {
+                    $(
+                        #[test]
+                        #[tracing_test::traced_test]
+                        fn [<parse_ $name>]() {
+                            tracing::debug!("{:?}", super::DiceRoll::parse($text));
+                            tracing::debug!("{:?}", $parsed);
 
-        ($name:ident: $text:expr => $parsed:expr, $($names:ident: $texts:expr => $parseds:expr),+$(,)?) => {
-            test_parse!($name: $text => $parsed);
-            test_parse! { $($names: $texts => $parseds),+ }
-        };
-    }
+                            // super dumb fix for broken tests
+                            pretty_assertions::assert_eq!(
+                                format!("{:?}", super::DiceRoll::parse($text)),
+                                format!("{:?}", $parsed)
+                            )
+                        }
+                    )+
+                }
+            };
+        }
 
-    test_parse! {
-        two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
-        d_twenty: "d20" => DiceRoll::new(1, 20, 0),
-        d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
-        two_d_four_minus_two: "2d4-2" => DiceRoll::new(2, 4, -2)
+        generate_tests! {
+            two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
+            d_twenty: "d20" => DiceRoll::new(1, 20, 0),
+            d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
+            two_d_four_minus_two: "2d4-2" => DiceRoll::new(2, 4, -2)
+        }
     }
 
     #[test]
@@ -294,6 +381,55 @@ mod tests {
             let rolls = roll.rolls();
             trace!(sum, ?rolls, extra);
             assert!(range.contains(&sum))
+        }
+    }
+
+    mod format_result {
+        #[allow(unused_macros)]
+        macro_rules! or_else {
+            ( ; $else:expr) => {
+                $else
+            };
+            ($target:literal ; $else:expr) => {
+                $target
+            };
+        }
+
+        macro_rules! generate_tests {
+            ($($name:ident: $faces:literal[$($rolls:literal),+] $($(+)?$extra:literal)? => $formatted:literal),+) => {
+                $(
+                    #[test]
+                    #[tracing_test::traced_test]
+                    fn $name() {
+                        //tracing::debug!("{:?}", super::DiceRoll::parse($text));
+                        //tracing::debug!("{:?}", $parsed);
+
+                        let extra = or_else!($($extra)? ; 0);
+                        let count = ${count($rolls)};
+
+                        let dice_roll = super::DiceRoll::new(count, $faces, extra).unwrap();
+                        let result = super::RollResult::new(dice_roll, [$($rolls),+], extra);
+
+                        // super dumb fix for broken tests
+                        pretty_assertions::assert_eq!(
+                            format!("{}", result),
+                            $formatted.to_string()
+                        )
+                    }
+                )+
+            };
+        }
+
+        generate_tests! {
+            two_d_ten: 10[10, 15] => "**25** (10, 15)",
+            d_twenty: 20[19] => "**19**",
+            three_d_six_plus_three: 6[4, 2, 3] +3 => "**12** (4, 2, 3, +3)",
+            three_d_six_minus_three: 6[4, 2, 3] -3 => "**6** (4, 2, 3, -3)",
+            d_twenty_plus_three: 20[20] +3 => "**__23__** (20, +3)",
+            d_twenty_minus_ten: 20[5] -10 => "**-5** (5, -10)",
+            nat_twenty: 20[20] => "**__20__**",
+            nat_one: 20[1] => "**__1__**",
+            nat_one_minus_ten: 20[1] -10 => "**__-9__** (1, -10)"
         }
     }
 }
