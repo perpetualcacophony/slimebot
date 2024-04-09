@@ -1,0 +1,15 @@
+name: Publish
+
+on:
+    release:
+        types: [ published ]
+
+jobs:
+    redeploy:
+        runs-on: ubuntu-latest
+    
+        steps:
+          - name: Trigger webhook
+            uses: distributhor/workflow-webhook@v3
+            with:
+              webhook_url: ${{ secrets.REDEPLOY_WEBHOOK_URL }}
