@@ -4,6 +4,9 @@ on:
   push:
     paths-ignore: [ "README.md" ]
     branches: [ "main" ]
+  
+  pull_request:
+    types: [ opened ]
 
 env:
   CARGO_TERM_COLOR: always
