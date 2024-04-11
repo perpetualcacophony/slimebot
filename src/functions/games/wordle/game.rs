@@ -1,8 +1,10 @@
 
 use poise::serenity_prelude::{
     self,
-    futures::{Stream, StreamExt}, CacheHttp, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateInteractionResponseMessage, EditMessage, Http, Message, ReactionType, ShardMessenger, UserId,
+    futures::{Stream, StreamExt},
+    ActionRow, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
+    CreateInteractionResponseMessage, EditMessage, Http, Message, MessageId, ReactionType,
+    ShardMessenger, User, UserId,
 };
 
 use crate::{
@@ -48,6 +50,14 @@ impl<'a> Game<'a> {
             dailies,
             style: style.unwrap_or_default(),
         }
+    }
+
+    pub fn channel_id(&self) -> ChannelId {
+        *self.as_ref()
+    }
+
+    pub fn message_id(&self) -> MessageId {
+        *self.as_ref()
     }
 
     pub async fn setup(&mut self) -> SerenityResult<()> {
@@ -208,6 +218,18 @@ impl<'a> Game<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl AsRef<ChannelId> for Game<'_> {
+    fn as_ref(&self) -> &ChannelId {
+        &self.msg.channel_id
+    }
+}
+
+impl AsRef<MessageId> for Game<'_> {
+    fn as_ref(&self) -> &MessageId {
+        &self.msg.id
     }
 }
 

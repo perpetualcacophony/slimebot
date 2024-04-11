@@ -66,7 +66,7 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
-        if let Some(message_id) = ctx.data().wordle().game_in_channel(ctx.channel_id()).await {
+        if let Some(message_id) = wordle.channel_is_locked(ctx.channel_id()).await {
             ctx.reply_ephemeral(format!(
                 "there's already a game being played in this channel! {}",
                 message_id.link(ctx.channel_id(), ctx.guild_id()),
@@ -84,9 +84,6 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             } else {
                 ctx.reply("loading...").await?.into_message().await?
             };
-
-            wordle.add_game(message.channel_id, message.id).await;
-
             // play game
             let mut game = wordle::Game::new(
                 ctx,
@@ -97,10 +94,14 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
                 style,
             );
 
+            wordle
+                .lock_channel(game.channel_id(), game.message_id())
+                .await;
+
             game.setup().await?;
             game.run().await?;
 
-            wordle.remove_game(ctx.channel_id()).await;
+            wordle.unlock_channel(game.channel_id()).await;
 
             if let Some(completed) = wordle
                 .wordles
@@ -142,7 +143,7 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 
     debug!(?wordle.active_games);
 
-    if let Some(msg) = wordle.game_in_channel(ctx.channel_id()).await {
+    if let Some(msg) = wordle.channel_is_locked(ctx.channel_id()).await {
         ctx.reply_ephemeral(format!(
             "there's already a game being played in this channel! {}",
             msg.link(ctx.channel_id(), ctx.guild_id()),
@@ -152,7 +153,6 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
         return Ok(());
     } else {
         let mut game_msg = ctx.reply("loading...").await?.into_message().await?;
-        wordle.add_game(ctx.channel_id(), game_msg.id).await;
 
         let puzzle = wordle::Puzzle::random(wordle.words());
 
@@ -165,12 +165,16 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             style,
         );
 
+        wordle
+            .lock_channel(game.channel_id(), game.message_id())
+            .await;
+
         game.setup().await?;
 
         // play game
         game.run().await?;
 
-        wordle.remove_game(ctx.channel_id()).await;
+        wordle.unlock_channel(game.channel_id()).await;
     }
 
     Ok(())

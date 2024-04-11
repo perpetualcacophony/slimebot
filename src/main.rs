@@ -123,22 +123,22 @@ impl WordleData {
         self.active_games.clone()
     }
 
-    async fn game_in_channel(&self, id: ChannelId) -> Option<MessageId> {
+    async fn channel_is_locked(&self, id: ChannelId) -> Option<MessageId> {
         let games = self.active_games();
         let guard = games.read().await;
         guard.get(&id).copied()
     }
 
-    async fn add_game(&self, channel_id: ChannelId, message_id: MessageId) {
+    async fn lock_channel(&self, channel_id: ChannelId, message_id: MessageId) {
         let games = self.active_games();
         let mut guard = games.write().await;
         guard.insert(channel_id, message_id);
     }
 
-    async fn remove_game(&self, channel_id: ChannelId) {
+    async fn unlock_channel(&self, id: ChannelId) {
         let games = self.active_games();
         let mut guard = games.write().await;
-        guard.remove(&channel_id);
+        guard.remove(&id);
     }
 }
 
