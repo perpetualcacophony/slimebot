@@ -1,4 +1,4 @@
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/perpetualcacophony/slimebot/docker-publish.yml) ![Static Badge](https://img.shields.io/badge/rust-1.75.0-f74c00?logo=rust&link=https%3A%2F%2Fblog.rust-lang.org%2F2023%2F12%2F28%2FRust-1.75.0.html)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/perpetualcacophony/slimebot/ci.yml) ![Static Badge](https://img.shields.io/badge/rust-1.75.0-f74c00?logo=rust&link=https%3A%2F%2Fblog.rust-lang.org%2F2023%2F12%2F28%2FRust-1.75.0.html)
 
 # 🌸 slimebot 🌸
 slimebot is a small self-hosted discord bot made for a private server with friends.

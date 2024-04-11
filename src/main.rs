@@ -19,7 +19,6 @@ mod config;
 mod db;
 
 mod errors;
-use errors::Error;
 
 mod functions;
 
@@ -28,13 +27,13 @@ use utils::Context;
 
 use poise::{
     serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, Message,
+        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents,
         MessageId,
     },
     PrefixFrameworkOptions,
 };
 
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{RwLock};
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 

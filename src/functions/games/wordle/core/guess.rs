@@ -220,7 +220,7 @@ impl ToPartialGuess for &str {
             }
         }
 
-        if words.get_word(&self).is_none() {
+        if words.get_word(self).is_none() {
             return Err(PartialGuessError::NotInList(self.to_string()));
         }
 

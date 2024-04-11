@@ -1,6 +1,6 @@
 use super::core::Word;
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
-use std::{collections::HashSet, fs, hash::Hash};
+use std::{collections::HashSet, fs};
 
 #[derive(Debug, Clone)]
 pub struct WordsList {
