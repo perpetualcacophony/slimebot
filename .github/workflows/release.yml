@@ -1,4 +1,4 @@
-name: Release
+name: Package release
 
 on:
   push:
@@ -13,6 +13,18 @@ env:
 
 
 jobs:
+  draft_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+
   build_and_push:
     runs-on: ubuntu-latest
     permissions:
@@ -83,13 +95,3 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
-  
-  redeploy:
-    needs: build_and_push
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Trigger webhook
-        uses: distributhor/workflow-webhook@v3
-        with:
-          webhook_url: ${{ secrets.REDEPLOY_WEBHOOK_URL }}

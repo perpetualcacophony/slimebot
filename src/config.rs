@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;

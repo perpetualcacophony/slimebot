@@ -3,11 +3,8 @@ use std::{borrow::Cow, ops::Not};
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        self, futures::StreamExt, ButtonStyle, CacheHttp, ComponentInteraction, CreateActionRow,
-        CreateButton, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
-        CreateMessage, EditMessage, Http, Message, ReactionType, ShardMessenger, UserId,
-    },
-    Context, CreateReply,
+        CreateButton, ReactionType, UserId,
+    }, CreateReply,
 };
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +12,6 @@ const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 pub use error::Error;
-use tracing::{debug, trace};
 
 pub mod core;
 use core::{AsEmoji, Guess};
@@ -32,7 +28,7 @@ mod words_list;
 pub use words_list::WordsList;
 
 mod daily;
-pub use daily::{DailyWordle, DailyWordles};
+pub use daily::{DailyWordles};
 
 mod options;
 pub use options::GameStyle;
@@ -105,8 +101,7 @@ impl AsEmoji for GameState {
 }
 
 use self::{
-    puzzle::DailyPuzzle,
-    utils::{ComponentInteractionExt, ContextExt, OptionComponentInteractionExt},
+    utils::{ComponentInteractionExt},
 };
 
 fn create_menu(daily_available: bool) -> CreateReply {

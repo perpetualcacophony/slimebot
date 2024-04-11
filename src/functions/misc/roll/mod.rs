@@ -1,4 +1,4 @@
-use std::{num::NonZeroI8, ops::Neg};
+use std::{fmt::Display, iter::Sum, ops::Neg};
 
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use regex::Regex;
@@ -6,12 +6,8 @@ use regex::Regex;
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
-pub mod natural;
-use natural::{NaturalI8, NaturalI8Constants, NaturalI8Error};
 #[derive(Debug, Error, PartialEq)]
 pub enum DiceRollError {
-    #[error(transparent)]
-    InvalidNumber(#[from] NaturalI8Error),
     #[error("")]
     NoFaces,
     #[error("")]
@@ -24,38 +20,63 @@ pub enum DiceRollError {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Die {
-    pub faces: NaturalI8,
+    pub faces: u8,
 }
 
 impl Die {
-    fn new(faces: NaturalI8) -> Self {
+    fn new(faces: u8) -> Self {
+        assert!(faces > 0, "die cannot have 0 faces");
         Self { faces }
     }
 
-    pub fn roll(&self) -> NaturalI8 {
+    fn as_rolled(&self, value: u8) -> RolledDie {
+        RolledDie { die: *self, value }
+    }
+
+    pub fn roll(&self) -> RolledDie {
         self.roll_with(&mut rand::thread_rng())
     }
 
-    fn roll_with(&self, rng: &mut impl Rng) -> NaturalI8 {
-        let range = 1..=self.faces.get();
-
-        range
-            .choose(rng)
-            .expect("should have at least one face")
-            .try_into()
-            .expect("faces is a valid NaturalI8")
+    fn roll_with(&self, rng: &mut impl Rng) -> RolledDie {
+        let range = 1..=self.faces;
+        let value = range.choose(rng).expect("should have at least one face");
+        self.as_rolled(value)
     }
 
     pub fn d20() -> Self {
-        Self::new(NaturalI8::twenty())
+        Self::new(20)
     }
 
-    fn min(&self) -> NaturalI8 {
-        NaturalI8::min()
+    pub const fn min(&self) -> u8 {
+        1
     }
 
-    pub fn max(&self) -> NaturalI8 {
+    pub fn max(&self) -> u8 {
         self.faces
+    }
+}
+
+impl Default for Die {
+    fn default() -> Self {
+        Self { faces: 1 }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct RolledDie {
+    die: Die,
+    value: u8,
+}
+
+impl RolledDie {
+    fn is_max(&self) -> bool {
+        // doesn't make any sense for a d1 or d2 to have a max or min
+        self.value == self.die.max() && self.die.faces != 1 && self.die.faces != 2
+    }
+
+    fn is_min(&self) -> bool {
+        // doesn't make any sense for a d1 or d2 to have a max or min
+        self.value == self.die.min() && self.die.faces != 1 && self.die.faces != 2
     }
 }
 
@@ -66,9 +87,8 @@ pub struct Dice {
 }
 
 impl Dice {
-    pub fn new(count: NaturalI8, faces: NaturalI8) -> Self {
-        let vec = vec![Die::new(faces); count.into()];
-
+    pub fn new(count: usize, faces: u8) -> Self {
+        let vec = vec![Die::new(faces); count];
         Self { vec, index: 0 }
     }
 
@@ -76,38 +96,23 @@ impl Dice {
         Roll::new(self.clone(), rng)
     }
 
-    pub fn len(&self) -> NaturalI8 {
+    pub fn len(&self) -> usize {
         ExactSizeIterator::len(self)
-            .try_into()
-            .expect("number of dice should not be 0")
     }
 
     #[instrument]
-    pub fn lowest_roll(&self) -> NaturalI8 {
+    pub fn lowest_roll(&self) -> usize {
         debug!(len = ?self.len());
         self.len()
     }
 
     #[instrument]
-    pub fn highest_roll(&self) -> i16 {
-        let highest = self
-            .clone()
-            .fold(0, |sum, die| sum + die.max().get() as i16);
+    pub fn highest_roll(&self) -> usize {
+        let highest = self.clone().fold(0, |sum, die| sum + die.max());
 
         debug!(highest);
 
-        highest
-    }
-}
-
-impl TryFrom<usize> for NaturalI8 {
-    type Error = NaturalI8Error;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        let int: i8 = value.try_into()?;
-        let non_zero: NonZeroI8 = int.try_into()?;
-
-        non_zero.try_into()
+        highest as usize
     }
 }
 
@@ -138,17 +143,23 @@ impl<It: Iterator<Item = Die>> Roll<It> {
         Self { iter, rng }
     }
 
-    fn total(self, extra: i8) -> i16 {
-        self.sum::<i16>() + extra as i16
+    fn total(self, extra: i8) -> isize {
+        self.sum::<u8>() as isize + extra as isize
     }
 }
 
 impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
-    type Item = NaturalI8;
+    type Item = RolledDie;
 
     fn next(&mut self) -> Option<Self::Item> {
         let die = self.iter.next();
         die.map(|die| die.roll_with(&mut self.rng))
+    }
+}
+
+impl Sum<RolledDie> for u8 {
+    fn sum<I: Iterator<Item = RolledDie>>(iter: I) -> Self {
+        iter.map(|roll| roll.value).sum()
     }
 }
 
@@ -160,10 +171,7 @@ pub struct DiceRoll {
 }
 
 impl DiceRoll {
-    pub fn new(count: i8, faces: i8, extra: i8) -> Result<Self, DiceRollError> {
-        let faces = faces.try_into()?;
-        let count = count.try_into()?;
-
+    pub fn new(count: usize, faces: u8, extra: i8) -> Result<Self, DiceRollError> {
         let dice = Dice::new(count, faces);
 
         let seed: [u8; 32] = rand::random();
@@ -177,9 +185,22 @@ impl DiceRoll {
         self.dice.roll(self.rng.clone())
     }
 
-    pub fn total(&self) -> i16 {
-        let sum = self.rolls().sum::<i16>();
-        sum + self.extra as i16
+    pub fn total(&self) -> isize {
+        let sum = self.rolls().sum::<u8>() as isize;
+        sum + self.extra as isize
+    }
+
+    pub fn result(self) -> RollResult {
+        let rolls = self.rolls().collect();
+        let extra = self.extra;
+        let total = self.total();
+
+        RollResult {
+            dice_roll: self,
+            rolls,
+            extra,
+            total,
+        }
     }
 
     #[instrument]
@@ -194,14 +215,15 @@ impl DiceRoll {
 
                 let count = caps
                     .get(1)
-                    .map_or(Ok(NaturalI8::default()), |mat| mat.as_str().parse())
-                    .unwrap_or_default();
+                    .map_or(Ok(1), |mat| mat.as_str().parse())
+                    .unwrap_or(1);
                 trace!(?count);
-                let faces: NaturalI8 = caps
+                let faces: u8 = caps
                     .get(2)
                     .ok_or(DiceRollError::NoFaces)?
                     .as_str()
-                    .parse()?;
+                    .parse()
+                    .map_err(|_| DiceRollError::NoFaces)?;
                 trace!(?faces);
 
                 let extra_unsigned = caps.get(4).map(|mat| {
@@ -214,17 +236,22 @@ impl DiceRoll {
                 });
                 trace!(?extra_unsigned);
 
-                let extra_sign = caps.get(3).map_or("", |mat| mat.as_str());
+                let extra_sign = caps.get(3).map(|s| s.as_str());
 
                 let extra = match extra_sign {
-                    "+" => extra_unsigned,
-                    "-" => extra_unsigned.map(|int| int.neg()),
-                    _ => None,
+                    Some("+") => extra_unsigned,
+                    Some("-") => extra_unsigned.map(|int| int.neg()),
+                    None => None,
+                    _ => {
+                        return Err(DiceRollError::InvalidExtraSign(
+                            extra_sign.unwrap_or_default().to_owned(),
+                        ))
+                    }
                 }
                 .unwrap_or_default();
                 debug!(?extra);
 
-                DiceRoll::new(count.get(), faces.get(), extra)
+                DiceRoll::new(count, faces, extra)
             })
             .ok_or(DiceRollError::NoMatch(text.to_owned()))?;
 
@@ -233,13 +260,89 @@ impl DiceRoll {
         roll
     }
 
-    pub fn min(&self) -> i16 {
-        self.dice.lowest_roll().get() as i16 + self.extra as i16
+    pub fn min(&self) -> isize {
+        self.dice.lowest_roll() as isize + self.extra as isize
     }
 
-    pub fn max(&self) -> i16 {
-        let highest: i16 = self.dice.highest_roll();
-        highest + self.extra as i16
+    pub fn max(&self) -> isize {
+        let highest = self.dice.highest_roll() as isize;
+        highest + self.extra as isize
+    }
+}
+
+pub struct RollResult {
+    dice_roll: DiceRoll,
+    rolls: Vec<RolledDie>,
+    extra: i8,
+    total: isize,
+}
+
+impl RollResult {
+    fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
+        let rolls = rolls.into();
+        let total = rolls.iter().copied().sum::<u8>() as isize + extra as isize;
+
+        Self {
+            dice_roll,
+            rolls,
+            extra,
+            total,
+        }
+    }
+
+    fn is_min(&self) -> bool {
+        self.total == self.dice_roll.min()
+    }
+
+    fn is_max(&self) -> bool {
+        self.total == self.dice_roll.max()
+    }
+}
+
+impl Display for RollResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut text = if (self.is_min() || self.is_max()) && self.rolls[0].die.faces != 1 {
+            if self.rolls.len() == 1 && self.rolls[0].die.faces == 2 {
+                format!("**{total}**", total = self.total)
+            } else {
+                format!("**__{total}__**", total = self.total)
+            }
+        } else {
+            format!("**{total}**", total = self.total)
+        };
+
+        if self.rolls.len() > 1 || self.extra != 0 {
+            text += " (";
+
+            let rolls = self
+                .rolls
+                .iter()
+                .map(|n| {
+                    if n.is_max() || n.is_min() {
+                        format!("__{num}__", num = n.value)
+                    } else {
+                        n.value.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            text += &rolls;
+
+            if self.extra != 0 {
+                let extra_text = if self.extra.is_positive() {
+                    format!(", +{num}", num = self.extra)
+                } else {
+                    format!(", {num}", num = self.extra)
+                };
+
+                text += &extra_text;
+            }
+
+            text += ")";
+        }
+
+        f.write_str(&text)
     }
 }
 
@@ -248,48 +351,51 @@ mod tests {
     use tracing::trace;
     use tracing_test::traced_test;
 
-    use super::natural::NaturalI8;
+    use crate::functions::misc::{DiceRoll, RollResult};
 
-    use super::{natural::NaturalI8Constants, DiceRoll, Die};
+    use super::Die;
 
-    macro_rules! test_parse {
-        ($name:ident: $text:expr => $parsed:expr$(,)?) => {
-            #[test]
-            #[traced_test]
-            fn $name() {
-                tracing::debug!("{:?}", super::DiceRoll::parse($text));
-                tracing::debug!("{:?}", $parsed);
+    mod parse {
+        use super::DiceRoll;
 
-                // super dumb fix for broken tests
-                pretty_assertions::assert_eq!(
-                    format!("{:?}", super::DiceRoll::parse($text)),
-                    format!("{:?}", $parsed)
-                )
-            }
-        };
+        macro_rules! generate_tests {
+            ($($name:ident: $text:expr => $parsed:expr),+) => {
+                paste::paste! {
+                    $(
+                        #[test]
+                        #[tracing_test::traced_test]
+                        fn [<parse_ $name>]() {
+                            tracing::debug!("{:?}", super::DiceRoll::parse($text));
+                            tracing::debug!("{:?}", $parsed);
 
-        ($name:ident: $text:expr => $parsed:expr, $($names:ident: $texts:expr => $parseds:expr),+$(,)?) => {
-            test_parse!($name: $text => $parsed);
-            test_parse! { $($names: $texts => $parseds),+ }
-        };
-    }
+                            // super dumb fix for broken tests
+                            pretty_assertions::assert_eq!(
+                                format!("{:?}", super::DiceRoll::parse($text)),
+                                format!("{:?}", $parsed)
+                            )
+                        }
+                    )+
+                }
+            };
+        }
 
-    test_parse! {
-        two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
-        d_twenty: "d20" => DiceRoll::new(1, 20, 0),
-        d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
-        two_d_four_minus_two: "2d4-2" => DiceRoll::new(2, 4, -2)
+        generate_tests! {
+            two_d_ten: "2d10" => DiceRoll::new(2, 10, 0),
+            d_twenty: "d20" => DiceRoll::new(1, 20, 0),
+            d_six_plus_three: "d6+3" => DiceRoll::new(1, 6, 3),
+            two_d_four_minus_two: "2d4-2" => DiceRoll::new(2, 4, -2)
+        }
     }
 
     #[test]
     fn roll_die() {
         let die = Die::d20();
-        let range = NaturalI8::one()..=NaturalI8::twenty();
+        let range = 1..=20;
         let mut rng = rand::thread_rng();
 
         for _ in 1..1000 {
-            let rolled: NaturalI8 = die.roll_with(&mut rng);
-            assert!(range.contains(&rolled))
+            let rolled = die.roll_with(&mut rng);
+            assert!(range.contains(&rolled.value))
         }
     }
 
@@ -301,7 +407,7 @@ mod tests {
 
         for _ in 1..1000 {
             let rolls = roll.rolls();
-            let sum: i8 = rolls.clone().sum();
+            let sum: u8 = rolls.clone().sum();
             trace!(sum, ?rolls);
             assert!(range.contains(&sum))
         }
@@ -316,10 +422,68 @@ mod tests {
 
         for _ in 1..2 {
             let roll = roll.clone();
-            let sum: i16 = roll.total();
+            let sum = roll.total();
             let rolls = roll.rolls();
             trace!(sum, ?rolls, extra);
             assert!(range.contains(&sum))
+        }
+    }
+
+    mod format_result {
+        #[allow(unused_macros)]
+        macro_rules! or_else {
+            ( ; $else:expr) => {
+                $else
+            };
+            ($target:literal ; $else:expr) => {
+                $target
+            };
+        }
+
+        macro_rules! generate_tests {
+            ($($name:ident: $faces:literal[$($rolls:literal),+] $($(+)?$extra:literal)? => $formatted:literal),+) => {
+                $(
+                    #[test]
+                    #[tracing_test::traced_test]
+                    fn $name() {
+                        //tracing::debug!("{:?}", super::DiceRoll::parse($text));
+                        //tracing::debug!("{:?}", $parsed);
+
+                        let extra = or_else!($($extra)? ; 0);
+                        let count = ${count($rolls)};
+
+                        let rolls = vec![$($rolls),+].into_iter();
+                        let dice = rolls.clone().map(|_| super::Die::new($faces));
+                        let rolled_dice = rolls.zip(dice).map(|(roll, die)| die.as_rolled(roll));
+                        let vec: Vec<crate::functions::misc::RolledDie> = rolled_dice.collect();
+
+                        let dice_roll = super::DiceRoll::new(count, $faces, extra).unwrap();
+                        let result = super::RollResult::new(dice_roll, vec, extra);
+
+                        // super dumb fix for broken tests
+                        pretty_assertions::assert_eq!(
+                            format!("{}", result),
+                            $formatted.to_string()
+                        )
+                    }
+                )+
+            };
+        }
+
+        generate_tests! {
+            two_d_ten: 10[10, 5] => "**15** (__10__, 5)",
+            d_twenty: 20[19] => "**19**",
+            three_d_six_plus_three: 6[4, 2, 3] +3 => "**12** (4, 2, 3, +3)",
+            three_d_six_minus_three: 6[4, 2, 3] -3 => "**6** (4, 2, 3, -3)",
+            d_twenty_plus_three: 20[20] +3 => "**__23__** (__20__, +3)",
+            d_twenty_minus_ten: 20[5] -10 => "**-5** (5, -10)",
+            nat_twenty: 20[20] => "**__20__**",
+            nat_one: 20[1] => "**__1__**",
+            nat_one_minus_ten: 20[1] -10 => "**__-9__** (__1__, -10)",
+            d_one: 1[1] => "**1**",
+            two_d_one: 1[1, 1] => "**2** (1, 1)",
+            d_two: 2[1] => "**1**",
+            two_d_two: 2[2, 2] => "**__4__** (2, 2)"
         }
     }
 }
