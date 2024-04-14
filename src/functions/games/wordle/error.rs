@@ -13,8 +13,6 @@ pub enum Error {
     Expired(DailyPuzzle),
     #[error("no puzzles in database")]
     NoPuzzles,
-    #[error("only one puzzle in database, so no 'previous puzzle' exists")]
-    OnlyOnePuzzle,
     #[error("mongodb error: {0:#}")]
     MongoDb(#[from] mongodb::error::Error),
     #[error(transparent)]

@@ -123,8 +123,16 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             }
         }
     } else {
-        ctx.reply_ephemeral("you don't have a daily wordle available!")
-            .await?;
+        let latest = wordles
+            .latest()
+            .await?
+            .expect("wordle has been refreshed by now");
+
+        ctx.reply_ephemeral(format!(
+            "you don't have a daily wordle yet! check back in {hours} hours",
+            hours = latest.age_hours()
+        ))
+        .await?;
     }
 
     Ok(())
