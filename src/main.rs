@@ -27,13 +27,12 @@ use utils::Context;
 
 use poise::{
     serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents,
-        MessageId,
+        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, MessageId,
     },
     PrefixFrameworkOptions,
 };
 
-use tokio::sync::{RwLock};
+use tokio::sync::RwLock;
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 

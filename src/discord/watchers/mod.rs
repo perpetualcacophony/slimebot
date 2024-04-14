@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, CreateMessage, Http, Message, UserId};
+use poise::serenity_prelude::{CacheHttp, CreateMessage, GuildId, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::{info, instrument};
 
 use crate::FormatDuration;
@@ -35,68 +34,56 @@ async fn check_vore(content: &str) -> bool {
 
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
-pub async fn vore(http: &Http, db: &Database, new_message: &Message) {
-    if check_vore(&new_message.content).await {
-        let recent = Utc::now();
-
-        log_watcher(http, new_message).await;
+pub async fn vore(http: &Http, db: &Database, msg: &Message) {
+    if check_vore(&msg.content).await {
+        log_watcher(http, msg).await;
 
         #[derive(Debug, Deserialize, Serialize)]
         struct VoreMention {
             timestamp: DateTime<Utc>,
             author: UserId,
+            guild: GuildId,
         }
+
+        let new_mention = VoreMention {
+            timestamp: Utc::now(),
+            author: msg.author.id,
+            guild: msg.guild_id.expect("message should be in guild"),
+        };
 
         let vore_mentions = db.collection::<VoreMention>("vore_mentions");
 
-        let new_mention = VoreMention {
-            timestamp: recent,
-            author: new_message.author.id,
-        };
+        let guild_bson =
+            mongodb::bson::ser::to_bson(&new_mention.guild).expect("GuildId can be serialized");
+
+        if let Some(last) = vore_mentions
+            .find_one(
+                doc! { "guild": guild_bson },
+                FindOneOptions::builder()
+                    .sort(doc! { "timestamp": -1 })
+                    .build(),
+            )
+            .await
+            .expect("db request should not fail")
+        {
+            let time = new_mention.timestamp - last.timestamp;
+
+            msg.channel_id
+                .say(
+                    http,
+                    format!(
+                        "~~{time}~~ 0 days without mentioning vore",
+                        time = time.format_largest()
+                    ),
+                )
+                .await
+                .expect("sending message should not fail");
+        }
+
         vore_mentions
             .insert_one(new_mention, None)
             .await
             .expect("inserting to db should not fail");
-
-        // fixing bug where error happens if collection has 1 object and returns none
-        let last = if vore_mentions
-            .count_documents(None, None)
-            .await
-            .expect("collection should have at least one item")
-            == 1
-        {
-            vore_mentions
-                .find_one(None, None)
-                .await
-                .expect("db request should not fail")
-                .expect("collection should not be empty")
-                .timestamp
-        } else {
-            vore_mentions
-                .find_one(
-                    doc! { "timestamp": { "$ne": format!("{recent:?}") } },
-                    FindOneOptions::builder()
-                        .sort(doc! { "timestamp": -1 })
-                        .build(),
-                )
-                .await
-                .expect("db request should not fail")
-                .expect("collection should not be empty")
-                .timestamp
-        };
-
-        let time = recent - last;
-        let time_text = time.format_largest();
-
-        http.send_message(
-            new_message.channel_id,
-            Vec::new(),
-            &json!({
-                "content": format!("~~{time_text}~~ 0 days without mentioning vore")
-            }),
-        )
-        .await
-        .expect("sending message should not fail");
     }
 }
 
