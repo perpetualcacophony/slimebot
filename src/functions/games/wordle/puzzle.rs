@@ -22,6 +22,7 @@ impl Puzzle {
         Self::Random(answer)
     }
 
+    #[allow(dead_code)] // this is used in a macro
     pub fn guess_str(&self, word: &impl AsLetters) -> Guess {
         self.answer().guess_str(word)
     }

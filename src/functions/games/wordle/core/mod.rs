@@ -121,6 +121,7 @@ pub trait AsEmoji {
         }
     }
 
+    #[allow(dead_code)]
     fn emoji_default_style(&self) -> String {
         self.emoji_with_style(GameStyle::default()).into()
     }

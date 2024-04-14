@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     convert::Infallible,
+    fmt::Display,
     ops::{Index, IndexMut, Not},
     str::FromStr,
 };
@@ -24,7 +25,7 @@ impl Guess {
             .map(|ch: char| (ch.to_ascii_lowercase(), LetterState::NotPresent))
             .collect::<Vec<(char, LetterState)>>()
             .try_into()
-            .unwrap();
+            .expect("should have 5 letters");
 
         Self { letters }
     }
@@ -127,12 +128,15 @@ impl IndexMut<usize> for Guess {
     }
 }
 
-impl ToString for Guess {
-    fn to_string(&self) -> String {
-        self.letters
+impl Display for Guess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let txt = self
+            .letters
             .iter()
             .map(|letter| letter.1.to_string())
-            .collect()
+            .collect::<String>();
+
+        f.write_str(&txt)
     }
 }
 
@@ -174,14 +178,13 @@ impl FromStr for LetterState {
     }
 }
 
-impl ToString for LetterState {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for LetterState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             Self::Correct => "O",
             Self::WrongPlace => "o",
             Self::NotPresent => ".",
-        }
-        .to_owned()
+        })
     }
 }
 

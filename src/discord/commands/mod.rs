@@ -1,12 +1,10 @@
 mod ban;
 mod watch_fic;
 
-
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId,
-        User,
+        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
     },
     CreateReply,
 };
@@ -511,6 +509,7 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
 
 pub use minecraft::minecraft;
 
+#[allow(dead_code)]
 mod minecraft {
     use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};

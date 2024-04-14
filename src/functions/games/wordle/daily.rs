@@ -207,6 +207,7 @@ impl DailyWordle {
         self.games.iter().find(|game| game.user == user)
     }
 
+    #[allow(dead_code)]
     pub fn played_by(&self, user: UserId) -> bool {
         self.user_game(user).is_some()
     }
@@ -219,6 +220,7 @@ impl DailyWordle {
         self.is_expired().not() && self.finished_by(user).not()
     }
 
+    #[allow(dead_code)]
     pub fn in_progress_for(&self, user: UserId) -> bool {
         self.user_game(user).is_some_and(|game| game.in_progress())
     }

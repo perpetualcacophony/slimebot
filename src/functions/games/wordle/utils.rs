@@ -8,11 +8,16 @@ use poise::{
 
 use crate::Context;
 
-pub trait CreateReplyExt: Default {
-    fn new() -> Self {
+pub trait CreateReplyExt {
+    #[allow(dead_code)]
+    fn new() -> Self
+    where
+        Self: Default,
+    {
         Self::default()
     }
 
+    #[allow(dead_code)]
     fn button(self, button: CreateButton) -> Self;
 }
 
@@ -42,13 +47,17 @@ pub trait ComponentInteractionExt {
         cache_http: impl CacheHttp,
         message: serenity::CreateInteractionResponseMessage,
     ) -> serenity::Result<()>;
+
+    #[allow(dead_code)]
     async fn update_message(
         &self,
         cache_http: impl CacheHttp,
         builder: serenity::CreateInteractionResponseMessage,
     ) -> serenity::Result<()>;
+
     fn custom_id(&self) -> &str;
 
+    #[allow(dead_code)]
     async fn reply(
         &self,
         cache_http: impl CacheHttp,
@@ -105,6 +114,7 @@ impl ComponentInteractionExt for serenity::ComponentInteraction {
 }
 
 pub trait OptionComponentInteractionExt {
+    #[allow(dead_code)]
     fn is_some_with_id(&self, custom_id: &str) -> bool;
 }
 
@@ -115,6 +125,7 @@ impl OptionComponentInteractionExt for Option<ComponentInteraction> {
 }
 
 pub trait ContextExt {
+    #[allow(dead_code)]
     fn in_guild(&self) -> bool;
 }
 

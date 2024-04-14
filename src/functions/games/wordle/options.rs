@@ -22,13 +22,3 @@ pub enum GameStyle {
     #[name = "fix_flags"]
     SpacedLetters,
 }
-
-impl GameStyle {
-    pub fn parse(style: Option<Self>, fix_flags: bool) -> Self {
-        if fix_flags {
-            Self::SpacedLetters
-        } else {
-            style.unwrap_or_default()
-        }
-    }
-}

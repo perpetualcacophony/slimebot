@@ -1,11 +1,7 @@
 use std::{borrow::Cow, ops::Not};
 
 use mongodb::bson::doc;
-use poise::{
-    serenity_prelude::{
-        CreateButton, ReactionType, UserId,
-    }, CreateReply,
-};
+use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
 
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
@@ -22,19 +18,17 @@ mod puzzle;
 pub use puzzle::Puzzle;
 
 type DbResult<T> = std::result::Result<T, MongoDbError>;
-type Result<T> = std::result::Result<T, crate::errors::Error>;
 
 mod words_list;
 pub use words_list::WordsList;
 
 mod daily;
-pub use daily::{DailyWordles};
+pub use daily::DailyWordles;
 
 mod options;
 pub use options::GameStyle;
 
 mod utils;
-use utils::CreateReplyExt;
 
 mod game;
 pub use game::Game;
@@ -59,24 +53,6 @@ impl GameState {
         }
     }
 
-    fn is_solved(&self) -> bool {
-        self.guesses
-            .last()
-            .map_or(false, |guess| guess.is_correct())
-    }
-
-    fn unfinished(owner: UserId, guesses: &[Guess]) -> Self {
-        Self::new(owner, guesses, false)
-    }
-
-    fn finished(owner: UserId, guesses: &[Guess]) -> Self {
-        Self::new(owner, guesses, true)
-    }
-
-    fn into_finished(mut self) -> Self {
-        self.finished = true;
-        self
-    }
     fn is_finished(&self) -> bool {
         self.finished
     }
@@ -100,10 +76,7 @@ impl AsEmoji for GameState {
     }
 }
 
-use self::{
-    utils::{ComponentInteractionExt},
-};
-
+/*
 fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {
         "you have a daily wordle available!"
@@ -134,6 +107,7 @@ fn create_menu(daily_available: bool) -> CreateReply {
         )
         .reply(true)
 }
+*/
 
 /*async fn mode_select_menu(
     ctx: crate::Context<'_>,

@@ -33,6 +33,7 @@ impl Die {
         RolledDie { die: *self, value }
     }
 
+    // convenience version of roll_with that doesn't use a cached Rng
     pub fn roll(&self) -> RolledDie {
         self.roll_with(&mut rand::thread_rng())
     }
@@ -41,10 +42,6 @@ impl Die {
         let range = 1..=self.faces;
         let value = range.choose(rng).expect("should have at least one face");
         self.as_rolled(value)
-    }
-
-    pub fn d20() -> Self {
-        Self::new(20)
     }
 
     pub const fn min(&self) -> u8 {
@@ -278,6 +275,7 @@ pub struct RollResult {
 }
 
 impl RollResult {
+    #[allow(dead_code)] // used in a macro
     fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
         let rolls = rolls.into();
         let total = rolls.iter().copied().sum::<u8>() as isize + extra as isize;
@@ -389,7 +387,7 @@ mod tests {
 
     #[test]
     fn roll_die() {
-        let die = Die::d20();
+        let die = Die::new(20);
         let range = 1..=20;
         let mut rng = rand::thread_rng();
 

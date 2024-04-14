@@ -1,5 +1,5 @@
 use super::core::Word;
-use rand::{prelude::SliceRandom, seq::IteratorRandom};
+use rand::seq::IteratorRandom;
 use std::{collections::HashSet, fs};
 
 #[derive(Debug, Clone)]

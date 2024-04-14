@@ -2,7 +2,7 @@ use super::CommandResult;
 use crate::errors::{self};
 use crate::functions::misc::{self, DiceRoll};
 use crate::Context;
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 #[instrument(skip_all)]
 #[poise::command(

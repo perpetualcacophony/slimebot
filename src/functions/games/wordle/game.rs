@@ -1,10 +1,9 @@
-
 use poise::serenity_prelude::{
     self,
     futures::{Stream, StreamExt},
-    ActionRow, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
+    CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
     CreateInteractionResponseMessage, EditMessage, Http, Message, MessageId, ReactionType,
-    ShardMessenger, User, UserId,
+    ShardMessenger, UserId,
 };
 
 use crate::{
@@ -16,7 +15,7 @@ use crate::{
 
 use super::{
     core::{Guess, PartialGuess, PartialGuessError, ToPartialGuess},
-    puzzle::{Puzzle},
+    puzzle::Puzzle,
     DailyWordles, GameState, GameStyle, WordsList,
 };
 
@@ -169,7 +168,7 @@ impl<'a> Game<'a> {
         let ctx = self.context();
 
         let mut messages = self.messages_stream();
-        let mut interactions = self.msg.await_component_interactions(ctx).stream();
+        let mut interactions = self.buttons_stream();
 
         loop {
             tokio::select! {
@@ -294,12 +293,10 @@ impl ComponentInteractionExt for ComponentInteraction {
             .yes_no_buttons();
 
         self.respond(ctx, builder).await?;
-        
 
         //self.delete_response(ctx).await?;
 
-        self
-            .await_yes_no(ctx)
+        self.await_yes_no(ctx)
             .await
             .map(|op| op.unwrap_or_default())
     }
@@ -396,6 +393,7 @@ trait AddButton: Sized + Clone {
         self
     }
 
+    #[allow(dead_code)]
     fn add_buttons_in_place(&mut self, buttons: &[CreateButton]) {
         for button in buttons {
             self.add_button_in_place(button.clone());
