@@ -10,7 +10,7 @@ mod error;
 pub use error::Error;
 
 pub mod core;
-use core::{AsEmoji, Guess};
+use core::AsEmoji;
 
 use mongodb::error::Error as MongoDbError;
 
@@ -30,26 +30,31 @@ pub use options::GameStyle;
 
 mod utils;
 
-mod game;
-pub use game::Game;
+pub mod game;
+pub use game::{Game, GameData};
+
+use self::core::{guess::GuessSlice, Guesses, GuessesRecord};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     user: UserId,
-    guesses: Vec<Guess>,
+    guesses: GuessesRecord,
     pub num_guesses: usize,
     finished: bool,
     solved: bool,
 }
 
 impl GameState {
-    fn new(owner: UserId, guesses: &[Guess], finished: bool) -> Self {
+    fn new(owner: UserId, guesses: impl GuessSlice, finished: bool) -> Self {
+        let count = guesses.count();
+        let solved = guesses.last_is_solved();
+
         Self {
             user: owner,
-            guesses: guesses.to_vec(),
-            num_guesses: guesses.len(),
+            guesses: guesses.to_record(),
+            num_guesses: count,
             finished,
-            solved: guesses.last().map_or(false, |guess| guess.is_correct()),
+            solved,
         }
     }
 

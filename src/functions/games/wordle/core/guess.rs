@@ -1,19 +1,19 @@
-use std::{
-    borrow::Cow,
-    convert::Infallible,
-    fmt::Display,
-    ops::{Index, IndexMut, Not},
-    str::FromStr,
-};
-
 use poise::serenity_prelude::Message;
 use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    convert::Infallible,
+    fmt::Display,
+    ops::{Deref, Index, IndexMut, Not},
+    str::FromStr,
+};
 
 use super::super::words_list::WordsList;
 
 use super::{AsEmoji, AsLetters};
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Guess {
     letters: [(char, LetterState); 5],
 }
@@ -62,6 +62,10 @@ impl Guess {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (char, LetterState)> + '_ {
         self.letters.iter_mut()
+    }
+
+    pub fn as_slice(&self) -> &[(char, LetterState)] {
+        self.as_ref()
     }
 }
 
@@ -143,6 +147,12 @@ impl Display for Guess {
 impl PartialEq<&str> for Guess {
     fn eq(&self, other: &&str) -> bool {
         &self.to_string() == other
+    }
+}
+
+impl AsRef<[(char, LetterState)]> for Guess {
+    fn as_ref(&self) -> &[(char, LetterState)] {
+        &self.letters
     }
 }
 
@@ -240,6 +250,226 @@ impl ToPartialGuess for String {
 impl ToPartialGuess for Message {
     fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError> {
         self.content.to_partial_guess(words)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuessesRecord(Vec<Guess>);
+
+impl<T: Into<Vec<Guess>>> From<T> for GuessesRecord {
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<[Guess]> for GuessesRecord {
+    fn as_ref(&self) -> &[Guess] {
+        self.0.as_ref()
+    }
+}
+
+use tinyvec::{ArrayVec, TinyVec};
+
+#[derive(Clone)]
+pub enum Guesses {
+    Limited {
+        vec: TinyVec<[Guess; 6]>,
+        limit: usize,
+    },
+    Unlimited(TinyVec<[Guess; 6]>),
+}
+
+impl Guesses {
+    pub fn push(&mut self, guess: Guess) -> Option<Guess> {
+        match self {
+            Self::Limited { vec, limit } => {
+                if vec.len() == *limit {
+                    None
+                } else {
+                    vec.push(guess);
+                    vec.last().copied()
+                }
+            }
+            Self::Unlimited(vec) => {
+                vec.push(guess);
+                vec.last().copied()
+            }
+        }
+    }
+
+    fn default_limit() -> Self {
+        Self::Limited {
+            vec: TinyVec::new(),
+            limit: 6,
+        }
+    }
+
+    fn with_limit(limit: usize) -> Self {
+        Self::Limited {
+            vec: TinyVec::new(),
+            limit,
+        }
+    }
+
+    pub fn unlimited() -> Self {
+        Self::Unlimited(TinyVec::new())
+    }
+}
+
+impl AsRef<[Guess]> for Guesses {
+    fn as_ref(&self) -> &[Guess] {
+        match self {
+            Self::Limited { vec, .. } => vec,
+            Self::Unlimited(vec) => vec,
+        }
+    }
+}
+
+pub trait GuessSlice: AsRef<[Guess]> {
+    fn iter(&self) -> std::slice::Iter<Guess> {
+        self.as_slice().iter()
+    }
+
+    fn as_slice(&self) -> &[Guess] {
+        self.as_ref()
+    }
+
+    fn count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn last(&self) -> Option<Guess> {
+        self.as_slice().last().copied()
+    }
+
+    fn last_is_solved(&self) -> bool {
+        self.last().is_some_and(|guess| guess.is_correct())
+    }
+
+    fn to_record(&self) -> GuessesRecord {
+        self.as_slice().into()
+    }
+
+    fn letter_states(&self) -> LetterStates {
+        self.iter()
+            .flat_map(|guess| guess.as_slice())
+            .copied()
+            .collect()
+    }
+
+    fn used_letters(&self) -> CharSet {
+        self.iter()
+            .flat_map(|guess| guess.iter().map(|(ch, _)| *ch))
+            .collect()
+    }
+
+    fn unused_letters(&self) -> CharSet {
+        let used_letters = self.used_letters();
+        ('a'..='z')
+            .filter(|ch| !used_letters.contains(ch))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LetterStates(BTreeMap<char, LetterState>);
+
+impl<T: Into<BTreeMap<char, LetterState>>> From<T> for LetterStates {
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl<A> FromIterator<A> for LetterStates
+where
+    BTreeMap<char, LetterState>: FromIterator<A>,
+{
+    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+        Self(<BTreeMap<char, LetterState> as FromIterator<A>>::from_iter(
+            iter,
+        ))
+    }
+}
+
+impl Deref for LetterStates {
+    type Target = BTreeMap<char, LetterState>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsEmoji for LetterStates {
+    fn as_emoji(&self) -> Cow<str> {
+        let tup = self
+            .iter()
+            .fold((String::new(), String::new()), |acc, letter_state| {
+                (
+                    acc.0 + &letter_state.0.as_emoji() + " ",
+                    acc.1 + &letter_state.1.as_emoji() + " ",
+                )
+            });
+
+        format!("{}\n{}", tup.0, tup.1).trim_end().to_owned().into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CharSet(BTreeSet<char>);
+
+impl Deref for CharSet {
+    type Target = BTreeSet<char>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<A> FromIterator<A> for CharSet
+where
+    <Self as Deref>::Target: FromIterator<A>,
+{
+    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+        Self(<<Self as Deref>::Target as FromIterator<A>>::from_iter(
+            iter,
+        ))
+    }
+}
+
+impl AsEmoji for CharSet {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .map(|ch| ch.as_emoji().to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+            .into()
+    }
+}
+
+impl GuessSlice for Guesses {}
+impl GuessSlice for GuessesRecord {}
+
+impl<T: GuessSlice> AsEmoji for T {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .map(|g| g.as_emoji())
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into()
+    }
+
+    fn emoji_with_letters(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters_spaced())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 

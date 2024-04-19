@@ -9,6 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 
 /// Functionality called from Discord.
 mod discord;
+use arc_swap::ArcSwap;
 #[allow(clippy::wildcard_imports)]
 use discord::commands::*;
 use mongodb::Database;
@@ -88,13 +89,13 @@ impl Data {
     }
 }
 
-use functions::games::wordle::{DailyWordles, WordsList};
+use functions::games::wordle::{DailyWordles, GameData, GameState, WordsList};
 
 #[derive(Debug, Clone)]
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
-    active_games: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
+    active_games: Arc<RwLock<HashMap<ChannelId, Arc<ArcSwap<GameData>>>>>,
 }
 
 impl WordleData {
@@ -118,26 +119,37 @@ impl WordleData {
         &self.wordles
     }
 
-    fn active_games(&self) -> Arc<RwLock<HashMap<ChannelId, MessageId>>> {
+    fn active_games(&self) -> Arc<RwLock<HashMap<ChannelId, Arc<ArcSwap<GameData>>>>> {
         self.active_games.clone()
     }
 
-    async fn channel_is_locked(&self, id: ChannelId) -> Option<MessageId> {
+    async fn channel_is_locked(&self, id: ChannelId) -> Option<Arc<GameData>> {
         let games = self.active_games();
         let guard = games.read().await;
-        guard.get(&id).copied()
+        guard.get(&id).map(|arc| arc.load_full())
     }
 
-    async fn lock_channel(&self, channel_id: ChannelId, message_id: MessageId) {
+    async fn lock_channel(&self, channel_id: ChannelId, data: GameData) {
         let games = self.active_games();
         let mut guard = games.write().await;
-        guard.insert(channel_id, message_id);
+        guard.insert(channel_id, Arc::new(ArcSwap::from_pointee(data)));
     }
 
     async fn unlock_channel(&self, id: ChannelId) {
         let games = self.active_games();
         let mut guard = games.write().await;
         guard.remove(&id);
+    }
+
+    async fn update_data(&self, channel_id: ChannelId, data: GameData) {
+        let games = self.active_games();
+        let mut guard = games.write().await;
+        let arc_swap = guard.get_mut(&channel_id).cloned();
+        drop(guard);
+
+        if let Some(arc_swap) = arc_swap {
+            arc_swap.swap(Arc::new(data));
+        }
     }
 }
 

@@ -10,11 +10,14 @@ use crate::{
     functions::games::wordle::{
         core::AsEmoji, utils::ComponentInteractionExt as UtilsComponentInteractionExt,
     },
-    Context,
+    Context, WordleData,
 };
 
 use super::{
-    core::{Guess, PartialGuess, PartialGuessError, ToPartialGuess},
+    core::{
+        guess::GuessSlice, Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError,
+        ToPartialGuess,
+    },
     puzzle::Puzzle,
     DailyWordles, GameState, GameStyle, WordsList,
 };
@@ -23,11 +26,12 @@ type SerenityResult<T> = serenity_prelude::Result<T>;
 
 pub struct Game<'a> {
     puzzle: Puzzle,
-    guesses: Vec<Guess>,
+    guesses: Guesses,
     ctx: Context<'a>,
     msg: &'a mut Message,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
+    data: &'a WordleData,
     style: GameStyle,
 }
 
@@ -37,16 +41,18 @@ impl<'a> Game<'a> {
         msg: &'a mut Message,
         words: &'a WordsList,
         dailies: &'a DailyWordles,
+        data: &'a WordleData,
         puzzle: impl Into<Puzzle>,
         style: Option<GameStyle>,
     ) -> Self {
         Self {
             puzzle: puzzle.into(),
-            guesses: Vec::with_capacity(6),
+            guesses: Guesses::unlimited(),
             ctx,
             msg,
             words,
             dailies,
+            data,
             style: style.unwrap_or_default(),
         }
     }
@@ -84,12 +90,8 @@ impl<'a> Game<'a> {
         self.ctx.author().id
     }
 
-    pub fn count_guesses(&self) -> usize {
-        self.guesses.len()
-    }
-
     pub fn title(&self) -> String {
-        format!("{} {}/6", self.puzzle().title(), self.count_guesses())
+        format!("{} {}/6", self.puzzle.title(), self.guesses.count())
     }
 
     pub fn content(&self) -> String {
@@ -118,7 +120,7 @@ impl<'a> Game<'a> {
         self.msg.await_component_interactions(self.ctx).stream()
     }
 
-    pub fn guess(&mut self, partial: PartialGuess) -> &Guess {
+    pub fn guess(&mut self, partial: PartialGuess) -> Guess {
         let new = self.puzzle.guess(partial);
         self.guesses.push(new);
         self.guesses.last().expect("just added one")
@@ -134,11 +136,19 @@ impl<'a> Game<'a> {
     }
 
     pub fn is_solved(&self) -> bool {
-        self.guesses.last().is_some_and(|guess| guess.is_correct())
+        self.guesses.last_is_solved()
     }
 
-    pub fn get_state(&self, finished: bool) -> GameState {
-        GameState::new(self.author_id(), &self.guesses, finished)
+    pub fn state(&self, finished: bool) -> GameState {
+        GameState::new(self.author_id(), self.guesses.to_record(), finished)
+    }
+
+    pub fn data(&self) -> GameData {
+        GameData {
+            guesses: self.guesses.to_record(),
+            channel_id: self.channel_id(),
+            message_id: self.message_id(),
+        }
     }
 
     pub fn buttons_builder(&self) -> CreateActionRow {
@@ -179,8 +189,10 @@ impl<'a> Game<'a> {
                         self.update_message().await?;
 
                         if let Some(num) = self.puzzle.number() {
-                            self.dailies.update(num, self.get_state(self.is_solved())).await?;
+                            self.dailies.update(num, self.state(self.is_solved())).await?;
                         }
+
+                        self.data.update_data(self.channel_id(), self.data()).await;
 
                         if self.is_solved() {
                             msg.reply(ctx, "you win!").await?;
@@ -193,7 +205,7 @@ impl<'a> Game<'a> {
                         match interaction.custom_id() {
                             "pause" => {
                                 let number = self.puzzle().number().expect("this option is only available for daily puzzles");
-                                self.dailies.update(number, self.get_state(false)).await?;
+                                self.dailies.update(number, self.state(false)).await?;
                                 break;
                             }
                             "cancel" => {
@@ -201,7 +213,7 @@ impl<'a> Game<'a> {
                             }
                             "give_up" => {
                                 if let Some(num) = self.puzzle().number() {
-                                    self.dailies.update(num, self.get_state(true)).await?;
+                                    self.dailies.update(num, self.state(true)).await?;
                                 }
 
                                 self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
@@ -372,6 +384,13 @@ impl AsRef<WordsList> for GameContext<'_> {
     fn as_ref(&self) -> &WordsList {
         self.words()
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct GameData {
+    pub guesses: GuessesRecord,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
 }
 
 trait AddButton: Sized + Clone {
