@@ -1,3 +1,6 @@
+use std::{collections::HashMap, sync::Arc};
+
+use arc_swap::{access::Access, ArcSwap};
 use poise::serenity_prelude::{
     self,
     futures::{Stream, StreamExt},
@@ -5,6 +8,7 @@ use poise::serenity_prelude::{
     CreateInteractionResponseMessage, EditMessage, Http, Message, MessageId, ReactionType,
     ShardMessenger, UserId,
 };
+use tokio::sync::RwLock;
 
 use crate::{
     functions::games::wordle::{
@@ -31,7 +35,7 @@ pub struct Game<'a> {
     msg: &'a mut Message,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
-    data: &'a WordleData,
+    data: &'a GameDataStore,
     style: GameStyle,
 }
 
@@ -41,7 +45,7 @@ impl<'a> Game<'a> {
         msg: &'a mut Message,
         words: &'a WordsList,
         dailies: &'a DailyWordles,
-        data: &'a WordleData,
+        data: &'a GameDataStore,
         puzzle: impl Into<Puzzle>,
         style: Option<GameStyle>,
     ) -> Self {
@@ -65,7 +69,20 @@ impl<'a> Game<'a> {
         *self.as_ref()
     }
 
+    pub async fn lock_channel(&self) {
+        self.update_data().await
+    }
+
+    pub async fn unlock_channel(&self) {
+        self.data.unlock_channel(self.channel_id()).await
+    }
+
+    pub async fn update_data(&self) {
+        self.data.set(self.channel_id(), self.data()).await
+    }
+
     pub async fn setup(&mut self) -> SerenityResult<()> {
+        self.lock_channel().await;
         self.update_message().await?;
         self.add_buttons().await
     }
@@ -74,7 +91,7 @@ impl<'a> Game<'a> {
         self.msg
             .edit(
                 self.ctx,
-                EditMessage::new().components(vec![self.buttons_builder()]),
+                EditMessage::new().components(self.buttons_builder()),
             )
             .await
     }
@@ -151,7 +168,7 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn buttons_builder(&self) -> CreateActionRow {
+    pub fn stop_buttons(&self) -> CreateActionRow {
         let pause_cancel_button = if self.puzzle().is_daily() {
             CreateButton::new("pause")
                 .emoji(ReactionType::Unicode("⏸️".to_owned()))
@@ -174,6 +191,18 @@ impl<'a> Game<'a> {
         CreateActionRow::Buttons(buttons)
     }
 
+    pub fn info_buttons(&self) -> CreateActionRow {
+        let unused = CreateButton::new("unused")
+            .emoji(ReactionType::Unicode("🔎".to_owned()))
+            .label("unused letters");
+
+        CreateActionRow::Buttons(vec![unused])
+    }
+
+    pub fn buttons_builder(&self) -> Vec<CreateActionRow> {
+        vec![self.stop_buttons(), self.info_buttons()]
+    }
+
     pub async fn run(&mut self) -> Result<(), crate::errors::CommandError> {
         let ctx = self.context();
 
@@ -192,7 +221,7 @@ impl<'a> Game<'a> {
                             self.dailies.update(num, self.state(self.is_solved())).await?;
                         }
 
-                        self.data.update_data(self.channel_id(), self.data()).await;
+                        self.update_data().await;
 
                         if self.is_solved() {
                             msg.reply(ctx, "you win!").await?;
@@ -201,32 +230,41 @@ impl<'a> Game<'a> {
                     }
                 },
                 Some(interaction) = interactions.next() => {
-                    if interaction.confirmed(ctx).await? {
-                        match interaction.custom_id() {
-                            "pause" => {
-                                let number = self.puzzle().number().expect("this option is only available for daily puzzles");
-                                self.dailies.update(number, self.state(false)).await?;
-                                break;
-                            }
-                            "cancel" => {
-                                break;
-                            }
-                            "give_up" => {
-                                if let Some(num) = self.puzzle().number() {
-                                    self.dailies.update(num, self.state(true)).await?;
+                    match interaction.custom_id() {
+                        "unused" => {
+                            interaction.reply_ephemeral(ctx, format!("unused letters: {}", self.guesses.unused_letters().as_emoji())).await?;
+                        }
+                        _ => {
+                            if interaction.confirmed(ctx).await? {
+                                match interaction.custom_id() {
+                                    "pause" => {
+                                        let number = self.puzzle().number().expect("this option is only available for daily puzzles");
+                                        self.dailies.update(number, self.state(false)).await?;
+                                        break;
+                                    }
+                                    "cancel" => {
+                                        break;
+                                    }
+                                    "give_up" => {
+                                        if let Some(num) = self.puzzle().number() {
+                                            self.dailies.update(num, self.state(true)).await?;
+                                        }
+
+                                        self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
+
+                                        self.finish("game over!").await?;
+                                        break;
+                                    },
+                                    _ => unreachable!()
                                 }
-
-                                self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
-
-                                self.finish("game over!").await?;
-                                break;
                             }
-                            _ => unreachable!()
                         }
                     }
                 }
             }
         }
+
+        self.unlock_channel();
 
         Ok(())
     }
@@ -446,3 +484,37 @@ trait YesNoButtons: AddButton {
 }
 
 impl<T> YesNoButtons for T where T: AddButton {}
+
+#[derive(Clone, Debug, Default)]
+pub struct GameDataStore(Arc<RwLock<HashMap<ChannelId, Arc<ArcSwap<GameData>>>>>);
+
+impl GameDataStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub async fn get(&self, channel_id: ChannelId) -> Option<Arc<GameData>> {
+        let guard = self.0.read().await;
+        guard.get(&channel_id).map(|arc_swap| arc_swap.load_full())
+    }
+
+    pub async fn channel_is_locked(&self, id: ChannelId) -> bool {
+        self.get(id).await.is_some()
+    }
+
+    pub async fn set(&self, channel_id: ChannelId, new_data: GameData) {
+        let mut guard = self.0.write().await;
+        if let Some(arc_swap) = guard.get_mut(&channel_id) {
+            arc_swap.store(Arc::new(new_data))
+        }
+    }
+
+    pub async fn remove(&self, channel_id: ChannelId) {
+        let mut guard = self.0.write().await;
+        guard.remove(&channel_id);
+    }
+
+    pub async fn unlock_channel(&self, id: ChannelId) {
+        self.remove(id).await;
+    }
+}

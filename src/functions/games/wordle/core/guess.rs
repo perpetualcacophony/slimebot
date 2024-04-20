@@ -2,7 +2,7 @@ use poise::serenity_prelude::Message;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     convert::Infallible,
     fmt::Display,
     ops::{Deref, Index, IndexMut, Not},
@@ -268,7 +268,7 @@ impl AsRef<[Guess]> for GuessesRecord {
     }
 }
 
-use tinyvec::{ArrayVec, TinyVec};
+use tinyvec::TinyVec;
 
 #[derive(Clone)]
 pub enum Guesses {
@@ -304,10 +304,16 @@ impl Guesses {
         }
     }
 
-    fn with_limit(limit: usize) -> Self {
-        Self::Limited {
-            vec: TinyVec::new(),
-            limit,
+    fn with_limit(limit: impl Into<Option<usize>>) -> Self {
+        if let Some(limit) = limit.into()
+            && limit != 0
+        {
+            Self::Limited {
+                vec: TinyVec::new(),
+                limit,
+            }
+        } else {
+            Self::unlimited()
         }
     }
 
@@ -380,14 +386,9 @@ impl<T: Into<BTreeMap<char, LetterState>>> From<T> for LetterStates {
     }
 }
 
-impl<A> FromIterator<A> for LetterStates
-where
-    BTreeMap<char, LetterState>: FromIterator<A>,
-{
-    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
-        Self(<BTreeMap<char, LetterState> as FromIterator<A>>::from_iter(
-            iter,
-        ))
+impl FromIterator<(char, LetterState)> for LetterStates {
+    fn from_iter<T: IntoIterator<Item = (char, LetterState)>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -401,16 +402,17 @@ impl Deref for LetterStates {
 
 impl AsEmoji for LetterStates {
     fn as_emoji(&self) -> Cow<str> {
-        let tup = self
-            .iter()
-            .fold((String::new(), String::new()), |acc, letter_state| {
-                (
-                    acc.0 + &letter_state.0.as_emoji() + " ",
-                    acc.1 + &letter_state.1.as_emoji() + " ",
-                )
-            });
-
-        format!("{}\n{}", tup.0, tup.1).trim_end().to_owned().into()
+        self.iter()
+            .fold([String::new(), String::new()], |acc, letter_state| {
+                [
+                    acc[0].clone() + &letter_state.0.as_emoji() + " ",
+                    acc[1].clone() + &letter_state.1.as_emoji() + " ",
+                ]
+            })
+            .join("\n")
+            .trim_end()
+            .to_owned()
+            .into()
     }
 }
 
@@ -425,14 +427,9 @@ impl Deref for CharSet {
     }
 }
 
-impl<A> FromIterator<A> for CharSet
-where
-    <Self as Deref>::Target: FromIterator<A>,
-{
-    fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
-        Self(<<Self as Deref>::Target as FromIterator<A>>::from_iter(
-            iter,
-        ))
+impl FromIterator<char> for CharSet {
+    fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 

@@ -69,7 +69,7 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
-        if let Some(data) = wordle.channel_is_locked(ctx.channel_id()).await {
+        if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
             ctx.reply_ephemeral(format!(
                 "there's already a game being played in this channel! {}",
                 data.message_id.link(ctx.channel_id(), ctx.guild_id()),
@@ -91,19 +91,15 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             let mut game = wordle::Game::new(
                 ctx,
                 &mut message,
-                ctx.data().wordle.words(),
+                wordle.words(),
                 wordles,
-                wordle,
+                wordle.game_data(),
                 daily.puzzle.clone(),
                 style,
             );
 
-            wordle.lock_channel(game.channel_id(), game.data()).await;
-
             game.setup().await?;
             game.run().await?;
-
-            wordle.unlock_channel(game.channel_id()).await;
 
             if let Some(completed) = wordle
                 .wordles
@@ -151,9 +147,9 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    debug!(?wordle.active_games);
+    debug!(?wordle.game_data);
 
-    if let Some(data) = wordle.channel_is_locked(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
         ctx.reply_ephemeral(format!(
             "there's already a game being played in this channel! {}",
             data.message_id.link(ctx.channel_id(), ctx.guild_id()),
@@ -171,19 +167,15 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             &mut game_msg,
             wordle.words(),
             wordle.wordles(),
-            wordle,
+            wordle.game_data(),
             puzzle,
             style,
         );
-
-        wordle.lock_channel(game.channel_id(), game.data()).await;
 
         game.setup().await?;
 
         // play game
         game.run().await?;
-
-        wordle.unlock_channel(game.channel_id()).await;
     }
 
     Ok(())
@@ -290,7 +282,7 @@ async fn role(ctx: Context<'_>) -> CommandResult {
 async fn letters(ctx: Context<'_>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.channel_is_locked(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
         let guesses = &data.guesses;
 
         let response = format!(
@@ -318,7 +310,7 @@ async fn letters(ctx: Context<'_>) -> CommandResult {
 async fn unused(ctx: Context<'_>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.channel_is_locked(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
         let guesses = &data.guesses;
 
         let response = format!(
