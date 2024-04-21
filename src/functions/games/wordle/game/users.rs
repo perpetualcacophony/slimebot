@@ -1,10 +1,4 @@
-use std::{
-    borrow::{Borrow, Cow},
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
+use std::collections::HashMap;
 
 use poise::serenity_prelude::{User, UserId};
 
@@ -87,9 +81,6 @@ impl<'owner> Users<'owner> {
     }
 }
 
-enum Owned {}
-enum Borrowed {}
-
 #[derive(Clone, Debug, Default)]
 struct UserMap(HashMap<UserId, User>);
 
@@ -154,7 +145,7 @@ impl<'map> IntoIterator for &'map UserMap {
     type IntoIter = <&'map HashMap<UserId, User> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_ref().into_iter()
+        self.as_ref().iter()
     }
 }
 
@@ -225,6 +216,6 @@ impl<'map, 'user> IntoIterator for &'map UserMapBorrowed<'user> {
     type IntoIter = <&'map HashMap<UserId, &'user User> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_ref().into_iter()
+        self.as_ref().iter()
     }
 }

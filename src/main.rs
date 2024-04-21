@@ -6,13 +6,11 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
-use arc_swap::ArcSwap;
 #[allow(clippy::wildcard_imports)]
-use discord::commands::*;
 use mongodb::Database;
 
 /// Config file parsing and option access.
@@ -28,13 +26,10 @@ mod utils;
 use utils::Context;
 
 use poise::{
-    serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents, MessageId,
-    },
+    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
     PrefixFrameworkOptions,
 };
 
-use tokio::sync::RwLock;
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
@@ -81,6 +76,7 @@ impl Data {
         &self.config
     }
 
+    #[allow(dead_code)]
     const fn db(&self) -> &Database {
         &self.db
     }
@@ -90,7 +86,7 @@ impl Data {
     }
 }
 
-use functions::games::wordle::{game::GamesCache, DailyWordles, GameData, GameRecord, WordsList};
+use functions::games::wordle::{game::GamesCache, DailyWordles, WordsList};
 
 #[derive(Debug, Clone)]
 struct WordleData {

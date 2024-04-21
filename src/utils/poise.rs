@@ -2,8 +2,6 @@ use crate::Data;
 
 use poise::{serenity_prelude as serenity, CreateReply};
 
-use super::serenity::buttons::AddButton;
-
 pub type Context<'a> = poise::Context<'a, Data, crate::errors::CommandError>;
 
 pub type Error = crate::errors::CommandError;
@@ -18,6 +16,7 @@ pub trait ContextExt {
 
     fn in_guild(&self) -> bool;
 
+    #[allow(dead_code)]
     fn in_dm(&self) -> bool {
         !self.in_guild()
     }

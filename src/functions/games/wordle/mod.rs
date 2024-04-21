@@ -1,16 +1,9 @@
-use std::{borrow::Cow, ops::Not};
-
-use mongodb::bson::doc;
-use poise::serenity_prelude::UserId;
-use serde::{Deserialize, Serialize};
-
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 pub use error::Error;
 
 pub mod core;
-use core::AsEmoji;
 
 use mongodb::error::Error as MongoDbError;
 
@@ -29,9 +22,7 @@ mod options;
 pub use options::GameStyle;
 
 pub mod game;
-pub use game::{Game, GameData, GameRecord};
-
-use self::core::{guess::GuessSlice, Guesses, GuessesRecord};
+pub use game::{Game, GameRecord};
 
 /*
 fn create_menu(daily_available: bool) -> CreateReply {

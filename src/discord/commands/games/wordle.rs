@@ -1,9 +1,6 @@
-use std::fmt::Write;
-use std::ops::Not;
-
-use poise::serenity_prelude::json::to_string;
 use poise::serenity_prelude::{CreateMessage, Mentionable, User};
 use poise::CreateReply;
+use std::ops::Not;
 use tracing::{debug, instrument};
 
 use crate::functions::games::wordle::core::guess::GuessSlice;

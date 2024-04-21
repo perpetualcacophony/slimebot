@@ -35,6 +35,7 @@ impl Puzzle {
         matches!(self, Self::Daily(..))
     }
 
+    #[allow(dead_code)] // worth having for a complete API
     pub fn is_random(&self) -> bool {
         matches!(self, Self::Random(..))
     }
