@@ -28,8 +28,6 @@ pub use daily::DailyWordles;
 mod options;
 pub use options::GameStyle;
 
-mod utils;
-
 pub mod game;
 pub use game::{Game, GameData, GameRecord};
 

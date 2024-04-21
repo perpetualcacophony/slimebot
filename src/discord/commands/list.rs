@@ -1,27 +1,30 @@
-use crate::*;
+macro_rules! list {
+    ($($command:ident),+) => {
+        pub fn list() -> Vec<crate::utils::poise::Command> {
+            vec![
+                $(super::$command()),+
+            ]
+        }
+    };
+}
 
-use super::utils::Command;
-
-pub fn list() -> Vec<Command> {
-    vec![
-        ping(),
-        pong(),
-        pfp(),
-        //watch_fic(),
-        echo(),
-        ban(),
-        banban(),
-        uptime(),
-        borzoi(),
-        cat(),
-        fox(),
-        minecraft(),
-        roll(),
-        flip(),
-        d20(),
-        version(),
-        wordle(),
-        help(),
-        eightball(),
-    ]
+list! {
+    ping,
+    pong,
+    pfp,
+    echo,
+    ban,
+    banban,
+    uptime,
+    borzoi,
+    cat,
+    fox,
+    minecraft,
+    roll,
+    flip,
+    d20,
+    version,
+    wordle,
+    help,
+    eightball
 }

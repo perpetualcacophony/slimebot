@@ -7,8 +7,13 @@ use poise::serenity_prelude::{
 };
 
 use crate::{
-    functions::games::wordle::{
-        core::AsEmoji, utils::ComponentInteractionExt as UtilsComponentInteractionExt,
+    functions::games::wordle::core::AsEmoji,
+    utils::{
+        poise::ContextExt,
+        serenity::{
+            buttons::YesNoButtons,
+            component_interaction::ComponentInteractionExt as UtilsComponentInteractionExt,
+        },
     },
     Context,
 };
@@ -19,7 +24,6 @@ use super::{
         ToPartialGuess,
     },
     puzzle::Puzzle,
-    utils::ContextExt,
     DailyWordles, GameStyle, WordsList,
 };
 
@@ -444,57 +448,3 @@ impl AsRef<WordsList> for GameContext<'_> {
         self.words()
     }
 }
-
-trait AddButton: Sized + Clone {
-    fn add_button(mut self, button: CreateButton) -> Self {
-        self.add_button_in_place(button);
-        self
-    }
-
-    fn add_button_in_place(&mut self, button: CreateButton) {
-        let cloned = self.clone();
-        *self = cloned.add_button(button);
-    }
-
-    fn add_buttons(mut self, buttons: &[CreateButton]) -> Self {
-        for button in buttons {
-            self = self.add_button(button.clone());
-        }
-
-        self
-    }
-
-    #[allow(dead_code)]
-    fn add_buttons_in_place(&mut self, buttons: &[CreateButton]) {
-        for button in buttons {
-            self.add_button_in_place(button.clone());
-        }
-    }
-}
-
-impl AddButton for CreateInteractionResponseMessage {
-    fn add_button(self, button: CreateButton) -> Self {
-        self.button(button)
-    }
-}
-
-trait YesNoButtons: AddButton {
-    fn yes_no_buttons(self) -> Self {
-        let yes_emoji = ReactionType::Unicode("✅".to_owned());
-        let no_emoji = ReactionType::Unicode("❌".to_owned());
-
-        let yes_button = CreateButton::new("yes")
-            .emoji(yes_emoji)
-            .label("yes")
-            .style(poise::serenity_prelude::ButtonStyle::Secondary);
-
-        let no_button = CreateButton::new("no")
-            .emoji(no_emoji)
-            .label("no")
-            .style(poise::serenity_prelude::ButtonStyle::Secondary);
-
-        self.add_buttons(&[yes_button, no_button])
-    }
-}
-
-impl<T> YesNoButtons for T where T: AddButton {}

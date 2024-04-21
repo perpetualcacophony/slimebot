@@ -1,44 +1,6 @@
-use poise::{
-    serenity_prelude::{
-        self as serenity, CacheHttp, ComponentInteraction, CreateActionRow, CreateButton,
-        CreateInteractionResponseMessage,
-    },
-    CreateReply,
+use poise::serenity_prelude::{
+    self as serenity, CacheHttp, ComponentInteraction, CreateInteractionResponseMessage,
 };
-
-use crate::Context;
-
-pub trait CreateReplyExt {
-    #[allow(dead_code)]
-    fn new() -> Self
-    where
-        Self: Default,
-    {
-        Self::default()
-    }
-
-    #[allow(dead_code)]
-    fn button(self, button: CreateButton) -> Self;
-}
-
-impl CreateReplyExt for CreateReply {
-    fn button(mut self, button: CreateButton) -> Self {
-        if let Some(ref mut rows) = self.components {
-            if let Some(buttons) = rows.iter_mut().find_map(|row| match row {
-                CreateActionRow::Buttons(b) => Some(b),
-                _ => None,
-            }) {
-                buttons.push(button);
-            } else {
-                rows.push(CreateActionRow::Buttons(vec![button]));
-            }
-        } else {
-            self = self.components(vec![CreateActionRow::Buttons(vec![button])]);
-        }
-
-        self
-    }
-}
 
 pub trait ComponentInteractionExt {
     async fn acknowledge(&self, cache_http: impl CacheHttp) -> serenity::Result<()>;
@@ -121,16 +83,5 @@ pub trait OptionComponentInteractionExt {
 impl OptionComponentInteractionExt for Option<ComponentInteraction> {
     fn is_some_with_id(&self, custom_id: &str) -> bool {
         self.as_ref().is_some_and(|ci| ci.custom_id() == custom_id)
-    }
-}
-
-pub trait ContextExt {
-    #[allow(dead_code)]
-    fn in_guild(&self) -> bool;
-}
-
-impl ContextExt for Context<'_> {
-    fn in_guild(&self) -> bool {
-        self.guild_id().is_some()
     }
 }

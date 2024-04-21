@@ -6,10 +6,9 @@ use poise::serenity_prelude::{CreateMessage, Mentionable, User};
 use poise::CreateReply;
 use tracing::{debug, instrument};
 
-use super::super::utils::CommandResult;
 use crate::functions::games::wordle::core::guess::GuessSlice;
 use crate::functions::games::wordle::core::AsEmoji;
-use crate::{discord::utils::ContextExt, utils::Context};
+use crate::utils::poise::{CommandResult, Context, ContextExt};
 
 use crate::functions::games::wordle::{self, GameStyle};
 

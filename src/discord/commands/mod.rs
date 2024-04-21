@@ -14,7 +14,7 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-pub type Context<'a> = poise::Context<'a, crate::Data, utils::Error>;
+use crate::utils::poise::{CommandResult, Context};
 
 //pub use watch_fic::watch_fic;
 
@@ -23,9 +23,6 @@ use crate::{
     errors::{self, ApiError},
     FormatDuration,
 };
-
-mod utils;
-use utils::CommandResult;
 
 trait LogCommands {
     async fn log_command(&self);
