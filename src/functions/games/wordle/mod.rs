@@ -18,9 +18,6 @@ pub use words_list::WordsList;
 mod daily;
 pub use daily::DailyWordles;
 
-mod options;
-pub use options::GameStyle;
-
 pub mod game;
 pub use game::{Game, GameRecord};
 

@@ -3,11 +3,13 @@ use poise::CreateReply;
 use std::ops::Not;
 use tracing::{debug, instrument};
 
-use crate::functions::games::wordle::core::guess::GuessSlice;
-use crate::functions::games::wordle::core::AsEmoji;
+use crate::functions::games::wordle::{
+    core::{guess::GuessSlice, AsEmoji},
+    game::options::GameOptionsBuilder,
+};
 use crate::utils::poise::{CommandResult, Context, ContextExt};
 
-use crate::functions::games::wordle::{self, GameStyle};
+use crate::functions::games::wordle::{self, game::options::GameStyle};
 
 /// play wordle right from discord!
 #[instrument(skip_all)]
@@ -87,11 +89,8 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             let mut game = wordle::Game::new(
                 ctx,
                 &mut message,
-                wordle.words(),
-                wordles,
-                wordle.game_data(),
                 daily.puzzle.clone(),
-                style,
+                GameOptionsBuilder::default().style(style).build(),
             );
 
             game.setup().await?;
@@ -161,11 +160,8 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
         let mut game = wordle::Game::new(
             ctx,
             &mut game_msg,
-            wordle.words(),
-            wordle.wordles(),
-            wordle.game_data(),
             puzzle,
-            style,
+            GameOptionsBuilder::default().style(style).build(),
         );
 
         game.setup().await?;

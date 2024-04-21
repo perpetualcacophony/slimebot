@@ -11,7 +11,7 @@ pub use guess::{Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError, 
 
 use self::guess::LetterState;
 
-use super::GameStyle;
+use super::game::options::GameStyle;
 
 /*
 #[derive(Debug, Clone, Default)]

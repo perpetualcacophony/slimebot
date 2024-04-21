@@ -8,6 +8,7 @@ use std::{
     ops::{Deref, Index, IndexMut, Not},
     str::FromStr,
 };
+use tinyvec::TinyVec;
 
 use super::super::words_list::WordsList;
 
@@ -268,66 +269,75 @@ impl AsRef<[Guess]> for GuessesRecord {
     }
 }
 
-use tinyvec::TinyVec;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GuessesLimit(usize);
 
-#[derive(Clone)]
-pub enum Guesses {
-    Limited {
-        vec: TinyVec<[Guess; 6]>,
-        limit: usize,
-    },
-    Unlimited(TinyVec<[Guess; 6]>),
+impl GuessesLimit {
+    pub fn new(limit: usize) -> Self {
+        assert!(limit != 0, "limit cannot be 0");
+        Self(limit)
+    }
+
+    pub fn try_new(limit: usize) -> Option<Self> {
+        (limit != 0).then_some(Self::new(limit))
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<usize> for GuessesLimit {
+    fn into(self) -> usize {
+        self.0
+    }
+}
+
+impl PartialEq<usize> for GuessesLimit {
+    fn eq(&self, other: &usize) -> bool {
+        &self.0 == other
+    }
+}
+
+impl Default for GuessesLimit {
+    fn default() -> Self {
+        Self(6)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Guesses {
+    vec: TinyVec<[Guess; 6]>,
+    limit: Option<GuessesLimit>,
 }
 
 impl Guesses {
-    pub fn push(&mut self, guess: Guess) -> Option<Guess> {
-        match self {
-            Self::Limited { vec, limit } => {
-                if vec.len() == *limit {
-                    None
-                } else {
-                    vec.push(guess);
-                    vec.last().copied()
-                }
-            }
-            Self::Unlimited(vec) => {
-                vec.push(guess);
-                vec.last().copied()
-            }
+    pub fn limit_reached(&self) -> bool {
+        self.limit.is_some_and(|lim| lim == self.vec.len())
+    }
+
+    pub fn push(&mut self, guess: Guess) {
+        if !self.limit_reached() {
+            self.vec.push(guess)
         }
     }
 
-    fn default_limit() -> Self {
-        Self::Limited {
-            vec: TinyVec::new(),
-            limit: 6,
-        }
+    pub fn default_limit() -> Self {
+        Self::new(GuessesLimit::default())
     }
 
-    fn with_limit(limit: impl Into<Option<usize>>) -> Self {
-        if let Some(limit) = limit.into()
-            && limit != 0
-        {
-            Self::Limited {
-                vec: TinyVec::new(),
-                limit,
-            }
-        } else {
-            Self::unlimited()
+    pub fn new(limit: impl Into<Option<GuessesLimit>>) -> Self {
+        Self {
+            limit: limit.into(),
+            ..Self::default()
         }
     }
 
     pub fn unlimited() -> Self {
-        Self::Unlimited(TinyVec::new())
+        Self::new(None)
     }
 }
 
 impl AsRef<[Guess]> for Guesses {
     fn as_ref(&self) -> &[Guess] {
-        match self {
-            Self::Limited { vec, .. } => vec,
-            Self::Unlimited(vec) => vec,
-        }
+        &self.vec
     }
 }
 

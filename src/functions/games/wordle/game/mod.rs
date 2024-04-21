@@ -18,13 +18,12 @@ use crate::{
     Context,
 };
 
+use self::options::GameOptions;
+
 use super::{
-    core::{
-        guess::GuessSlice, Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError,
-        ToPartialGuess,
-    },
+    core::{guess::GuessSlice, Guess, Guesses, PartialGuess, PartialGuessError, ToPartialGuess},
     puzzle::Puzzle,
-    DailyWordles, GameStyle, WordsList,
+    DailyWordles, WordsList,
 };
 
 type SerenityResult<T> = serenity_prelude::Result<T>;
@@ -41,6 +40,9 @@ pub use record::GameRecord;
 mod users;
 use users::Users;
 
+pub mod options;
+use options::GameStyle;
+
 pub struct Game<'a> {
     puzzle: Puzzle,
     guesses: Guesses,
@@ -48,7 +50,7 @@ pub struct Game<'a> {
     msg: &'a mut Message,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
-    data: &'a GamesCache,
+    cache: &'a GamesCache,
     users: Users<'a>,
     style: GameStyle,
 }
@@ -57,11 +59,8 @@ impl<'a> Game<'a> {
     pub fn new(
         ctx: Context<'a>,
         msg: &'a mut Message,
-        words: &'a WordsList,
-        dailies: &'a DailyWordles,
-        data: &'a GamesCache,
         puzzle: impl Into<Puzzle>,
-        style: Option<GameStyle>,
+        options: GameOptions,
     ) -> Self {
         let users = if ctx.in_guild() {
             Users::more(ctx.author())
@@ -69,16 +68,18 @@ impl<'a> Game<'a> {
             Users::one(ctx.author())
         };
 
+        let data = ctx.data();
+
         Self {
             puzzle: puzzle.into(),
-            guesses: Guesses::unlimited(),
+            guesses: Guesses::new(options.guesses_limit),
             ctx,
             msg,
-            words,
-            dailies,
-            data,
+            words: data.wordle().words(),
+            dailies: data.wordle().wordles(),
+            cache: data.wordle().game_data(),
             users,
-            style: style.unwrap_or_default(),
+            style: options.style,
         }
     }
 
@@ -95,11 +96,11 @@ impl<'a> Game<'a> {
     }
 
     pub async fn unlock_channel(&self) {
-        self.data.unlock_channel(self.channel_id()).await
+        self.cache.unlock_channel(self.channel_id()).await
     }
 
     pub async fn update_data(&self) {
-        self.data.set(self.channel_id(), self.data()).await
+        self.cache.set(self.channel_id(), self.data()).await
     }
 
     pub async fn setup(&mut self) -> SerenityResult<()> {
