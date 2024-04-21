@@ -1,6 +1,3 @@
-use std::{collections::HashMap, sync::Arc};
-
-use arc_swap::{access::Access, ArcSwap};
 use poise::serenity_prelude::{
     self,
     futures::{Stream, StreamExt},
@@ -8,13 +5,12 @@ use poise::serenity_prelude::{
     CreateInteractionResponseMessage, EditMessage, Http, Message, MessageId, ReactionType,
     ShardMessenger, UserId,
 };
-use tokio::sync::RwLock;
 
 use crate::{
     functions::games::wordle::{
         core::AsEmoji, utils::ComponentInteractionExt as UtilsComponentInteractionExt,
     },
-    Context, WordleData,
+    Context,
 };
 
 use super::{
@@ -23,10 +19,23 @@ use super::{
         ToPartialGuess,
     },
     puzzle::Puzzle,
-    DailyWordles, GameState, GameStyle, WordsList,
+    utils::ContextExt,
+    DailyWordles, GameStyle, WordsList,
 };
 
 type SerenityResult<T> = serenity_prelude::Result<T>;
+
+mod cache;
+pub use cache::GamesCache;
+
+mod data;
+pub use data::GameData;
+
+mod record;
+pub use record::GameRecord;
+
+mod users;
+use users::Users;
 
 pub struct Game<'a> {
     puzzle: Puzzle,
@@ -35,7 +44,8 @@ pub struct Game<'a> {
     msg: &'a mut Message,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
-    data: &'a GameDataStore,
+    data: &'a GamesCache,
+    users: Users<'a>,
     style: GameStyle,
 }
 
@@ -45,10 +55,16 @@ impl<'a> Game<'a> {
         msg: &'a mut Message,
         words: &'a WordsList,
         dailies: &'a DailyWordles,
-        data: &'a GameDataStore,
+        data: &'a GamesCache,
         puzzle: impl Into<Puzzle>,
         style: Option<GameStyle>,
     ) -> Self {
+        let users = if ctx.in_guild() {
+            Users::more(ctx.author())
+        } else {
+            Users::one(ctx.author())
+        };
+
         Self {
             puzzle: puzzle.into(),
             guesses: Guesses::unlimited(),
@@ -57,6 +73,7 @@ impl<'a> Game<'a> {
             words,
             dailies,
             data,
+            users,
             style: style.unwrap_or_default(),
         }
     }
@@ -156,8 +173,8 @@ impl<'a> Game<'a> {
         self.guesses.last_is_solved()
     }
 
-    pub fn state(&self, finished: bool) -> GameState {
-        GameState::new(self.author_id(), self.guesses.to_record(), finished)
+    pub fn state(&self, finished: bool) -> GameRecord {
+        GameRecord::new(self.author_id(), self.guesses.to_record(), finished)
     }
 
     pub fn data(&self) -> GameData {
@@ -227,6 +244,10 @@ impl<'a> Game<'a> {
                             msg.reply(ctx, "you win!").await?;
                             break;
                         }
+
+                        if !self.users.contains(&msg.author) {
+                            self.users.add(msg.author)
+                        }
                     }
                 },
                 Some(interaction) = interactions.next() => {
@@ -264,7 +285,7 @@ impl<'a> Game<'a> {
             }
         }
 
-        self.unlock_channel();
+        self.unlock_channel().await;
 
         Ok(())
     }
@@ -424,13 +445,6 @@ impl AsRef<WordsList> for GameContext<'_> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct GameData {
-    pub guesses: GuessesRecord,
-    pub channel_id: ChannelId,
-    pub message_id: MessageId,
-}
-
 trait AddButton: Sized + Clone {
     fn add_button(mut self, button: CreateButton) -> Self {
         self.add_button_in_place(button);
@@ -484,37 +498,3 @@ trait YesNoButtons: AddButton {
 }
 
 impl<T> YesNoButtons for T where T: AddButton {}
-
-#[derive(Clone, Debug, Default)]
-pub struct GameDataStore(Arc<RwLock<HashMap<ChannelId, Arc<ArcSwap<GameData>>>>>);
-
-impl GameDataStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub async fn get(&self, channel_id: ChannelId) -> Option<Arc<GameData>> {
-        let guard = self.0.read().await;
-        guard.get(&channel_id).map(|arc_swap| arc_swap.load_full())
-    }
-
-    pub async fn channel_is_locked(&self, id: ChannelId) -> bool {
-        self.get(id).await.is_some()
-    }
-
-    pub async fn set(&self, channel_id: ChannelId, new_data: GameData) {
-        let mut guard = self.0.write().await;
-        if let Some(arc_swap) = guard.get_mut(&channel_id) {
-            arc_swap.store(Arc::new(new_data))
-        }
-    }
-
-    pub async fn remove(&self, channel_id: ChannelId) {
-        let mut guard = self.0.write().await;
-        guard.remove(&channel_id);
-    }
-
-    pub async fn unlock_channel(&self, id: ChannelId) {
-        self.remove(id).await;
-    }
-}

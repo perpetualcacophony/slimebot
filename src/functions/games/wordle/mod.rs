@@ -31,55 +31,9 @@ pub use options::GameStyle;
 mod utils;
 
 pub mod game;
-pub use game::{Game, GameData};
+pub use game::{Game, GameData, GameRecord};
 
 use self::core::{guess::GuessSlice, Guesses, GuessesRecord};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameState {
-    user: UserId,
-    guesses: GuessesRecord,
-    pub num_guesses: usize,
-    finished: bool,
-    solved: bool,
-}
-
-impl GameState {
-    fn new(owner: UserId, guesses: impl GuessSlice, finished: bool) -> Self {
-        let count = guesses.count();
-        let solved = guesses.last_is_solved();
-
-        Self {
-            user: owner,
-            guesses: guesses.to_record(),
-            num_guesses: count,
-            finished,
-            solved,
-        }
-    }
-
-    fn is_finished(&self) -> bool {
-        self.finished
-    }
-
-    fn in_progress(&self) -> bool {
-        self.is_finished().not()
-    }
-}
-
-impl AsEmoji for GameState {
-    fn as_emoji(&self) -> Cow<str> {
-        self.guesses.as_emoji()
-    }
-
-    fn emoji_with_letters(&self) -> String {
-        self.guesses.emoji_with_letters()
-    }
-
-    fn emoji_with_letters_spaced(&self) -> String {
-        self.guesses.emoji_with_letters_spaced()
-    }
-}
 
 /*
 fn create_menu(daily_available: bool) -> CreateReply {

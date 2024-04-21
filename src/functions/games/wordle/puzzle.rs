@@ -35,6 +35,10 @@ impl Puzzle {
         matches!(self, Self::Daily(..))
     }
 
+    pub fn is_random(&self) -> bool {
+        matches!(self, Self::Random(..))
+    }
+
     pub fn answer(&self) -> &Word {
         match self {
             Self::Random(answer) => answer,

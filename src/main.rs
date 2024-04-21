@@ -2,6 +2,7 @@
 #![warn(clippy::unwrap_used)]
 #![feature(macro_metavar_expr)]
 #![feature(let_chains)]
+#![feature(associated_type_defaults)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
@@ -89,20 +90,20 @@ impl Data {
     }
 }
 
-use functions::games::wordle::{game::GameDataStore, DailyWordles, GameData, GameState, WordsList};
+use functions::games::wordle::{game::GamesCache, DailyWordles, GameData, GameRecord, WordsList};
 
 #[derive(Debug, Clone)]
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
-    game_data: GameDataStore,
+    game_data: GamesCache,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
         let wordles = DailyWordles::new(db);
-        let game_data = GameDataStore::new();
+        let game_data = GamesCache::new();
 
         Self {
             words,
@@ -119,7 +120,7 @@ impl WordleData {
         &self.wordles
     }
 
-    const fn game_data(&self) -> &GameDataStore {
+    const fn game_data(&self) -> &GamesCache {
         &self.game_data
     }
 }
