@@ -23,12 +23,15 @@ impl GamesCache {
         self.get(id).await.is_some()
     }
 
-    pub async fn set(&self, channel_id: ChannelId, new_data: GameData) {
+    pub async fn set(&self, channel_id: ChannelId, new_data: GameData) -> Arc<GameData> {
+        let arc = Arc::new(new_data);
         let mut guard = self.0.write().await;
         if let Some(arc_swap) = guard.get_mut(&channel_id) {
-            arc_swap.store(Arc::new(new_data))
+            arc_swap.store(arc.clone());
+            arc
         } else {
-            guard.insert(channel_id, Arc::new(ArcSwap::from_pointee(new_data)));
+            guard.insert(channel_id, Arc::new(ArcSwap::new(arc.clone())));
+            arc
         }
     }
 

@@ -219,3 +219,67 @@ impl<'map, 'user> IntoIterator for &'map UserMapBorrowed<'user> {
         self.as_ref().iter()
     }
 }
+
+mod new {
+    use std::{collections::HashMap, marker::PhantomData};
+
+    use poise::serenity_prelude::{User, UserId};
+
+    enum Owned {}
+    enum Borrowed {}
+
+    pub enum NewUserMap<'user, M> {
+        Owned {
+            map: HashMap<UserId, User>,
+        },
+        Borrowed {
+            map: HashMap<UserId, &'user User>,
+            phantom: PhantomData<M>,
+        },
+    }
+
+    impl<M> NewUserMap<'_, M> {
+        fn owned() -> Self {
+            Self::Owned {
+                map: HashMap::new(),
+            }
+        }
+
+        fn borrowed() -> Self {
+            Self::Borrowed {
+                map: HashMap::new(),
+                phantom: PhantomData::default(),
+            }
+        }
+    }
+
+    impl NewUserMap<'_, Owned> {
+        fn new() -> Self {
+            Self::owned()
+        }
+
+        fn inner(&self) -> &HashMap<UserId, User> {
+            match self {
+                Self::Owned { map } => map,
+                _ => unreachable!(),
+            }
+        }
+
+        fn inner_mut(&mut self) -> &mut HashMap<UserId, User> {
+            match self {
+                Self::Owned { map } => map,
+                _ => unreachable!(),
+            }
+        }
+
+        fn insert(&mut self, user: User) {
+            self.inner_mut().insert(user.id, user);
+        }
+    }
+
+    impl NewUserMap<'_, Borrowed> {
+        fn new() -> Self {
+            Self::borrowed()
+        }
+    }
+}

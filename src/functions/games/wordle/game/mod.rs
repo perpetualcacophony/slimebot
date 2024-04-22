@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use poise::serenity_prelude::{
     self,
     futures::{Stream, StreamExt},
@@ -18,7 +20,7 @@ use crate::{
     Context,
 };
 
-use self::options::GameOptions;
+use self::{message::GameMessage, options::GameOptions};
 
 use super::{
     core::{guess::GuessSlice, Guess, Guesses, PartialGuess, PartialGuessError, ToPartialGuess},
@@ -43,11 +45,13 @@ use users::Users;
 pub mod options;
 use options::GameStyle;
 
+mod message;
+
 pub struct Game<'a> {
-    puzzle: Puzzle,
+    puzzle: Arc<Puzzle>,
     guesses: Guesses,
     ctx: Context<'a>,
-    msg: &'a mut Message,
+    msg: GameMessage,
     words: &'a WordsList,
     dailies: &'a DailyWordles,
     cache: &'a GamesCache,
@@ -56,12 +60,11 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new(
+    pub async fn new(
         ctx: Context<'a>,
-        msg: &'a mut Message,
         puzzle: impl Into<Puzzle>,
         options: GameOptions,
-    ) -> Self {
+    ) -> serenity_prelude::Result<Self> {
         let users = if ctx.in_guild() {
             Users::more(ctx.author())
         } else {
@@ -69,9 +72,11 @@ impl<'a> Game<'a> {
         };
 
         let data = ctx.data();
+        let puzzle = puzzle.into();
+        let msg = GameMessage::new(ctx, &puzzle).await?;
 
-        Self {
-            puzzle: puzzle.into(),
+        Ok(Self {
+            puzzle: Arc::new(puzzle),
             guesses: Guesses::new(options.guesses_limit),
             ctx,
             msg,
@@ -80,7 +85,7 @@ impl<'a> Game<'a> {
             cache: data.wordle().game_data(),
             users,
             style: options.style,
-        }
+        })
     }
 
     pub fn channel_id(&self) -> ChannelId {
@@ -91,7 +96,7 @@ impl<'a> Game<'a> {
         *self.as_ref()
     }
 
-    pub async fn lock_channel(&self) {
+    pub async fn lock_channel(&self) -> Arc<GameData> {
         self.update_data().await
     }
 
@@ -99,23 +104,15 @@ impl<'a> Game<'a> {
         self.cache.unlock_channel(self.channel_id()).await
     }
 
-    pub async fn update_data(&self) {
-        self.cache.set(self.channel_id(), self.data()).await
+    pub async fn update_data(&self) -> Arc<GameData> {
+        self.cache.set(self.channel_id(), self.data()).await;
+        self.cache.get(self.channel_id()).await.expect("just added")
     }
 
     pub async fn setup(&mut self) -> SerenityResult<()> {
-        self.lock_channel().await;
-        self.update_message().await?;
-        self.add_buttons().await
-    }
-
-    pub async fn add_buttons(&mut self) -> SerenityResult<()> {
-        self.msg
-            .edit(
-                self.ctx,
-                EditMessage::new().components(self.buttons_builder()),
-            )
-            .await
+        let arc = self.lock_channel().await;
+        self.msg.edit(self.ctx, arc).await?;
+        Ok(())
     }
 
     fn context(&self) -> GameContext<'a> {
@@ -129,34 +126,8 @@ impl<'a> Game<'a> {
         self.ctx.author().id
     }
 
-    pub fn title(&self) -> String {
-        format!("{} {}/6", self.puzzle.title(), self.guesses.count())
-    }
-
-    pub fn content(&self) -> String {
-        format!(
-            "{}\n{}",
-            self.title(),
-            self.guesses.emoji_with_style(self.style)
-        )
-    }
-
-    pub async fn update_message(&mut self) -> SerenityResult<()> {
-        self.msg
-            .edit(self.ctx, EditMessage::new().content(self.content()))
-            .await
-    }
-
-    pub fn puzzle(&self) -> &Puzzle {
-        &self.puzzle
-    }
-
-    pub fn messages_stream(&self) -> impl Stream<Item = Message> {
-        self.msg.channel_id.await_replies(self.ctx).stream()
-    }
-
-    pub fn buttons_stream(&self) -> impl Stream<Item = ComponentInteraction> {
-        self.msg.await_component_interactions(self.ctx).stream()
+    pub fn puzzle(&self) -> Arc<Puzzle> {
+        self.puzzle.clone()
     }
 
     pub fn guess(&mut self, partial: PartialGuess) -> Guess {
@@ -165,14 +136,14 @@ impl<'a> Game<'a> {
         self.guesses.last().expect("just added one")
     }
 
-    pub async fn finish(&mut self, text: impl AsRef<str>) -> SerenityResult<()> {
-        let ctx = self.ctx;
-        let new_content = format!("{}\n{}", self.content(), text.as_ref());
+    // pub async fn finish(&mut self, text: impl AsRef<str>) -> SerenityResult<()> {
+    //     let ctx = self.ctx;
+    //     let new_content = format!("{}\n{}", self.content(), text.as_ref());
 
-        self.msg
-            .edit(ctx, EditMessage::new().content(new_content))
-            .await
-    }
+    //     self.msg
+    //         .edit(ctx, EditMessage::new().content(new_content))
+    //         .await
+    // }
 
     pub fn is_solved(&self) -> bool {
         self.guesses.last_is_solved()
@@ -184,52 +155,17 @@ impl<'a> Game<'a> {
 
     pub fn data(&self) -> GameData {
         GameData {
-            guesses: self.guesses.to_record(),
+            puzzle: self.puzzle(),
+            guesses: self.guesses.clone(),
             channel_id: self.channel_id(),
             message_id: self.message_id(),
         }
     }
-
-    pub fn stop_buttons(&self) -> CreateActionRow {
-        let pause_cancel_button = if self.puzzle().is_daily() {
-            CreateButton::new("pause")
-                .emoji(ReactionType::Unicode("⏸️".to_owned()))
-                .label("pause")
-                .style(poise::serenity_prelude::ButtonStyle::Primary)
-        } else {
-            CreateButton::new("cancel")
-                .emoji(ReactionType::Unicode("🚫".to_owned()))
-                .label("cancel")
-                .style(poise::serenity_prelude::ButtonStyle::Secondary)
-        };
-
-        let give_up_button = CreateButton::new("give_up")
-            .emoji(ReactionType::Unicode("🏳️".to_owned()))
-            .label("give up")
-            .style(poise::serenity_prelude::ButtonStyle::Danger);
-
-        let buttons = vec![pause_cancel_button, give_up_button];
-
-        CreateActionRow::Buttons(buttons)
-    }
-
-    pub fn info_buttons(&self) -> CreateActionRow {
-        let unused = CreateButton::new("unused")
-            .emoji(ReactionType::Unicode("🔎".to_owned()))
-            .label("unused letters");
-
-        CreateActionRow::Buttons(vec![unused])
-    }
-
-    pub fn buttons_builder(&self) -> Vec<CreateActionRow> {
-        vec![self.stop_buttons(), self.info_buttons()]
-    }
-
     pub async fn run(&mut self) -> Result<(), crate::errors::CommandError> {
         let ctx = self.context();
 
-        let mut messages = self.messages_stream();
-        let mut interactions = self.buttons_stream();
+        let mut messages = self.msg.replies_stream(ctx);
+        let mut interactions = self.msg.buttons_stream(ctx);
 
         loop {
             tokio::select! {
@@ -237,13 +173,12 @@ impl<'a> Game<'a> {
                     if let Some(partial) = msg.find_guess(ctx).await? {
                         self.guess(partial);
 
-                        self.update_message().await?;
+                        let data = self.cache.set(*self.msg.channel_id(), self.data()).await;
+                        self.msg.edit(ctx, data).await?;
 
                         if let Some(num) = self.puzzle.number() {
                             self.dailies.update(num, self.state(self.is_solved())).await?;
                         }
-
-                        self.update_data().await;
 
                         if self.is_solved() {
                             msg.reply(ctx, "you win!").await?;
@@ -278,7 +213,7 @@ impl<'a> Game<'a> {
 
                                         self.msg.reply(ctx, format!("the word was: {word}", word = self.puzzle.answer())).await?;
 
-                                        self.finish("game over!").await?;
+                                        self.msg.finish(ctx, "game over!").await?;
                                         break;
                                     },
                                     _ => unreachable!()
@@ -298,13 +233,13 @@ impl<'a> Game<'a> {
 
 impl AsRef<ChannelId> for Game<'_> {
     fn as_ref(&self) -> &ChannelId {
-        &self.msg.channel_id
+        self.msg.channel_id()
     }
 }
 
 impl AsRef<MessageId> for Game<'_> {
     fn as_ref(&self) -> &MessageId {
-        &self.msg.id
+        self.msg.message_id()
     }
 }
 

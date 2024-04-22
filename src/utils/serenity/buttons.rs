@@ -6,6 +6,8 @@ use poise::{
     CreateReply,
 };
 
+use std::ops::Index;
+
 pub trait AddButton: Sized + Clone {
     fn add_button(mut self, button: CreateButton) -> Self {
         self.add_button_in_place(button);
@@ -84,3 +86,44 @@ pub trait YesNoButtons: AddButton {
 }
 
 impl<T> YesNoButtons for T where T: AddButton {}
+
+pub trait AddActionRow {
+    fn add_action_row(self, action_row: CreateActionRow) -> Self;
+
+    fn add_button_row(self, buttons: Vec<CreateButton>) -> Self
+    where
+        Self: Sized,
+    {
+        self.add_action_row(CreateActionRow::Buttons(buttons))
+    }
+}
+
+impl AddActionRow for CreateReply {
+    fn add_action_row(mut self, action_row: CreateActionRow) -> Self {
+        self.components
+            .get_or_insert_with(|| Vec::with_capacity(1))
+            .push(action_row);
+
+        self
+    }
+}
+
+pub trait AddActionRows {
+    fn add_action_rows(self, action_rows: Vec<CreateActionRow>) -> Self;
+}
+
+impl<T: AddActionRow> AddActionRows for T {
+    fn add_action_rows(mut self, action_rows: Vec<CreateActionRow>) -> Self {
+        for row in action_rows {
+            self = self.add_action_row(row);
+        }
+
+        self
+    }
+}
+
+impl AddActionRows for CreateInteractionResponseMessage {
+    fn add_action_rows(self, action_rows: Vec<CreateActionRow>) -> Self {
+        self.components(action_rows)
+    }
+}

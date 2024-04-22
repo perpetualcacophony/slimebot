@@ -283,6 +283,12 @@ impl GuessesLimit {
     }
 }
 
+impl Display for GuessesLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
+    }
+}
+
 #[allow(clippy::from_over_into)]
 impl Into<usize> for GuessesLimit {
     fn into(self) -> usize {
@@ -305,7 +311,7 @@ impl Default for GuessesLimit {
 #[derive(Clone, Debug, Default)]
 pub struct Guesses {
     vec: TinyVec<[Guess; 6]>,
-    limit: Option<GuessesLimit>,
+    pub limit: Option<GuessesLimit>,
 }
 
 impl Guesses {

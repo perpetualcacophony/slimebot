@@ -76,22 +76,13 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 
             return Ok(());
         } else {
-            let mut message = if ctx.guild_id().is_some() {
-                ctx.reply("you can't play a daily wordle in a server - check your dms!")
-                    .await?;
-                ctx.author()
-                    .dm(ctx, CreateMessage::new().content("loading..."))
-                    .await?
-            } else {
-                ctx.reply("loading...").await?.into_message().await?
-            };
             // play game
             let mut game = wordle::Game::new(
                 ctx,
-                &mut message,
                 daily.puzzle.clone(),
                 GameOptionsBuilder::default().style(style).build(),
-            );
+            )
+            .await?;
 
             game.setup().await?;
             game.run().await?;
@@ -153,16 +144,14 @@ async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 
         return Ok(());
     } else {
-        let mut game_msg = ctx.reply("loading...").await?.into_message().await?;
-
         let puzzle = wordle::Puzzle::random(wordle.words());
 
         let mut game = wordle::Game::new(
             ctx,
-            &mut game_msg,
             puzzle,
             GameOptionsBuilder::default().style(style).build(),
-        );
+        )
+        .await?;
 
         game.setup().await?;
 
