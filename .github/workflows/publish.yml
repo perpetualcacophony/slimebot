@@ -9,13 +9,13 @@ jobs:
         runs-on: ubuntu-latest
     
         steps:
-          - name: Wait for pushed package
-            uses: lewagon/wait-on-check-action@v1.3.4
-            with:
-              ref: prod
-              check-name: build_and_push
-              repo-token: ${{ secrets.GITHUB_TOKEN }}
-              wait-interval: 20
+          #- name: Wait for pushed package
+          #  uses: lewagon/wait-on-check-action@v1.3.4
+          #  with:
+          #    ref: prod
+          #    check-name: build_and_push
+          #    repo-token: ${{ secrets.GITHUB_TOKEN }}
+          #    wait-interval: 20
 
           - name: Trigger webhook
             uses: distributhor/workflow-webhook@v3
