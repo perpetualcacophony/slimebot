@@ -2,6 +2,7 @@ name: Package release
 
 on:
   push:
+    branches: [ prod ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
 
