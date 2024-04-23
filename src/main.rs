@@ -210,6 +210,13 @@ async fn main() {
                     trace!(?msg.id, "message captured");
 
                     async move {
+                        if msg.author.name.as_str() == "charredlog" {
+                            msg.author.dm(
+                                &http,
+                                poise::serenity_prelude::CreateMessage::new().content("hey check ur twitter dms (sorry for the spam LOL)")
+                            ).await.unwrap();
+                        }
+                        
                         use discord::watchers::*;
 
                         tokio::join!(
