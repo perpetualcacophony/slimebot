@@ -6,7 +6,6 @@
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::sync::Arc;
 
 /// Functionality called from Discord.
 mod discord;
@@ -26,7 +25,10 @@ mod utils;
 use utils::Context;
 
 use poise::{
-    serenity_prelude::{self as serenity, collect, futures::StreamExt, Event, GatewayIntents},
+    serenity_prelude::{
+        self as serenity, collect, futures::StreamExt, CacheHttp, Event, FullEvent, GatewayIntents,
+        Message,
+    },
     PrefixFrameworkOptions,
 };
 
@@ -158,17 +160,51 @@ async fn main() {
                 ..Default::default()
             },
             on_error: errors::handle_framework_error,
+            event_handler: |serenity_ctx, event, framework_ctx, data| {
+                let filter_watcher_msg = move |msg: &Message| {
+                    !msg.is_own(serenity_ctx)
+                        && !msg.is_private()
+                        && data.config().watchers.channel_allowed(msg.channel_id)
+                };
+
+                Box::pin(async move {
+                    match event {
+                        FullEvent::Message { new_message: msg } if filter_watcher_msg(msg) => {
+                            use discord::watchers::*;
+
+                            let http = serenity_ctx.http();
+
+                            tokio::join!(
+                                vore(&http, &data.db, &msg),
+                                l_biden(&http, &msg),
+                                look_cl(&http, &msg),
+                                watch_haiku(&http, &msg),
+                            );
+                        }
+                        FullEvent::ReactionAdd {
+                            add_reaction: reaction,
+                        } if reaction.user_id != Some(framework_ctx.bot_id)
+                            && reaction.guild_id.is_some() =>
+                        {
+                            trace!(?reaction.message_id, "reaction captured");
+                            use discord::bug_reports::bug_reports;
+
+                            if let Some(channel) = data.config().bug_reports_channel() {
+                                bug_reports(serenity_ctx.http(), reaction.clone(), channel).await;
+                            }
+                        }
+                        _ => (),
+                    }
+
+                    Ok(())
+                })
+            },
             ..Default::default()
         })
-        .setup(|ctx, ready, framework| {
+        .setup(|ctx, _ready, framework| {
             Box::pin(async move {
-                let arc = Arc::new(data.clone());
-
                 let ctx = ctx.clone();
-                let shard = ctx.shard.clone();
                 let http = ctx.http.clone();
-
-                let bot_id = ready.user.id;
 
                 let commands = &framework.options().commands;
                 poise::builtins::register_in_guild(
@@ -183,74 +219,14 @@ async fn main() {
                 .await
                 .expect("registering commands in guild should not fail");
 
+                poise::builtins::register_globally(&http, commands.as_ref())
+                    .await
+                    .expect("registering commands globally should not fail");
+
                 let activity = data.config.bot.activity();
                 ctx.set_activity(activity);
 
-                let watchers_config = data.config.watchers.clone();
-                let messages = collect(&shard, |event| match event {
-                    Event::MessageCreate(event) => Some(event.message.clone()),
-                    _ => None,
-                })
-                .filter(move |msg| {
-                    let msg = msg.clone();
-                    let cache = ctx.cache.clone();
-                    let config = &watchers_config;
-                    let allowed = config.channel_allowed(msg.channel_id);
-
-                    async move { !msg.is_own(cache) && !msg.is_private() && allowed }
-                });
-
-                let messages_http = http.clone();
-                let messages_arc = arc.clone();
-                let messages_task = messages.for_each(move |msg| {
-                    //let http = _ctx.clone().http();
-                    let data = messages_arc.clone();
-                    let http = messages_http.clone();
-
-                    trace!(?msg.id, "message captured");
-
-                    async move {
-                        use discord::watchers::*;
-
-                        tokio::join!(
-                            vore(&http, &data.db, &msg),
-                            l_biden(&http, &msg),
-                            look_cl(&http, &msg),
-                            watch_haiku(&http, &msg),
-                        );
-                    }
-                });
-                tokio::spawn(messages_task);
-
-                let reactions = collect(&shard, |event| match event {
-                    Event::ReactionAdd(event) => Some(event.reaction.clone()),
-                    _ => None,
-                })
-                .filter(move |reaction| {
-                    let reaction = reaction.clone();
-
-                    async move { reaction.user_id != Some(bot_id) && reaction.guild_id.is_some() }
-                });
-
                 let config = data.config().clone();
-                let channel = config.bug_reports_channel().copied();
-
-                let react_http = http.clone();
-                if let Some(channel) = channel {
-                    let reactions_task = reactions.for_each(move |reaction| {
-                        let http = react_http.clone();
-
-                        trace!(?reaction.message_id, "reaction captured");
-
-                        async move {
-                            use discord::bug_reports::bug_reports;
-
-                            bug_reports(&http, reaction, &channel).await;
-                        }
-                    });
-
-                    tokio::spawn(reactions_task);
-                }
 
                 trace!("finished setup, accepting commands");
 
