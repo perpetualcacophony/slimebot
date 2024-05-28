@@ -203,20 +203,15 @@ async fn main() {
                 let ctx = ctx.clone();
                 let http = ctx.http.clone();
 
-                let commands = &framework.options().commands;
-                poise::builtins::register_in_guild(
-                    &http,
-                    commands.as_ref(),
-                    *data
-                        .config
-                        .bot
-                        .testing_server()
-                        .expect("bot testing server id should be valid"),
-                )
-                .await
-                .expect("registering commands in guild should not fail");
+                let commands = framework.options().commands.as_ref();
 
-                poise::builtins::register_globally(&http, commands.as_ref())
+                if let Some(guild_id) = data.config.bot.testing_server() {
+                    poise::builtins::register_in_guild(&http, commands, *guild_id)
+                        .await
+                        .expect("registering commands in guild should not fail");
+                }
+
+                poise::builtins::register_globally(&http, commands)
                     .await
                     .expect("registering commands globally should not fail");
 
