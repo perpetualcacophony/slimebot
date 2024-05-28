@@ -314,38 +314,29 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn format_full() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
-
         assert_eq!("2d 1h 19m", duration.format_full(),)
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn format_largest() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("1 hour", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("19 minutes", duration.format_largest(),);
     }
