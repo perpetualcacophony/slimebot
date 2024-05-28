@@ -25,10 +25,7 @@ mod utils;
 use utils::Context;
 
 use poise::{
-    serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, CacheHttp, Event, FullEvent, GatewayIntents,
-        Message,
-    },
+    serenity_prelude::{self as serenity, CacheHttp, FullEvent, GatewayIntents, Message},
     PrefixFrameworkOptions,
 };
 
@@ -175,10 +172,10 @@ async fn main() {
                             let http = serenity_ctx.http();
 
                             tokio::join!(
-                                vore(&http, &data.db, &msg),
-                                l_biden(&http, &msg),
-                                look_cl(&http, &msg),
-                                watch_haiku(&http, &msg),
+                                vore(http, &data.db, msg),
+                                l_biden(http, msg),
+                                look_cl(http, msg),
+                                watch_haiku(http, msg),
                             );
                         }
                         FullEvent::ReactionAdd {
