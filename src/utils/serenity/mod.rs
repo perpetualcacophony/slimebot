@@ -4,3 +4,5 @@ pub use id::AsDiscordId;
 pub mod buttons;
 
 pub mod component_interaction;
+
+pub mod channel;
