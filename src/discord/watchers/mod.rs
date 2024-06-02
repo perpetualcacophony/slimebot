@@ -5,7 +5,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::FormatDuration;
+use crate::{errors::CommandError, FormatDuration};
+
+use super::commands::SendMessageError;
 
 mod haiku;
 
@@ -34,7 +36,7 @@ async fn check_vore(content: &str) -> bool {
 
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
-pub async fn vore(http: &Http, db: &Database, msg: &Message) {
+pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), CommandError> {
     if check_vore(&msg.content).await {
         log_watcher(http, msg).await;
 
@@ -63,8 +65,7 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) {
                     .sort(doc! { "timestamp": -1 })
                     .build(),
             )
-            .await
-            .expect("db request should not fail")
+            .await?
         {
             let time = new_mention.timestamp - last.timestamp;
 
@@ -77,48 +78,47 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) {
                     ),
                 )
                 .await
-                .expect("sending message should not fail");
+                .map_err(SendMessageError::from)?;
         }
 
-        vore_mentions
-            .insert_one(new_mention, None)
-            .await
-            .expect("inserting to db should not fail");
+        vore_mentions.insert_one(new_mention, None).await?;
     }
+
+    Ok(())
 }
 
 // watches all channels for "L" and responds with the biden image
 #[instrument(skip_all, level = "trace")]
-pub async fn l_biden(http: &Http, new_message: &Message) {
-    if new_message.content == "L" {
+pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
+    if msg.content == "L" {
         info!(
             "@{} (#{}): {}",
-            new_message.author.name,
-            new_message
-                .channel(http)
+            msg.author.name,
+            msg.channel(http)
                 .await
                 .expect("message should have a channel")
                 .guild()
                 .expect("channel should be inside a guild")
                 .name(),
-            new_message.content
+            msg.content
         );
 
-        new_message
-            .channel_id
+        msg.channel_id
             .send_message(
                 http,
                 CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
             )
             .await
-            .expect("sending message should not fail");
+            .map_err(SendMessageError::from)?;
     }
+
+    Ok(())
 }
 
 // watches all channels for "CL" and reponds with the Look CL copypasta
 #[instrument(skip_all, level = "trace")]
-pub async fn look_cl(http: &Http, new_message: &Message) {
-    if new_message
+pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
+    if msg
         .content
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~', '#', '^'], " ")
         .split_ascii_whitespace()
@@ -126,38 +126,38 @@ pub async fn look_cl(http: &Http, new_message: &Message) {
     {
         info!(
             "@{} (#{}): {}",
-            new_message.author.name,
-            new_message
-                .channel(http)
+            msg.author.name,
+            msg.channel(http)
                 .await
                 .expect("message should be in a channel")
                 .guild()
                 .expect("channel should be in a guild")
                 .name(),
-            new_message.content
+            msg.content
         );
 
-        if new_message.content.starts_with("Look CL") || new_message.content.starts_with("look CL")
-        {
-            new_message.channel_id.send_message(http, CreateMessage::new()
+        if msg.content.starts_with("Look CL") || msg.content.starts_with("look CL") {
+            msg.channel_id.send_message(http, CreateMessage::new()
                 .content("I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(new_message)
+                .reference_message(msg)
             )
             .await
-            .expect("sending message should not fail");
+            .map_err(SendMessageError::from)?;
         } else {
-            new_message.channel_id.send_message(http, CreateMessage::new()
+            msg.channel_id.send_message(http, CreateMessage::new()
                 .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(new_message)
+                .reference_message(msg)
             )
             .await
-            .expect("sending message should not fail");
+            .map_err(SendMessageError::from)?;
         }
     }
+
+    Ok(())
 }
 
 #[instrument(skip_all)]
-pub async fn watch_haiku(http: &Http, msg: &Message) {
+pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), CommandError> {
     if let Some(haiku) = haiku::check_haiku(&msg.content) {
         let haiku = haiku
             .iter()
@@ -167,8 +167,8 @@ pub async fn watch_haiku(http: &Http, msg: &Message) {
 
         let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
 
-        msg.reply(http, txt)
-            .await
-            .expect("sending message should not fail");
+        msg.reply(http, txt).await.map_err(SendMessageError::from)?;
     }
+
+    Ok(())
 }

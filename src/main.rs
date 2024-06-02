@@ -24,6 +24,8 @@ mod functions;
 mod utils;
 use utils::Context;
 
+mod event_handler;
+
 use poise::{
     serenity_prelude::{self as serenity, CacheHttp, FullEvent, GatewayIntents, Message},
     PrefixFrameworkOptions,
@@ -157,45 +159,7 @@ async fn main() {
                 ..Default::default()
             },
             on_error: errors::handle_framework_error,
-            event_handler: |serenity_ctx, event, framework_ctx, data| {
-                let filter_watcher_msg = move |msg: &Message| {
-                    !msg.is_own(serenity_ctx)
-                        && !msg.is_private()
-                        && data.config().watchers.channel_allowed(msg.channel_id)
-                };
-
-                Box::pin(async move {
-                    match event {
-                        FullEvent::Message { new_message: msg } if filter_watcher_msg(msg) => {
-                            use discord::watchers::*;
-
-                            let http = serenity_ctx.http();
-
-                            tokio::join!(
-                                vore(http, &data.db, msg),
-                                l_biden(http, msg),
-                                look_cl(http, msg),
-                                watch_haiku(http, msg),
-                            );
-                        }
-                        FullEvent::ReactionAdd {
-                            add_reaction: reaction,
-                        } if reaction.user_id != Some(framework_ctx.bot_id)
-                            && reaction.guild_id.is_some() =>
-                        {
-                            trace!(?reaction.message_id, "reaction captured");
-                            use discord::bug_reports::bug_reports;
-
-                            if let Some(channel) = data.config().bug_reports_channel() {
-                                bug_reports(serenity_ctx.http(), reaction.clone(), channel).await;
-                            }
-                        }
-                        _ => (),
-                    }
-
-                    Ok(())
-                })
-            },
+            event_handler: event_handler::poise,
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {

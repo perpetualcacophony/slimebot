@@ -5,7 +5,7 @@ use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{functions::misc::roll::DiceRollError, Data};
+use crate::{event_handler, functions::misc::roll::DiceRollError, Data};
 
 /*#[derive(Debug, Error)]
 pub enum Error {
@@ -107,6 +107,8 @@ pub enum CommandError {
     DiceRoll(#[from] DiceRollError),
     #[error("error from mongodb: {0}")]
     MongoDb(#[from] mongodb::error::Error),
+    #[error("error from event handler: {0}")]
+    EventHandler(#[from] event_handler::Error),
 }
 
 #[derive(Debug, Error)]
