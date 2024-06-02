@@ -57,3 +57,23 @@ impl ChannelIdExt for ChannelId {
             .map_err(SendMessageError::from)
     }
 }
+
+pub trait MessageExt {
+    async fn reply_ext(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError>;
+}
+
+impl MessageExt for Message {
+    async fn reply_ext(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError> {
+        self.reply(cache_http, content)
+            .await
+            .map_err(SendMessageError::from)
+    }
+}

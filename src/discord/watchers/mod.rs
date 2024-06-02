@@ -5,7 +5,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::{errors::CommandError, utils::serenity::channel::ChannelIdExt, FormatDuration};
+use crate::{
+    errors::CommandError,
+    utils::serenity::channel::{ChannelIdExt, MessageExt},
+    FormatDuration,
+};
 
 use super::commands::SendMessageError;
 
@@ -77,8 +81,7 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), Comma
                         time = time.format_largest()
                     ),
                 )
-                .await
-                .map_err(SendMessageError::from)?;
+                .await?;
         }
 
         vore_mentions.insert_one(new_mention, None).await?;
@@ -95,8 +98,7 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
             "@{} (#{}): {}",
             msg.author.name,
             msg.channel(http)
-                .await
-                .expect("message should have a channel")
+                .await?
                 .guild()
                 .expect("channel should be inside a guild")
                 .name(),
@@ -104,12 +106,8 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
         );
 
         msg.channel_id
-            .send_message(
-                http,
-                CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            .say_ext(http, "https://files.catbox.moe/v7itt0.webp")
+            .await?;
     }
 
     Ok(())
@@ -137,16 +135,14 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
         );
 
         if msg.content.starts_with("Look CL") || msg.content.starts_with("look CL") {
-            msg.channel_id.send_message(http, CreateMessage::new()
-                .content("I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(msg)
+            msg.reply_ext(http,
+                "I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
             )
             .await
             .map_err(SendMessageError::from)?;
         } else {
-            msg.channel_id.send_message(http, CreateMessage::new()
-                .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(msg)
+            msg.reply_ext(http,
+                "Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
             )
             .await
             .map_err(SendMessageError::from)?;
@@ -167,7 +163,7 @@ pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), CommandError>
 
         let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
 
-        msg.reply(http, txt).await.map_err(SendMessageError::from)?;
+        msg.reply_ext(http, txt).await?;
     }
 
     Ok(())
