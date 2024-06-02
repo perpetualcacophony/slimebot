@@ -2271,7 +2271,7 @@ dependencies = [
 
 [[package]]
 name = "slimebot"
-version = "1.7.3"
+version = "1.7.6"
 dependencies = [
  "anyhow",
  "arc-swap",
