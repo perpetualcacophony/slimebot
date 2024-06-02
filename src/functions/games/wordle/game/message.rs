@@ -1,14 +1,9 @@
-use std::{error::Error, marker::PhantomData, sync::Arc};
-
-use arc_swap::{ArcSwap, ArcSwapOption};
 use poise::serenity_prelude::{
-    self, futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow,
-    CreateButton, CreateMessage, EditMessage, GuildId, Message, MessageId, ReactionType, Result,
-    ShardMessenger,
+    futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
+    CreateMessage, EditMessage, Message, MessageId, ReactionType, Result, ShardMessenger,
 };
 
 use crate::{
-    discord::commands::SendMessageError,
     functions::games::wordle::{
         core::{guess::GuessSlice, AsEmoji},
         Puzzle,
@@ -17,8 +12,6 @@ use crate::{
 };
 
 use super::{GameContext, GameData};
-
-enum NoMessage {}
 
 pub struct GameMessage {
     msg: Message,

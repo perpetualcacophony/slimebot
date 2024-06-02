@@ -1,7 +1,6 @@
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
-pub use error::Error;
 
 pub mod core;
 

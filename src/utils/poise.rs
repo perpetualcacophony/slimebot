@@ -1,6 +1,6 @@
 use crate::{discord::commands::SendMessageError, Data};
 
-use poise::{serenity_prelude as serenity, CreateReply};
+use poise::CreateReply;
 
 pub type Context<'a> = poise::Context<'a, Data, crate::errors::CommandError>;
 

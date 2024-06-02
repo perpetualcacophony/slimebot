@@ -18,11 +18,7 @@ use crate::utils::poise::{CommandResult, Context, ContextExt};
 
 //pub use watch_fic::watch_fic;
 
-use crate::{
-    built_info,
-    errors::{self, ApiError},
-    FormatDuration,
-};
+use crate::{built_info, FormatDuration};
 
 trait LogCommands {
     async fn log_command(&self);
@@ -82,9 +78,9 @@ impl SendMessageError {
     }
 }
 
-impl Into<serenity_prelude::Error> for SendMessageError {
-    fn into(self) -> serenity_prelude::Error {
-        self.source
+impl From<SendMessageError> for serenity_prelude::Error {
+    fn from(val: SendMessageError) -> Self {
+        val.source
     }
 }
 
@@ -356,7 +352,7 @@ pub async fn banban(ctx: Context<'_>) -> CommandResult {
         .await?;
     } else {
         ctx.send_ext(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
-            .await;
+            .await?;
     }
 
     Ok(())
@@ -530,7 +526,7 @@ pub use minecraft::minecraft;
 
 #[allow(dead_code)]
 mod minecraft {
-    use crate::{discord::commands::SendMessageError, utils::poise::ContextExt};
+    use crate::utils::poise::ContextExt;
 
     use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};

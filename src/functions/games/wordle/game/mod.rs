@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use poise::serenity_prelude::{
     self,
-    futures::{Stream, StreamExt},
-    CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateInteractionResponseMessage, EditMessage, Http, Message, MessageId, ReactionType,
+    futures::StreamExt,
+    CacheHttp, ChannelId, ComponentInteraction,
+    CreateInteractionResponseMessage, Http, Message, MessageId, ReactionType,
     ShardMessenger, UserId,
 };
 

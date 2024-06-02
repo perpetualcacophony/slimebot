@@ -44,7 +44,7 @@ impl<'owner> Users<'owner> {
             Self::More { owner, others } => {
                 let mut new =
                     UserMapBorrowed::with_capacity(others.as_ref().map_or(1, |map| map.len()));
-                new.insert(*owner);
+                new.insert(owner);
                 new
             }
         }
@@ -248,7 +248,7 @@ mod new {
         fn borrowed() -> Self {
             Self::Borrowed {
                 map: HashMap::new(),
-                phantom: PhantomData::default(),
+                phantom: PhantomData,
             }
         }
     }

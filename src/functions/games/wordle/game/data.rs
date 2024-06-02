@@ -3,7 +3,7 @@ use std::sync::Arc;
 use poise::serenity_prelude::{ChannelId, MessageId};
 
 use crate::functions::games::wordle::{
-    core::{Guesses, GuessesRecord},
+    core::Guesses,
     Puzzle,
 };
 

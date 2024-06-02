@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{CreateMessage, Mentionable, User};
+use poise::serenity_prelude::{Mentionable, User};
 use poise::CreateReply;
 use std::ops::Not;
 use tracing::{debug, instrument};

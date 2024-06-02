@@ -6,7 +6,6 @@ use poise::{
     CreateReply,
 };
 
-use std::ops::Index;
 
 pub trait AddButton: Sized + Clone {
     fn add_button(mut self, button: CreateButton) -> Self {
