@@ -9,14 +9,14 @@ use tracing_unwrap::ResultExt;
 pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
-pub struct Data {
+pub struct PoiseData {
     pub(crate) config: crate::config::Config,
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
     pub(crate) wordle: WordleData,
 }
 
-impl Data {
+impl PoiseData {
     pub(crate) fn new() -> Self {
         let config: crate::config::Config = ::config::Config::builder()
             .add_source(::config::File::with_name("slimebot.toml"))

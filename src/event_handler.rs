@@ -7,10 +7,7 @@ use poise::{
 use thiserror::Error;
 use tracing::trace;
 
-use crate::{
-    data::{self, Data},
-    errors::CommandError,
-};
+use crate::{errors::CommandError, PoiseData};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -91,8 +88,8 @@ impl
 async fn event_handler(
     serenity_ctx: &serenity::Context,
     event: &FullEvent,
-    framework_ctx: FrameworkContext<'_, data::Data, CommandError>,
-    data: &data::Data,
+    framework_ctx: FrameworkContext<'_, PoiseData, CommandError>,
+    data: &PoiseData,
 ) -> Result<(), Error> {
     let filter_watcher_msg = move |msg: &Message| {
         !msg.is_own(&serenity_ctx.cache)
@@ -141,8 +138,8 @@ async fn event_handler(
 pub fn poise<'a>(
     serenity_ctx: &'a serenity::Context,
     event: &'a FullEvent,
-    framework_ctx: FrameworkContext<'a, data::Data, CommandError>,
-    data: &'a data::Data,
+    framework_ctx: FrameworkContext<'a, PoiseData, CommandError>,
+    data: &'a PoiseData,
 ) -> Pin<Box<dyn Future<Output = Result<(), CommandError>> + Send + 'a>> {
     Box::pin(async move {
         event_handler(serenity_ctx, event, framework_ctx, data)

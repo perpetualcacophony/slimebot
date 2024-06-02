@@ -36,9 +36,8 @@ use tracing::{debug, info, trace};
 
 use tracing_unwrap::ResultExt;
 
-use data::Data;
-
 mod data;
+use data::PoiseData;
 
 use functions::games::wordle::{game::GamesCache, DailyWordles, WordsList};
 
@@ -97,7 +96,7 @@ async fn main() {
 
     info!("{build}");
 
-    let data = data::Data::new();
+    let data = PoiseData::new();
     let config = data.config.clone();
 
     if let Some(flavor_text) = config.logs.flavor_text() {

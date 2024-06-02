@@ -1,14 +1,11 @@
-use crate::{
-    data::{self, Data},
-    discord::commands::SendMessageError,
-};
+use crate::{discord::commands::SendMessageError, PoiseData};
 
 use poise::CreateReply;
 
-pub type Context<'a> = poise::Context<'a, data::Data, crate::errors::CommandError>;
+pub type Context<'a> = poise::Context<'a, PoiseData, crate::errors::CommandError>;
 
 pub type Error = crate::errors::CommandError;
-pub type Command = poise::Command<data::Data, Error>;
+pub type Command = poise::Command<PoiseData, Error>;
 pub type CommandResult = Result<(), Error>;
 
 pub trait ContextExt<'a> {
