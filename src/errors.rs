@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
 use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
@@ -5,13 +7,13 @@ use tracing_unwrap::ResultExt;
 
 use crate::{functions::misc::roll::DiceRollError, Data};
 
-#[derive(Debug, Error)]
+/*#[derive(Debug, Error)]
 pub enum Error {
     #[error("user error: {0}")]
     Input(#[from] InputError),
     #[error("bot error: {0}")]
     Bot(BotError),
-}
+}*/
 
 #[derive(Debug, Error)]
 pub enum BotError {
@@ -31,7 +33,7 @@ pub enum InputError {
     Other(String),
 }
 
-use crate::functions::games::wordle;
+/*use crate::functions::games::wordle;
 impl From<wordle::Error> for Error {
     fn from(value: wordle::Error) -> Self {
         match value {
@@ -39,7 +41,7 @@ impl From<wordle::Error> for Error {
             _ => unimplemented!(),
         }
     }
-}
+}*/
 
 pub fn handle_framework_error(err: FrameworkError<'_, Data, CommandError>) -> BoxFuture<()> {
     Box::pin(async {
@@ -72,6 +74,13 @@ pub fn handle_framework_error(err: FrameworkError<'_, Data, CommandError>) -> Bo
 }
 async fn handle_error(err: CommandError, ctx: Context<'_, Data, CommandError>) {
     match err {
+        CommandError::SendMessage(err) => error!("{err}"),
+        CommandError::DiceRoll(err) => warn!("{err}"),
+        other => error!("{}", other.source().expect("all variants have a source")),
+    }
+}
+
+/*
         CommandError::Input(_) => {
             warn!(%err);
             ctx.reply(err.to_string())
@@ -84,17 +93,20 @@ async fn handle_error(err: CommandError, ctx: Context<'_, Data, CommandError>) {
         _ => {
             error!("{err}");
         }
-    }
-}
+*/
 
 #[derive(Debug, Error)]
 pub enum CommandError {
     #[error("input error: {0}")]
-    Input(#[from] InputError),
-    #[error("internal error: {0}")]
-    Internal(#[from] InternalError),
-    #[error(transparent)]
-    Library(#[from] LibraryError),
+    SendMessage(#[from] crate::discord::commands::SendMessageError),
+    #[error("other serenity error: {0}")]
+    Serenity(#[from] serenity::Error),
+    #[error("other reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("")]
+    DiceRoll(#[from] DiceRollError),
+    #[error("error from mongodb: {0}")]
+    MongoDb(#[from] mongodb::error::Error),
 }
 
 #[derive(Debug, Error)]
@@ -107,7 +119,7 @@ pub enum LibraryError {
     Serenity(#[from] serenity::Error),
 }
 
-impl From<mongodb::error::Error> for CommandError {
+/*impl From<mongodb::error::Error> for CommandError {
     fn from(value: mongodb::error::Error) -> Self {
         Self::Library(value.into())
     }
@@ -123,7 +135,7 @@ impl From<serenity::Error> for CommandError {
     fn from(value: serenity::Error) -> Self {
         Self::Library(value.into())
     }
-}
+}*/
 
 #[derive(Debug, Error)]
 pub enum ApiError {

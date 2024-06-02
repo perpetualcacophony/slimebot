@@ -3,11 +3,14 @@ use poise::CreateReply;
 use std::ops::Not;
 use tracing::{debug, instrument};
 
-use crate::functions::games::wordle::{
-    core::{guess::GuessSlice, AsEmoji},
-    game::options::GameOptionsBuilder,
-};
 use crate::utils::poise::{CommandResult, Context, ContextExt};
+use crate::{
+    discord::commands::SendMessageError,
+    functions::games::wordle::{
+        core::{guess::GuessSlice, AsEmoji},
+        game::options::GameOptionsBuilder,
+    },
+};
 
 use crate::functions::games::wordle::{self, game::options::GameStyle};
 
@@ -31,7 +34,8 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
         Some("wordle"),
         poise::builtins::HelpConfiguration::default(),
     )
-    .await?;
+    .await
+    .map_err(SendMessageError::new)?;
 
     Ok(())
 }

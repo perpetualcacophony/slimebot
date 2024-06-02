@@ -1,12 +1,14 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{error::Error, marker::PhantomData, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use poise::serenity_prelude::{
-    futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateMessage, EditMessage, GuildId, Message, MessageId, ReactionType, Result, ShardMessenger,
+    self, futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow,
+    CreateButton, CreateMessage, EditMessage, GuildId, Message, MessageId, ReactionType, Result,
+    ShardMessenger,
 };
 
 use crate::{
+    discord::commands::SendMessageError,
     functions::games::wordle::{
         core::{guess::GuessSlice, AsEmoji},
         Puzzle,
@@ -94,7 +96,8 @@ impl GameMessage {
     pub async fn loading_msg(ctx: Context<'_>, puzzle: &Puzzle) -> Result<Message> {
         let msg = if puzzle.is_daily() && ctx.in_guild() {
             ctx.reply_ephemeral("you can't play a daily wordle in a server - check your dms!")
-                .await?;
+                .await
+                .map_err(|err| err.source)?;
 
             ctx.author()
                 .dm(ctx, CreateMessage::new().content("loading..."))

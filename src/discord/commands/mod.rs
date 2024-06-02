@@ -4,7 +4,7 @@ mod watch_fic;
 use mongodb::bson::doc;
 use poise::{
     serenity_prelude::{
-        futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
+        self, futures::StreamExt, CacheHttp, Channel, CreateAttachment, Member, MessageId, User,
     },
     CreateReply,
 };
@@ -14,7 +14,7 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-use crate::utils::poise::{CommandResult, Context};
+use crate::utils::poise::{CommandResult, Context, ContextExt};
 
 //pub use watch_fic::watch_fic;
 
@@ -58,12 +58,34 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
     let ping = ctx.ping().await.as_millis();
     if ping == 0 {
         ctx.say("pong! (please try again later to display latency)")
-            .await?;
+            .await
+            .map_err(SendMessageError::new)?;
     } else {
-        ctx.say(format!("pong! ({}ms)", ping)).await?;
+        ctx.say(format!("pong! ({}ms)", ping))
+            .await
+            .map_err(SendMessageError::new)?;
     }
 
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("message failed to end")]
+pub struct SendMessageError {
+    #[from]
+    pub source: serenity_prelude::Error,
+}
+
+impl SendMessageError {
+    pub fn new(source: serenity_prelude::Error) -> Self {
+        Self { source }
+    }
+}
+
+impl Into<serenity_prelude::Error> for SendMessageError {
+    fn into(self) -> serenity_prelude::Error {
+        self.source
+    }
 }
 
 #[instrument(skip_all)]
@@ -79,10 +101,10 @@ pub async fn pong(ctx: Context<'_>) -> CommandResult {
 
     let ping = ctx.ping().await.as_millis();
     if ping == 0 {
-        ctx.say("ping! (please try again later to display latency)")
+        ctx.say_ext("ping! (please try again later to display latency)")
             .await?;
     } else {
-        ctx.say(format!("ping! ({}ms)", ping)).await?;
+        ctx.say_ext(format!("ping! ({}ms)", ping)).await?;
     }
 
     Ok(())
@@ -203,7 +225,7 @@ pub async fn pfp(
 
         let attachment = CreateAttachment::url(ctx.http(), &pfp).await?;
 
-        ctx.send(
+        ctx.send_ext(
             CreateReply::default()
                 .content(response_text)
                 .attachment(attachment),
@@ -241,7 +263,7 @@ pub async fn pfp(
             author_response(ctx.author())
         };
 
-        ctx.send(
+        ctx.send_ext(
             CreateReply::default()
                 .content(response_text)
                 .attachment(CreateAttachment::url(ctx.http(), &pfp).await?),
@@ -263,7 +285,9 @@ pub async fn echo(ctx: Context<'_>, channel: Option<Channel>, message: String) -
         None => ctx.channel_id(),
     };
 
-    id.say(ctx.http(), message).await?;
+    id.say(ctx.http(), message)
+        .await
+        .map_err(SendMessageError::new)?;
 
     Ok(())
 }
@@ -331,9 +355,8 @@ pub async fn banban(ctx: Context<'_>) -> CommandResult {
         )
         .await?;
     } else {
-        ctx.send(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
-            .await
-            .expect("banban image should be valid");
+        ctx.send_ext(CreateReply::default().content("https://files.catbox.moe/jm6sr9.png"))
+            .await;
     }
 
     Ok(())
@@ -347,13 +370,12 @@ pub async fn uptime(ctx: Context<'_>) -> CommandResult {
     let started = ctx.data().started;
     let uptime = chrono::Utc::now() - started;
 
-    ctx.reply(format!(
+    ctx.reply_ext(format!(
         "uptime: {} (since {})",
         uptime.format_full(),
         started.format("%Y-%m-%d %H:%M UTC")
     ))
-    .await
-    .expect("sending message should not fail");
+    .await?;
 
     Ok(())
 }
@@ -419,11 +441,11 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
     let response = reqwest::get("https://dog.ceo/api/breed/borzoi/images/random").await?;
 
     if response.status().is_server_error() {
-        ctx.reply("sorry, dog api is down!").await?;
+        ctx.reply_ext("sorry, dog api is down!").await?;
 
-        return Err(errors::CommandError::Internal(errors::InternalError::Api(
-            ApiError::DogCeo(response.status().as_u16()),
-        )));
+        //return Err(errors::CommandError::Internal(errors::InternalError::Api(
+        //    ApiError::DogCeo(response.status().as_u16()),
+        //)));
     }
 
     let image_url = response.json::<DogApiResponse>().await?.message;
@@ -437,7 +459,7 @@ pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
             .reply(true),
     );
 
-    ctx.send(reply).await?;
+    ctx.send_ext(reply).await?;
 
     Ok(())
 }
@@ -469,7 +491,7 @@ pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
         .attachment(attachment)
         .reply(true);
 
-    ctx.send(reply).await?;
+    ctx.send_ext(reply).await?;
 
     Ok(())
 }
@@ -499,7 +521,7 @@ pub async fn fox(ctx: Context<'_>) -> CommandResult {
         .attachment(attachment)
         .reply(true);
 
-    ctx.send(reply).await?;
+    ctx.send_ext(reply).await?;
 
     Ok(())
 }
@@ -508,6 +530,8 @@ pub use minecraft::minecraft;
 
 #[allow(dead_code)]
 mod minecraft {
+    use crate::{discord::commands::SendMessageError, utils::poise::ContextExt};
+
     use super::{CommandResult, Context, LogCommands};
     use poise::{serenity_prelude::CreateEmbed, CreateReply};
     use serde::Deserialize;
@@ -587,7 +611,7 @@ mod minecraft {
             );
         }
 
-        ctx.send(CreateReply::default().embed(embed)).await?;
+        ctx.send_ext(CreateReply::default().embed(embed)).await?;
 
         Ok(())
     }
@@ -653,7 +677,7 @@ pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) ->
         }
     };
 
-    ctx.reply(text).await?;
+    ctx.reply_ext(text).await?;
 
     Ok(())
 }
@@ -680,7 +704,7 @@ pub async fn version(ctx: Context<'_>) -> CommandResult {
         format!("release {}", built_info::PKG_VERSION)
     };
 
-    ctx.reply(build).await?;
+    ctx.reply_ext(build).await?;
 
     Ok(())
 }
@@ -702,7 +726,8 @@ pub async fn help(
         command.as_deref(),
         poise::builtins::HelpConfiguration::default(),
     )
-    .await?;
+    .await
+    .map_err(SendMessageError::from)?;
 
     Ok(())
 }

@@ -28,7 +28,7 @@ pub async fn eightball(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
-    let roll: DiceRoll = misc::DiceRoll::parse(&text).map_err(errors::InputError::DiceRoll)?;
+    let roll: DiceRoll = misc::DiceRoll::parse(&text)?;
     let result = roll.result();
 
     ctx.reply(result.to_string()).await?;

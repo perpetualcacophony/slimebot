@@ -12,7 +12,7 @@ pub enum DiceRollError {
     NoFaces,
     #[error("")]
     InvalidExtra(String),
-    #[error("")]
+    #[error("'{0}' is not a valid sign, expected '+' or '-'")]
     InvalidExtraSign(String),
     #[error("no match in `{0}`")]
     NoMatch(String),
