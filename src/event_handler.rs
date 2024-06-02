@@ -13,10 +13,19 @@ use crate::{errors::CommandError, Data};
 pub enum Error {
     #[error(transparent)]
     MessageWatchers(#[from] MessageWatchersErrors),
+    #[error(transparent)]
+    CommandError(Box<CommandError>),
+}
+
+// this error needs to be boxed, so doing it in the From impl for convenience
+impl From<CommandError> for Error {
+    fn from(value: CommandError) -> Self {
+        Self::CommandError(Box::new(value))
+    }
 }
 
 #[derive(Debug)]
-struct MessageWatchersErrors {
+pub struct MessageWatchersErrors {
     failures: Vec<CommandError>,
 }
 
@@ -117,7 +126,7 @@ async fn event_handler(
             use crate::discord::bug_reports::bug_reports;
 
             if let Some(channel) = data.config().bug_reports_channel() {
-                bug_reports(serenity_ctx.http(), reaction.clone(), channel).await;
+                bug_reports(serenity_ctx.http(), reaction.clone(), channel).await?;
             }
         }
         _ => (),
