@@ -27,7 +27,7 @@ use utils::Context;
 mod event_handler;
 
 use poise::{
-    serenity_prelude::{self as serenity, CacheHttp, FullEvent, GatewayIntents, Message},
+    serenity_prelude::{self as serenity, CacheHttp, GatewayIntents},
     PrefixFrameworkOptions,
 };
 
