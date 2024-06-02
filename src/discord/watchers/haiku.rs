@@ -1,6 +1,6 @@
 use tracing::debug;
 
-pub fn check_haiku(text: &str) -> Option<Vec<String>> {
+pub fn check_haiku(text: &str) -> Option<[String; 3]> {
     // completely ignore spoilered messages
     if text.matches("||").count() >= 2 {
         return None;
@@ -77,7 +77,7 @@ pub fn check_haiku(text: &str) -> Option<Vec<String>> {
     debug!(total_syllables);
 
     if total_syllables == 17 && parsed.next().is_none() {
-        Some(vec![first_line, second_line, third_line])
+        Some([first_line, second_line, third_line])
     } else {
         None
     }

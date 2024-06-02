@@ -1,20 +1,8 @@
-use std::{borrow::Cow, ops::Not};
-
-use mongodb::bson::doc;
-use poise::{
-    serenity_prelude::{
-        CreateButton, ReactionType, UserId,
-    }, CreateReply,
-};
-use serde::{Deserialize, Serialize};
-
 const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
-pub use error::Error;
 
 pub mod core;
-use core::{AsEmoji, Guess};
 
 use mongodb::error::Error as MongoDbError;
 
@@ -22,88 +10,17 @@ mod puzzle;
 pub use puzzle::Puzzle;
 
 type DbResult<T> = std::result::Result<T, MongoDbError>;
-type Result<T> = std::result::Result<T, crate::errors::Error>;
 
 mod words_list;
 pub use words_list::WordsList;
 
 mod daily;
-pub use daily::{DailyWordles};
+pub use daily::DailyWordles;
 
-mod options;
-pub use options::GameStyle;
+pub mod game;
+pub use game::{Game, GameRecord};
 
-mod utils;
-use utils::CreateReplyExt;
-
-mod game;
-pub use game::Game;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameState {
-    user: UserId,
-    guesses: Vec<Guess>,
-    pub num_guesses: usize,
-    finished: bool,
-    solved: bool,
-}
-
-impl GameState {
-    fn new(owner: UserId, guesses: &[Guess], finished: bool) -> Self {
-        Self {
-            user: owner,
-            guesses: guesses.to_vec(),
-            num_guesses: guesses.len(),
-            finished,
-            solved: guesses.last().map_or(false, |guess| guess.is_correct()),
-        }
-    }
-
-    fn is_solved(&self) -> bool {
-        self.guesses
-            .last()
-            .map_or(false, |guess| guess.is_correct())
-    }
-
-    fn unfinished(owner: UserId, guesses: &[Guess]) -> Self {
-        Self::new(owner, guesses, false)
-    }
-
-    fn finished(owner: UserId, guesses: &[Guess]) -> Self {
-        Self::new(owner, guesses, true)
-    }
-
-    fn into_finished(mut self) -> Self {
-        self.finished = true;
-        self
-    }
-    fn is_finished(&self) -> bool {
-        self.finished
-    }
-
-    fn in_progress(&self) -> bool {
-        self.is_finished().not()
-    }
-}
-
-impl AsEmoji for GameState {
-    fn as_emoji(&self) -> Cow<str> {
-        self.guesses.as_emoji()
-    }
-
-    fn emoji_with_letters(&self) -> String {
-        self.guesses.emoji_with_letters()
-    }
-
-    fn emoji_with_letters_spaced(&self) -> String {
-        self.guesses.emoji_with_letters_spaced()
-    }
-}
-
-use self::{
-    utils::{ComponentInteractionExt},
-};
-
+/*
 fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {
         "you have a daily wordle available!"
@@ -134,6 +51,7 @@ fn create_menu(daily_available: bool) -> CreateReply {
         )
         .reply(true)
 }
+*/
 
 /*async fn mode_select_menu(
     ctx: crate::Context<'_>,

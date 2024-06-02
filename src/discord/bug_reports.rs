@@ -6,13 +6,18 @@ use poise::serenity_prelude::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelId) {
+use crate::{discord::commands::SendMessageError, errors::CommandError};
+
+pub async fn bug_reports(
+    http: &Http,
+    add_reaction: Reaction,
+    channel: &ChannelId,
+) -> Result<(), CommandError> {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
     let ladybugs = add_reaction
         .message(http)
-        .await
-        .expect("reaction should have a message")
+        .await?
         .reactions
         .iter()
         .find(|r| r.reaction_type == ladybug_reaction)
@@ -27,8 +32,7 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
                 http,
                 GetMessages::new().around(add_reaction.message_id).limit(5),
             )
-            .await
-            .expect("channel should have messages");
+            .await?;
 
         let messages = messages
             .into_iter()
@@ -62,8 +66,7 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
         let messages = join_all(messages).await;
         let footer_icon = UserId::new(http.application_id().expect("bot app should have id").get())
             .to_user(http)
-            .await
-            .expect("user id should match a user")
+            .await?
             .face();
         let member = add_reaction
             .member
@@ -73,8 +76,7 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
                 http,
                 add_reaction.user_id.expect("reaction should have user id"),
             )
-            .await
-            .expect("user id should match member");
+            .await?;
 
         let mut embed = CreateEmbed::default();
 
@@ -95,7 +97,7 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
         channel
             .send_message(http, CreateMessage::new().embed(embed.clone()))
             .await
-            .expect("sending message should not fail");
+            .map_err(SendMessageError::from)?;
 
         info!(
             "@{} reported a bug: {} (#{})",
@@ -114,4 +116,6 @@ pub async fn bug_reports(http: &Http, add_reaction: Reaction, channel: &ChannelI
                 .name(),
         );
     }
+
+    Ok(())
 }

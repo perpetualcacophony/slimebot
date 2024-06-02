@@ -2,15 +2,14 @@
 #![warn(clippy::unwrap_used)]
 #![feature(macro_metavar_expr)]
 #![feature(let_chains)]
+#![feature(associated_type_defaults)]
 
 /// Logging frontends, with [`tracing`](https://docs.rs/tracing/latest/tracing/) backend.
 mod logging;
-use std::{collections::HashMap, sync::Arc};
 
 /// Functionality called from Discord.
 mod discord;
 #[allow(clippy::wildcard_imports)]
-use discord::commands::*;
 use mongodb::Database;
 
 /// Config file parsing and option access.
@@ -25,15 +24,13 @@ mod functions;
 mod utils;
 use utils::Context;
 
+mod event_handler;
+
 use poise::{
-    serenity_prelude::{
-        self as serenity, collect, futures::StreamExt, ChannelId, Event, GatewayIntents,
-        MessageId,
-    },
+    serenity_prelude::{self as serenity, CacheHttp, GatewayIntents},
     PrefixFrameworkOptions,
 };
 
-use tokio::sync::{RwLock};
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
@@ -80,6 +77,7 @@ impl Data {
         &self.config
     }
 
+    #[allow(dead_code)]
     const fn db(&self) -> &Database {
         &self.db
     }
@@ -89,25 +87,25 @@ impl Data {
     }
 }
 
-use functions::games::wordle::{DailyWordles, WordsList};
+use functions::games::wordle::{game::GamesCache, DailyWordles, WordsList};
 
 #[derive(Debug, Clone)]
 struct WordleData {
     words: WordsList,
     wordles: DailyWordles,
-    active_games: Arc<RwLock<HashMap<ChannelId, MessageId>>>,
+    game_data: GamesCache,
 }
 
 impl WordleData {
     fn new(db: &Database) -> Self {
         let words = WordsList::load();
         let wordles = DailyWordles::new(db);
-        let active_games = Arc::new(RwLock::new(HashMap::new()));
+        let game_data = GamesCache::new();
 
         Self {
             words,
             wordles,
-            active_games,
+            game_data,
         }
     }
 
@@ -119,26 +117,8 @@ impl WordleData {
         &self.wordles
     }
 
-    fn active_games(&self) -> Arc<RwLock<HashMap<ChannelId, MessageId>>> {
-        self.active_games.clone()
-    }
-
-    async fn channel_is_locked(&self, id: ChannelId) -> Option<MessageId> {
-        let games = self.active_games();
-        let guard = games.read().await;
-        guard.get(&id).copied()
-    }
-
-    async fn lock_channel(&self, channel_id: ChannelId, message_id: MessageId) {
-        let games = self.active_games();
-        let mut guard = games.write().await;
-        guard.insert(channel_id, message_id);
-    }
-
-    async fn unlock_channel(&self, id: ChannelId) {
-        let games = self.active_games();
-        let mut guard = games.write().await;
-        guard.remove(&id);
+    const fn game_data(&self) -> &GamesCache {
+        &self.game_data
     }
 }
 
@@ -179,99 +159,30 @@ async fn main() {
                 ..Default::default()
             },
             on_error: errors::handle_framework_error,
+            event_handler: event_handler::poise,
             ..Default::default()
         })
-        .setup(|ctx, ready, framework| {
+        .setup(|ctx, _ready, framework| {
             Box::pin(async move {
-                let arc = Arc::new(data.clone());
-
                 let ctx = ctx.clone();
-                let shard = ctx.shard.clone();
                 let http = ctx.http.clone();
 
-                let bot_id = ready.user.id;
+                let commands = framework.options().commands.as_ref();
 
-                let commands = &framework.options().commands;
-                poise::builtins::register_in_guild(
-                    &http,
-                    commands.as_ref(),
-                    *data
-                        .config
-                        .bot
-                        .testing_server()
-                        .expect("bot testing server id should be valid"),
-                )
-                .await
-                .expect("registering commands in guild should not fail");
+                if let Some(guild_id) = data.config.bot.testing_server() {
+                    poise::builtins::register_in_guild(&http, commands, *guild_id)
+                        .await
+                        .expect("registering commands in guild should not fail");
+                }
+
+                poise::builtins::register_globally(&http, commands)
+                    .await
+                    .expect("registering commands globally should not fail");
 
                 let activity = data.config.bot.activity();
                 ctx.set_activity(activity);
 
-                let watchers_config = data.config.watchers.clone();
-                let messages = collect(&shard, |event| match event {
-                    Event::MessageCreate(event) => Some(event.message.clone()),
-                    _ => None,
-                })
-                .filter(move |msg| {
-                    let msg = msg.clone();
-                    let cache = ctx.cache.clone();
-                    let config = &watchers_config;
-                    let allowed = config.channel_allowed(msg.channel_id);
-
-                    async move { !msg.is_own(cache) && !msg.is_private() && allowed }
-                });
-
-                let messages_http = http.clone();
-                let messages_arc = arc.clone();
-                let messages_task = messages.for_each(move |msg| {
-                    //let http = _ctx.clone().http();
-                    let data = messages_arc.clone();
-                    let http = messages_http.clone();
-
-                    trace!(?msg.id, "message captured");
-
-                    async move {
-                        use discord::watchers::*;
-
-                        tokio::join!(
-                            vore(&http, &data.db, &msg),
-                            l_biden(&http, &msg),
-                            look_cl(&http, &msg),
-                            watch_haiku(&http, &msg),
-                        );
-                    }
-                });
-                tokio::spawn(messages_task);
-
-                let reactions = collect(&shard, |event| match event {
-                    Event::ReactionAdd(event) => Some(event.reaction.clone()),
-                    _ => None,
-                })
-                .filter(move |reaction| {
-                    let reaction = reaction.clone();
-
-                    async move { reaction.user_id != Some(bot_id) && reaction.guild_id.is_some() }
-                });
-
                 let config = data.config().clone();
-                let channel = config.bug_reports_channel().copied();
-
-                let react_http = http.clone();
-                if let Some(channel) = channel {
-                    let reactions_task = reactions.for_each(move |reaction| {
-                        let http = react_http.clone();
-
-                        trace!(?reaction.message_id, "reaction captured");
-
-                        async move {
-                            use discord::bug_reports::bug_reports;
-
-                            bug_reports(&http, reaction, &channel).await;
-                        }
-                    });
-
-                    tokio::spawn(reactions_task);
-                }
 
                 trace!("finished setup, accepting commands");
 
@@ -359,38 +270,29 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn format_full() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
-
         assert_eq!("2d 1h 19m", duration.format_full(),)
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn format_largest() {
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-21T21:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("2 days", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T21:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("1 hour", duration.format_largest(),);
 
-        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z")
-            .expect("hard-coded timestamp should be valid");
-        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z")
-            .expect("hard-coded timestamp should be valid");
+        let start = DateTime::parse_from_rfc3339("2024-01-19T20:00:00.000Z").unwrap();
+        let end = DateTime::parse_from_rfc3339("2024-01-19T20:19:00.000Z").unwrap();
         let duration = end - start;
         assert_eq!("19 minutes", duration.format_largest(),);
     }

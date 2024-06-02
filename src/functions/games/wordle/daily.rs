@@ -10,7 +10,7 @@ use poise::serenity_prelude::{futures::StreamExt, UserId};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 
-use super::{core::Word, puzzle, DbResult, GameState, WordsList};
+use super::{core::Word, puzzle, DbResult, GameRecord, WordsList};
 
 #[derive(Debug, Clone)]
 pub struct DailyWordles {
@@ -79,7 +79,7 @@ impl DailyWordles {
         Ok(wordle)
     }
 
-    pub async fn update(&self, puzzle: u32, game: GameState) -> DbResult<()> {
+    pub async fn update(&self, puzzle: u32, game: GameRecord) -> DbResult<()> {
         let user = mongodb::bson::ser::to_bson(&game.user).expect("implements serialize");
         let game = mongodb::bson::ser::to_bson(&game).expect("implements serialize");
 
@@ -163,7 +163,7 @@ impl DailyWordles {
             .map(|daily| daily.is_some())
     }
 
-    pub async fn find_game(&self, user: UserId, wordle: u32) -> DbResult<Option<GameState>> {
+    pub async fn find_game(&self, user: UserId, wordle: u32) -> DbResult<Option<GameRecord>> {
         Ok(self
             .collection
             .find_one(doc! { "puzzle.number": wordle }, None)
@@ -175,7 +175,7 @@ impl DailyWordles {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyWordle {
     pub puzzle: puzzle::DailyPuzzle,
-    games: Vec<GameState>,
+    games: Vec<GameRecord>,
 }
 
 impl DailyWordle {
@@ -203,10 +203,11 @@ impl DailyWordle {
         self.age_hours() >= 48
     }
 
-    pub fn user_game(&self, user: UserId) -> Option<&GameState> {
+    pub fn user_game(&self, user: UserId) -> Option<&GameRecord> {
         self.games.iter().find(|game| game.user == user)
     }
 
+    #[allow(dead_code)]
     pub fn played_by(&self, user: UserId) -> bool {
         self.user_game(user).is_some()
     }
@@ -219,6 +220,7 @@ impl DailyWordle {
         self.is_expired().not() && self.finished_by(user).not()
     }
 
+    #[allow(dead_code)]
     pub fn in_progress_for(&self, user: UserId) -> bool {
         self.user_game(user).is_some_and(|game| game.in_progress())
     }

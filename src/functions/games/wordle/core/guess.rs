@@ -1,18 +1,20 @@
-use std::{
-    borrow::Cow,
-    convert::Infallible,
-    ops::{Index, IndexMut, Not},
-    str::FromStr,
-};
-
 use poise::serenity_prelude::Message;
 use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet},
+    convert::Infallible,
+    fmt::Display,
+    ops::{Deref, Index, IndexMut, Not},
+    str::FromStr,
+};
+use tinyvec::TinyVec;
 
 use super::super::words_list::WordsList;
 
 use super::{AsEmoji, AsLetters};
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Guess {
     letters: [(char, LetterState); 5],
 }
@@ -24,7 +26,7 @@ impl Guess {
             .map(|ch: char| (ch.to_ascii_lowercase(), LetterState::NotPresent))
             .collect::<Vec<(char, LetterState)>>()
             .try_into()
-            .unwrap();
+            .expect("should have 5 letters");
 
         Self { letters }
     }
@@ -61,6 +63,10 @@ impl Guess {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (char, LetterState)> + '_ {
         self.letters.iter_mut()
+    }
+
+    pub fn as_slice(&self) -> &[(char, LetterState)] {
+        self.as_ref()
     }
 }
 
@@ -127,18 +133,27 @@ impl IndexMut<usize> for Guess {
     }
 }
 
-impl ToString for Guess {
-    fn to_string(&self) -> String {
-        self.letters
+impl Display for Guess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let txt = self
+            .letters
             .iter()
             .map(|letter| letter.1.to_string())
-            .collect()
+            .collect::<String>();
+
+        f.write_str(&txt)
     }
 }
 
 impl PartialEq<&str> for Guess {
     fn eq(&self, other: &&str) -> bool {
         &self.to_string() == other
+    }
+}
+
+impl AsRef<[(char, LetterState)]> for Guess {
+    fn as_ref(&self) -> &[(char, LetterState)] {
+        &self.letters
     }
 }
 
@@ -174,14 +189,13 @@ impl FromStr for LetterState {
     }
 }
 
-impl ToString for LetterState {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for LetterState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             Self::Correct => "O",
             Self::WrongPlace => "o",
             Self::NotPresent => ".",
-        }
-        .to_owned()
+        })
     }
 }
 
@@ -237,6 +251,238 @@ impl ToPartialGuess for String {
 impl ToPartialGuess for Message {
     fn to_partial_guess(&self, words: &WordsList) -> Result<PartialGuess, PartialGuessError> {
         self.content.to_partial_guess(words)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuessesRecord(Vec<Guess>);
+
+impl<T: Into<Vec<Guess>>> From<T> for GuessesRecord {
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<[Guess]> for GuessesRecord {
+    fn as_ref(&self) -> &[Guess] {
+        self.0.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GuessesLimit(usize);
+
+impl GuessesLimit {
+    pub fn new(limit: usize) -> Self {
+        assert!(limit != 0, "limit cannot be 0");
+        Self(limit)
+    }
+
+    pub fn try_new(limit: usize) -> Option<Self> {
+        (limit != 0).then_some(Self::new(limit))
+    }
+}
+
+impl Display for GuessesLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<usize> for GuessesLimit {
+    fn into(self) -> usize {
+        self.0
+    }
+}
+
+impl PartialEq<usize> for GuessesLimit {
+    fn eq(&self, other: &usize) -> bool {
+        &self.0 == other
+    }
+}
+
+impl Default for GuessesLimit {
+    fn default() -> Self {
+        Self(6)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Guesses {
+    vec: TinyVec<[Guess; 6]>,
+    pub limit: Option<GuessesLimit>,
+}
+
+impl Guesses {
+    pub fn limit_reached(&self) -> bool {
+        self.limit.is_some_and(|lim| lim == self.vec.len())
+    }
+
+    pub fn push(&mut self, guess: Guess) {
+        if !self.limit_reached() {
+            self.vec.push(guess)
+        }
+    }
+
+    pub fn default_limit() -> Self {
+        Self::new(GuessesLimit::default())
+    }
+
+    pub fn new(limit: impl Into<Option<GuessesLimit>>) -> Self {
+        Self {
+            limit: limit.into(),
+            ..Self::default()
+        }
+    }
+
+    pub fn unlimited() -> Self {
+        Self::new(None)
+    }
+}
+
+impl AsRef<[Guess]> for Guesses {
+    fn as_ref(&self) -> &[Guess] {
+        &self.vec
+    }
+}
+
+pub trait GuessSlice: AsRef<[Guess]> {
+    fn iter(&self) -> std::slice::Iter<Guess> {
+        self.as_slice().iter()
+    }
+
+    fn as_slice(&self) -> &[Guess] {
+        self.as_ref()
+    }
+
+    fn count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn last(&self) -> Option<Guess> {
+        self.as_slice().last().copied()
+    }
+
+    fn last_is_solved(&self) -> bool {
+        self.last().is_some_and(|guess| guess.is_correct())
+    }
+
+    fn to_record(&self) -> GuessesRecord {
+        self.as_slice().into()
+    }
+
+    fn letter_states(&self) -> LetterStates {
+        self.iter()
+            .flat_map(|guess| guess.as_slice())
+            .copied()
+            .collect()
+    }
+
+    fn used_letters(&self) -> CharSet {
+        self.iter()
+            .flat_map(|guess| guess.iter().map(|(ch, _)| *ch))
+            .collect()
+    }
+
+    fn unused_letters(&self) -> CharSet {
+        let used_letters = self.used_letters();
+        ('a'..='z')
+            .filter(|ch| !used_letters.contains(ch))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LetterStates(BTreeMap<char, LetterState>);
+
+impl<T: Into<BTreeMap<char, LetterState>>> From<T> for LetterStates {
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl FromIterator<(char, LetterState)> for LetterStates {
+    fn from_iter<T: IntoIterator<Item = (char, LetterState)>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl Deref for LetterStates {
+    type Target = BTreeMap<char, LetterState>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsEmoji for LetterStates {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .fold([String::new(), String::new()], |acc, letter_state| {
+                [
+                    acc[0].clone() + &letter_state.0.as_emoji() + " ",
+                    acc[1].clone() + &letter_state.1.as_emoji() + " ",
+                ]
+            })
+            .join("\n")
+            .trim_end()
+            .to_owned()
+            .into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CharSet(BTreeSet<char>);
+
+impl Deref for CharSet {
+    type Target = BTreeSet<char>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl FromIterator<char> for CharSet {
+    fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl AsEmoji for CharSet {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .map(|ch| ch.as_emoji().to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+            .into()
+    }
+}
+
+impl GuessSlice for Guesses {}
+impl GuessSlice for GuessesRecord {}
+
+impl<T: GuessSlice> AsEmoji for T {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .map(|g| g.as_emoji())
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into()
+    }
+
+    fn emoji_with_letters(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters_spaced())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 

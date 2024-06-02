@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 mod word;
 pub use word::Word;
 
-mod guess;
-pub use guess::{Guess, PartialGuess, PartialGuessError, ToPartialGuess};
+pub mod guess;
+pub use guess::{Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError, ToPartialGuess};
 
 use self::guess::LetterState;
 
-use super::GameStyle;
+use super::game::options::GameStyle;
 
 /*
 #[derive(Debug, Clone, Default)]
@@ -121,6 +121,7 @@ pub trait AsEmoji {
         }
     }
 
+    #[allow(dead_code)]
     fn emoji_default_style(&self) -> String {
         self.emoji_with_style(GameStyle::default()).into()
     }
@@ -147,30 +148,6 @@ impl AsEmoji for Vec<LetterState> {
             .collect::<Vec<_>>()
             .join("")
             .into()
-    }
-}
-
-impl AsEmoji for Vec<Guess> {
-    fn as_emoji(&self) -> Cow<str> {
-        self.iter()
-            .map(|g| g.as_emoji())
-            .collect::<Vec<_>>()
-            .join("\n")
-            .into()
-    }
-
-    fn emoji_with_letters(&self) -> String {
-        self.iter()
-            .map(|g| g.emoji_with_letters())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    fn emoji_with_letters_spaced(&self) -> String {
-        self.iter()
-            .map(|g| g.emoji_with_letters_spaced())
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 }
 

@@ -75,6 +75,7 @@ pub struct Answer {
 }
 
 impl Answer {
+    #[allow(dead_code)] // here by convention
     fn new(tone: AnswerTone, text: &'static str) -> Self {
         Self {
             tone,
@@ -107,7 +108,8 @@ pub struct Answers(&'static [Answer]);
 
 impl Answers {
     fn weighted_dist(&self) -> WeightedIndex<f32> {
-        WeightedIndex::new(self.0.iter().map(|ans| ans.weight)).unwrap()
+        WeightedIndex::new(self.0.iter().map(|ans| ans.weight))
+            .expect("should have more than 1 answer")
     }
 
     pub fn get(&self, rng: &mut impl Rng) -> Answer {
@@ -202,6 +204,9 @@ mod tests {
                 map
             }
 
+            #[allow(dead_code)]
+            // not sure how needed this is, and it brings in a lot of extra code
+            // but it only compiles on test, so it's fiiiiiiine
             fn tone_ratios(&self) -> HashMap<AnswerTone, usize> {
                 let counts = self.tone_counts();
                 let counts: Vec<usize> = counts.values().copied().collect();

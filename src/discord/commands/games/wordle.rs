@@ -1,14 +1,18 @@
-use std::ops::Not;
-
-use poise::serenity_prelude::{CreateMessage, Mentionable, User};
+use poise::serenity_prelude::{Mentionable, User};
 use poise::CreateReply;
+use std::ops::Not;
 use tracing::{debug, instrument};
 
-use super::super::utils::CommandResult;
-use crate::functions::games::wordle::core::AsEmoji;
-use crate::{discord::utils::ContextExt, utils::Context};
+use crate::utils::poise::{CommandResult, Context, ContextExt};
+use crate::{
+    discord::commands::SendMessageError,
+    functions::games::wordle::{
+        core::{guess::GuessSlice, AsEmoji},
+        game::options::GameOptionsBuilder,
+    },
+};
 
-use crate::functions::games::wordle::{self, GameStyle};
+use crate::functions::games::wordle::{self, game::options::GameStyle};
 
 /// play wordle right from discord!
 #[instrument(skip_all)]
@@ -17,7 +21,7 @@ use crate::functions::games::wordle::{self, GameStyle};
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("daily", "random", "display", "role")
+    subcommands("daily", "random", "display", "role", "letters", "unused")
 )]
 pub async fn wordle(ctx: Context<'_>) -> CommandResult {
     //let words = ctx.data().wordle.words();
@@ -30,7 +34,8 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
         Some("wordle"),
         poise::builtins::HelpConfiguration::default(),
     )
-    .await?;
+    .await
+    .map_err(SendMessageError::new)?;
 
     Ok(())
 }
@@ -66,42 +71,25 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
-        if let Some(message_id) = wordle.channel_is_locked(ctx.channel_id()).await {
+        if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
             ctx.reply_ephemeral(format!(
                 "there's already a game being played in this channel! {}",
-                message_id.link(ctx.channel_id(), ctx.guild_id()),
+                data.message_id.link(ctx.channel_id(), ctx.guild_id()),
             ))
             .await?;
 
             return Ok(());
         } else {
-            let mut message = if ctx.guild_id().is_some() {
-                ctx.reply("you can't play a daily wordle in a server - check your dms!")
-                    .await?;
-                ctx.author()
-                    .dm(ctx, CreateMessage::new().content("loading..."))
-                    .await?
-            } else {
-                ctx.reply("loading...").await?.into_message().await?
-            };
             // play game
             let mut game = wordle::Game::new(
                 ctx,
-                &mut message,
-                ctx.data().wordle.words(),
-                wordles,
                 daily.puzzle.clone(),
-                style,
-            );
-
-            wordle
-                .lock_channel(game.channel_id(), game.message_id())
-                .await;
+                GameOptionsBuilder::default().style(style).build(),
+            )
+            .await?;
 
             game.setup().await?;
             game.run().await?;
-
-            wordle.unlock_channel(game.channel_id()).await;
 
             if let Some(completed) = wordle
                 .wordles
@@ -123,8 +111,16 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             }
         }
     } else {
-        ctx.reply_ephemeral("you don't have a daily wordle available!")
-            .await?;
+        let latest = wordles
+            .latest()
+            .await?
+            .expect("wordle has been refreshed by now");
+
+        ctx.reply_ephemeral(format!(
+            "you don't have a daily wordle yet! check back in {hours} hours",
+            hours = latest.age_hours()
+        ))
+        .await?;
     }
 
     Ok(())
@@ -141,40 +137,30 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    debug!(?wordle.active_games);
+    debug!(?wordle.game_data);
 
-    if let Some(msg) = wordle.channel_is_locked(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
         ctx.reply_ephemeral(format!(
             "there's already a game being played in this channel! {}",
-            msg.link(ctx.channel_id(), ctx.guild_id()),
+            data.message_id.link(ctx.channel_id(), ctx.guild_id()),
         ))
         .await?;
 
         return Ok(());
     } else {
-        let mut game_msg = ctx.reply("loading...").await?.into_message().await?;
-
         let puzzle = wordle::Puzzle::random(wordle.words());
 
         let mut game = wordle::Game::new(
             ctx,
-            &mut game_msg,
-            wordle.words(),
-            wordle.wordles(),
             puzzle,
-            style,
-        );
-
-        wordle
-            .lock_channel(game.channel_id(), game.message_id())
-            .await;
+            GameOptionsBuilder::default().style(style).build(),
+        )
+        .await?;
 
         game.setup().await?;
 
         // play game
         game.run().await?;
-
-        wordle.unlock_channel(game.channel_id()).await;
     }
 
     Ok(())
@@ -265,6 +251,61 @@ async fn role(ctx: Context<'_>) -> CommandResult {
         }
     } else {
         ctx.reply_ephemeral("Error: there's no wordle role configured!")
+            .await?;
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+async fn letters(ctx: Context<'_>) -> CommandResult {
+    let wordle = ctx.data().wordle();
+
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+        let guesses = &data.guesses;
+
+        let response = format!(
+            "guessed letters:\n{guessed}\n\nunused letters:\n{unused}",
+            guessed = guesses.letter_states().as_emoji(),
+            unused = guesses.unused_letters().as_emoji()
+        );
+
+        ctx.reply(response).await?;
+    } else {
+        ctx.reply("there isn't a game active in this channel!")
+            .await?;
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+async fn unused(ctx: Context<'_>) -> CommandResult {
+    let wordle = ctx.data().wordle();
+
+    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+        let guesses = &data.guesses;
+
+        let response = format!(
+            "unused letters:\n{unused}",
+            unused = guesses.unused_letters().as_emoji()
+        );
+
+        ctx.reply(response).await?;
+    } else {
+        ctx.reply("there isn't a game active in this channel!")
             .await?;
     }
 

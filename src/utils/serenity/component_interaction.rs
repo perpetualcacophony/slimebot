@@ -1,39 +1,6 @@
-use poise::{
-    serenity_prelude::{
-        self as serenity, CacheHttp, ComponentInteraction, CreateActionRow, CreateButton,
-        CreateInteractionResponseMessage,
-    },
-    CreateReply,
+use poise::serenity_prelude::{
+    self as serenity, CacheHttp, ComponentInteraction, CreateInteractionResponseMessage,
 };
-
-use crate::Context;
-
-pub trait CreateReplyExt: Default {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn button(self, button: CreateButton) -> Self;
-}
-
-impl CreateReplyExt for CreateReply {
-    fn button(mut self, button: CreateButton) -> Self {
-        if let Some(ref mut rows) = self.components {
-            if let Some(buttons) = rows.iter_mut().find_map(|row| match row {
-                CreateActionRow::Buttons(b) => Some(b),
-                _ => None,
-            }) {
-                buttons.push(button);
-            } else {
-                rows.push(CreateActionRow::Buttons(vec![button]));
-            }
-        } else {
-            self = self.components(vec![CreateActionRow::Buttons(vec![button])]);
-        }
-
-        self
-    }
-}
 
 pub trait ComponentInteractionExt {
     async fn acknowledge(&self, cache_http: impl CacheHttp) -> serenity::Result<()>;
@@ -42,13 +9,17 @@ pub trait ComponentInteractionExt {
         cache_http: impl CacheHttp,
         message: serenity::CreateInteractionResponseMessage,
     ) -> serenity::Result<()>;
+
+    #[allow(dead_code)]
     async fn update_message(
         &self,
         cache_http: impl CacheHttp,
         builder: serenity::CreateInteractionResponseMessage,
     ) -> serenity::Result<()>;
+
     fn custom_id(&self) -> &str;
 
+    #[allow(dead_code)]
     async fn reply(
         &self,
         cache_http: impl CacheHttp,
@@ -105,21 +76,12 @@ impl ComponentInteractionExt for serenity::ComponentInteraction {
 }
 
 pub trait OptionComponentInteractionExt {
+    #[allow(dead_code)]
     fn is_some_with_id(&self, custom_id: &str) -> bool;
 }
 
 impl OptionComponentInteractionExt for Option<ComponentInteraction> {
     fn is_some_with_id(&self, custom_id: &str) -> bool {
         self.as_ref().is_some_and(|ci| ci.custom_id() == custom_id)
-    }
-}
-
-pub trait ContextExt {
-    fn in_guild(&self) -> bool;
-}
-
-impl ContextExt for Context<'_> {
-    fn in_guild(&self) -> bool {
-        self.guild_id().is_some()
     }
 }
