@@ -36,56 +36,9 @@ use tracing::{debug, info, trace};
 
 use tracing_unwrap::ResultExt;
 
-use chrono::Utc;
-type UtcDateTime = chrono::DateTime<Utc>;
+use data::Data;
 
-#[derive(Debug, Clone)]
-pub struct Data {
-    config: config::Config,
-    db: Database,
-    started: UtcDateTime,
-    wordle: WordleData,
-}
-
-impl Data {
-    fn new() -> Self {
-        let config: crate::config::Config = ::config::Config::builder()
-            .add_source(::config::File::with_name("slimebot.toml"))
-            .add_source(::config::Environment::with_prefix("SLIMEBOT"))
-            .build()
-            .expect_or_log("config file could not be loaded")
-            .try_deserialize()
-            .expect_or_log("configuration could not be parsed");
-
-        trace!("config loaded");
-
-        let db = db::database(&config.db);
-
-        let started = Utc::now();
-
-        let wordle = WordleData::new(&db);
-
-        Self {
-            config,
-            db,
-            started,
-            wordle,
-        }
-    }
-
-    const fn config(&self) -> &crate::config::Config {
-        &self.config
-    }
-
-    #[allow(dead_code)]
-    const fn db(&self) -> &Database {
-        &self.db
-    }
-
-    const fn wordle(&self) -> &WordleData {
-        &self.wordle
-    }
-}
+mod data;
 
 use functions::games::wordle::{game::GamesCache, DailyWordles, WordsList};
 
@@ -144,7 +97,7 @@ async fn main() {
 
     info!("{build}");
 
-    let data = Data::new();
+    let data = data::Data::new();
     let config = data.config.clone();
 
     if let Some(flavor_text) = config.logs.flavor_text() {

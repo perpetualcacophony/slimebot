@@ -5,9 +5,13 @@ use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{event_handler, functions::misc::roll::DiceRollError, Data};
+use crate::{
+    data::{self, Data},
+    event_handler,
+    functions::misc::roll::DiceRollError,
+};
 
-pub fn handle_framework_error(err: FrameworkError<'_, Data, CommandError>) -> BoxFuture<()> {
+pub fn handle_framework_error(err: FrameworkError<'_, data::Data, CommandError>) -> BoxFuture<()> {
     Box::pin(async {
         match err {
             FrameworkError::Command { error, ctx, .. } => {

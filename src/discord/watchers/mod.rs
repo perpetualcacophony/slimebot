@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::{errors::CommandError, FormatDuration};
+use crate::{errors::CommandError, utils::serenity::channel::ChannelIdExt, FormatDuration};
 
 use super::commands::SendMessageError;
 
@@ -70,7 +70,7 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), Comma
             let time = new_mention.timestamp - last.timestamp;
 
             msg.channel_id
-                .say(
+                .say_ext(
                     http,
                     format!(
                         "~~{time}~~ 0 days without mentioning vore",
