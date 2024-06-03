@@ -14,11 +14,14 @@ use serde::Deserialize;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument};
 
-use crate::utils::poise::{CommandResult, Context, ContextExt};
+use crate::utils::{
+    format_duration::FormatDuration,
+    poise::{CommandResult, Context, ContextExt},
+};
 
 //pub use watch_fic::watch_fic;
 
-use crate::{built_info, FormatDuration};
+use crate::built_info;
 
 trait LogCommands {
     async fn log_command(&self);

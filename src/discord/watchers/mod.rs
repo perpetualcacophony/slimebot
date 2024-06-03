@@ -7,8 +7,10 @@ use tracing::{info, instrument};
 
 use crate::{
     errors::CommandError,
-    utils::serenity::channel::{ChannelIdExt, MessageExt},
-    FormatDuration,
+    utils::{
+        format_duration::FormatDuration,
+        serenity::channel::{ChannelIdExt, MessageExt},
+    },
 };
 
 use super::commands::SendMessageError;
