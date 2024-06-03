@@ -1,6 +1,7 @@
 use poise::serenity_prelude::{
-    futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateMessage, EditMessage, Message, MessageId, ReactionType, Result, ShardMessenger,
+    self, futures::Stream, CacheHttp, ChannelId, ComponentInteraction, CreateActionRow,
+    CreateButton, CreateMessage, EditMessage, Message, MessageId, ReactionType, Result,
+    ShardMessenger,
 };
 
 use crate::{
@@ -90,7 +91,7 @@ impl GameMessage {
         let msg = if puzzle.is_daily() && ctx.in_guild() {
             ctx.reply_ephemeral("you can't play a daily wordle in a server - check your dms!")
                 .await
-                .map_err(|err| err.source)?;
+                .map_err(serenity_prelude::Error::from)?;
 
             ctx.author()
                 .dm(ctx, CreateMessage::new().content("loading..."))

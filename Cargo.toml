@@ -45,6 +45,7 @@ tracing-subscriber = { version = "0.3.17", features = [
 tracing-test = "0.2.4"
 tracing-unwrap = { version = "0.10.0", default-features = false }
 time = "0.3.36"
+backoff = { version = "0.4.0", features = ["tokio"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

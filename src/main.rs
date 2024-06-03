@@ -34,8 +34,6 @@ use poise::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-use tracing_unwrap::ResultExt;
-
 mod data;
 use data::PoiseData;
 

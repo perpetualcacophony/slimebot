@@ -54,7 +54,9 @@ impl<'a> ContextExt<'a> for Context<'a> {
         self,
         text: impl Into<String>,
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError> {
-        Self::reply(self, text).await.map_err(SendMessageError::new)
+        Self::reply(self, text)
+            .await
+            .map_err(SendMessageError::from)
     }
 
     async fn send_ext(
@@ -63,7 +65,7 @@ impl<'a> ContextExt<'a> for Context<'a> {
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError> {
         Self::send(self, builder)
             .await
-            .map_err(SendMessageError::new)
+            .map_err(SendMessageError::from)
     }
 
     async fn say_ext(

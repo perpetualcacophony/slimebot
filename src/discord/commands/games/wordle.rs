@@ -35,7 +35,7 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
         poise::builtins::HelpConfiguration::default(),
     )
     .await
-    .map_err(SendMessageError::new)?;
+    .map_err(SendMessageError::from)?;
 
     Ok(())
 }

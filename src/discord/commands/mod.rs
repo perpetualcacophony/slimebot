@@ -56,20 +56,17 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
 
     let ping = ctx.ping().await.as_millis();
     if ping == 0 {
-        ctx.say("pong! (please try again later to display latency)")
-            .await
-            .map_err(SendMessageError::new)?;
+        ctx.say_ext("pong! (please try again later to display latency)")
+            .await?;
     } else {
-        ctx.say(format!("pong! ({}ms)", ping))
-            .await
-            .map_err(SendMessageError::new)?;
+        ctx.say_ext(format!("pong! ({}ms)", ping)).await?;
     }
 
     Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("message failed to end")]
+#[error("message failed to send")]
 pub struct SendMessageError {
     #[from]
     pub source: serenity_prelude::Error,
@@ -78,6 +75,24 @@ pub struct SendMessageError {
 impl SendMessageError {
     pub fn new(source: serenity_prelude::Error) -> Self {
         Self { source }
+    }
+
+    pub fn backoff(self) -> backoff::Error<Self> {
+        use serenity_prelude::Error as E;
+
+        match self.source {
+            E::Model(ref model) => {
+                use serenity_prelude::ModelError as M;
+
+                match model {
+                    M::InvalidPermissions { .. } | M::MessageTooLong(..) => {
+                        backoff::Error::permanent(self)
+                    }
+                    _ => backoff::Error::transient(self),
+                }
+            }
+            _ => backoff::Error::transient(self),
+        }
     }
 }
 

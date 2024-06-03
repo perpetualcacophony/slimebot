@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, CreateMessage, GuildId, Http, Message, UserId};
+use poise::serenity_prelude::{CacheHttp, GuildId, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
