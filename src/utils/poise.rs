@@ -1,6 +1,7 @@
 use crate::{discord::commands::SendMessageError, PoiseData};
 
 use poise::CreateReply;
+use tracing::warn;
 
 pub type Context<'a> = poise::Context<'a, PoiseData, crate::errors::CommandError>;
 
@@ -8,16 +9,16 @@ pub type Error = crate::errors::CommandError;
 pub type Command = poise::Command<PoiseData, Error>;
 pub type CommandResult = Result<(), Error>;
 
-pub trait ContextExt<'a> {
+pub trait ContextExt<'a>: Into<Context<'a>> + Copy {
     async fn reply_ephemeral(
         self,
         text: impl Into<String>,
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError>;
 
-    fn in_guild(&self) -> bool;
+    fn in_guild(self) -> bool;
 
     #[allow(dead_code)]
-    fn in_dm(&self) -> bool {
+    fn in_dm(self) -> bool {
         !self.in_guild()
     }
 
@@ -46,7 +47,7 @@ impl<'a> ContextExt<'a> for Context<'a> {
         self.send_ext(builder).await
     }
 
-    fn in_guild(&self) -> bool {
+    fn in_guild(self) -> bool {
         self.guild_id().is_some()
     }
 
@@ -54,25 +55,32 @@ impl<'a> ContextExt<'a> for Context<'a> {
         self,
         text: impl Into<String>,
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError> {
-        Self::reply(self, text)
+        self.send_ext(CreateReply::default().reply(true).content(text))
             .await
-            .map_err(SendMessageError::from)
     }
 
     async fn send_ext(
         self,
         builder: CreateReply,
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError> {
-        Self::send(self, builder)
-            .await
-            .map_err(SendMessageError::from)
+        backoff::future::retry_notify(
+            backoff::ExponentialBackoff::default(),
+            || async {
+                self.send(builder.clone())
+                    .await
+                    .map_err(SendMessageError::from)
+                    .map_err(SendMessageError::backoff)
+            },
+            |err, _| warn!("{err}, retrying..."),
+        )
+        .await
     }
 
     async fn say_ext(
         self,
         text: impl Into<String>,
     ) -> Result<poise::ReplyHandle<'a>, SendMessageError> {
-        self.say(text).await.map_err(SendMessageError::from)
+        self.send_ext(CreateReply::default().content(text)).await
     }
 }
 
