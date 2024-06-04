@@ -1,4 +1,3 @@
-
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;

@@ -5,7 +5,7 @@ use thiserror::Error;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{event_handler, functions::misc::roll::DiceRollError, PoiseData};
+use crate::{framework::event_handler, functions::misc::roll::DiceRollError, PoiseData};
 
 pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, CommandError>) -> BoxFuture<()> {
     Box::pin(async {

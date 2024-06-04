@@ -1,4 +1,4 @@
-use super::WordleData;
+use crate::WordleData;
 
 use mongodb::Database;
 
@@ -10,7 +10,7 @@ pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
 pub struct PoiseData {
-    pub(crate) config: crate::config::Config,
+    pub(crate) config: super::config::Config,
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
     pub(crate) wordle: WordleData,
@@ -18,7 +18,7 @@ pub struct PoiseData {
 
 impl PoiseData {
     pub(crate) fn new() -> Self {
-        let config: crate::config::Config = ::config::Config::builder()
+        let config: super::config::Config = ::config::Config::builder()
             .add_source(::config::File::with_name("slimebot.toml"))
             .add_source(::config::Environment::with_prefix("SLIMEBOT"))
             .build()
@@ -28,7 +28,7 @@ impl PoiseData {
 
         trace!("config loaded");
 
-        let db = crate::db::database(&config.db);
+        let db = super::db::database(&config.db);
 
         let started = Utc::now();
 
@@ -42,7 +42,7 @@ impl PoiseData {
         }
     }
 
-    pub(crate) const fn config(&self) -> &crate::config::Config {
+    pub(crate) const fn config(&self) -> &super::config::Config {
         &self.config
     }
 

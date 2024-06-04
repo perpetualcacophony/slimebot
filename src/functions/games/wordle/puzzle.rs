@@ -7,7 +7,7 @@ use super::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::data::UtcDateTime;
+use crate::framework::data::UtcDateTime;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Puzzle {

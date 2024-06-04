@@ -3,7 +3,7 @@ use mongodb::{
     Database,
 };
 
-use crate::config::DbConfig;
+use super::config::DbConfig;
 
 pub fn database(config: &DbConfig) -> Database {
     let credential = Credential::builder()
