@@ -121,7 +121,8 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
     Ok(())
 }
 
-// watches all channels for "CL" and reponds with the Look CL copypasta
+#[cfg(feature = "look_cl")]
+/// Watches all channels for "CL" and reponds with the Look CL copypasta.
 #[instrument(skip_all, level = "trace")]
 pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
     if msg

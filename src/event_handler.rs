@@ -106,6 +106,7 @@ async fn event_handler(
             let results: Result<MessageWatchersErrors, ()> = tokio::join!(
                 vore(http, &data.db, msg),
                 l_biden(http, msg),
+                #[cfg(feature = "look_cl")]
                 look_cl(http, msg),
                 watch_haiku(http, msg),
             )
