@@ -21,6 +21,7 @@ mod errors;
 
 mod functions;
 
+#[macro_use]
 mod utils;
 use utils::Context;
 
