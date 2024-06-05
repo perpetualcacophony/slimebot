@@ -1,13 +1,13 @@
-use std::error::Error;
+use std::error::Error as _;
 
 use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
 
-use crate::{framework::event_handler, functions::misc::roll::DiceRollError, PoiseData};
+use crate::{framework::event_handler, PoiseData};
 
-pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, CommandError>) -> BoxFuture<()> {
+pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxFuture<()> {
     Box::pin(async {
         match err {
             FrameworkError::Command { error, ctx, .. } => {
@@ -36,18 +36,20 @@ pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, CommandError>) 
         };
     })
 }
-async fn handle_error(err: CommandError, _ctx: Context<'_, PoiseData, CommandError>) {
+async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
     match err {
-        CommandError::SendMessage(err) => error!("{err}"),
-        CommandError::DiceRoll(err) => warn!("{err}"),
-        other => error!("{}", other.source().expect("all variants have a source")),
+        Error::Command(cmd) => match cmd {
+            CommandError::SendMessage(err) => error!("{err}"),
+            CommandError::DiceRoll(err) => warn!("{err}"),
+            other => error!("{}", other.source().expect("all variants have a source")),
+        },
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 pub enum CommandError {
     #[error("input error: {0}")]
-    SendMessage(#[from] crate::discord::commands::SendMessageError),
+    SendMessage(#[from] SendMessageError),
     #[error("other serenity error: {0}")]
     Serenity(#[from] serenity::Error),
     #[error("other reqwest error: {0}")]
@@ -60,12 +62,57 @@ pub enum CommandError {
     EventHandler(#[from] event_handler::Error),
 }
 
-#[derive(Debug, Error)]
-pub enum LibraryError {
-    #[error("mongodb error")]
-    MongoDb(#[from] mongodb::error::Error),
-    #[error("reqwest error")]
-    Reqwest(#[from] reqwest::Error),
-    #[error("serenity error")]
-    Serenity(#[from] serenity::Error),
+#[derive(Debug, ThisError)]
+pub enum Error {
+    #[error(transparent)]
+    Command(#[from] CommandError),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("message failed to send")]
+pub struct SendMessageError {
+    #[from]
+    pub source: serenity::Error,
+}
+
+impl SendMessageError {
+    pub fn new(source: serenity::Error) -> Self {
+        Self { source }
+    }
+
+    pub fn backoff(self) -> backoff::Error<Self> {
+        use serenity::Error as E;
+
+        match self.source {
+            E::Model(ref model) => {
+                use serenity::ModelError as M;
+
+                match model {
+                    M::InvalidPermissions { .. } | M::MessageTooLong(..) => {
+                        backoff::Error::permanent(self)
+                    }
+                    _ => backoff::Error::transient(self),
+                }
+            }
+            _ => backoff::Error::transient(self),
+        }
+    }
+}
+
+impl From<SendMessageError> for serenity::Error {
+    fn from(val: SendMessageError) -> Self {
+        val.source
+    }
+}
+
+#[derive(Debug, ThisError, PartialEq)]
+pub enum DiceRollError {
+    #[error("")]
+    NoFaces,
+    #[error("")]
+    InvalidExtra(String),
+    #[error("'{0}' is not a valid sign, expected '+' or '-'")]
+    InvalidExtraSign(String),
+    #[error("no match in `{0}`")]
+    NoMatch(String),
 }

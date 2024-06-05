@@ -1,6 +1,6 @@
 use poise::serenity_prelude::{self, CacheHttp, ChannelId, EditChannel, GuildChannel, Message};
 
-use crate::discord::commands::SendMessageError;
+use crate::errors::SendMessageError;
 
 trait RenameGuildChannel {
     async fn rename(

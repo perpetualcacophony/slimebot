@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::commands::SendMessageError;
+use crate::errors::SendMessageError;
 
 mod haiku;
 

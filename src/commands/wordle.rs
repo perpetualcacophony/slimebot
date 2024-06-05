@@ -4,7 +4,7 @@ use tracing::{debug, instrument};
 
 use crate::utils::poise::{CommandResult, Context, ContextExt};
 use crate::{
-    discord::commands::SendMessageError,
+    errors::SendMessageError,
     functions::games::wordle::{
         core::{guess::GuessSlice, AsEmoji},
         game::options::GameOptionsBuilder,

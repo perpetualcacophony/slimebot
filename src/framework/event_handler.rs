@@ -4,12 +4,12 @@ use poise::{
     serenity_prelude::{self as serenity, CacheHttp, FullEvent, Message},
     FrameworkContext,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 use tracing::trace;
 
 use crate::{errors::CommandError, PoiseData};
 
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 pub enum Error {
     #[error(transparent)]
     MessageWatchers(#[from] MessageWatchersErrors),
@@ -88,7 +88,7 @@ impl
 async fn event_handler(
     serenity_ctx: &serenity::Context,
     event: &FullEvent,
-    framework_ctx: FrameworkContext<'_, PoiseData, CommandError>,
+    framework_ctx: FrameworkContext<'_, PoiseData, crate::errors::Error>,
     data: &PoiseData,
 ) -> Result<(), Error> {
     let filter_watcher_msg = move |msg: &Message| {
@@ -138,12 +138,13 @@ async fn event_handler(
 pub fn poise<'a>(
     serenity_ctx: &'a serenity::Context,
     event: &'a FullEvent,
-    framework_ctx: FrameworkContext<'a, PoiseData, CommandError>,
+    framework_ctx: FrameworkContext<'a, PoiseData, crate::errors::Error>,
     data: &'a PoiseData,
-) -> Pin<Box<dyn Future<Output = Result<(), CommandError>> + Send + 'a>> {
+) -> Pin<Box<dyn Future<Output = Result<(), crate::errors::Error>> + Send + 'a>> {
     Box::pin(async move {
         event_handler(serenity_ctx, event, framework_ctx, data)
             .await
             .map_err(CommandError::from)
+            .map_err(crate::errors::Error::from)
     })
 }

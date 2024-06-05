@@ -1,13 +1,15 @@
-use crate::{discord::commands::SendMessageError, PoiseData};
+use crate::{
+    errors::{CommandError, Error, SendMessageError},
+    PoiseData,
+};
 
 use poise::CreateReply;
 use tracing::warn;
 
-pub type Context<'a> = poise::Context<'a, PoiseData, crate::errors::CommandError>;
+pub type Context<'a> = poise::Context<'a, PoiseData, crate::errors::Error>;
 
-pub type Error = crate::errors::CommandError;
 pub type Command = poise::Command<PoiseData, Error>;
-pub type CommandResult = Result<(), Error>;
+pub type CommandResult = Result<(), CommandError>;
 
 pub trait ContextExt<'a>: Into<Context<'a>> + Copy {
     async fn reply_ephemeral(

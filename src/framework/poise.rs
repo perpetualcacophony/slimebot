@@ -2,17 +2,17 @@ use poise::PrefixFrameworkOptions;
 use tracing::trace;
 
 use crate::{
-    discord,
-    errors::{self, CommandError},
+    commands,
+    errors::{self, CommandError, Error},
     utils::serenity::channel::ChannelIdExt,
 };
 
 use super::{data::PoiseData, event_handler};
 
-pub fn build(data: PoiseData) -> poise::Framework<PoiseData, CommandError> {
+pub fn build(data: PoiseData) -> poise::Framework<PoiseData, Error> {
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: discord::commands::list(),
+            commands: commands::list(),
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(data.config.bot.prefix().to_string()),
                 ..Default::default()
@@ -44,7 +44,10 @@ pub fn build(data: PoiseData) -> poise::Framework<PoiseData, CommandError> {
                 trace!("finished setup, accepting commands");
 
                 if let Some(status_channel) = data.config.bot.status_channel() {
-                    status_channel.say_ext(http, "ready!").await?;
+                    status_channel
+                        .say_ext(http, "ready!")
+                        .await
+                        .map_err(CommandError::from)?;
                 }
 
                 Ok(data)

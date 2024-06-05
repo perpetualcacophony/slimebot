@@ -1,8 +1,8 @@
-use core::fmt;
 use rand::{
     distributions::{Distribution, WeightedIndex},
     Rng,
 };
+use std::fmt;
 
 macro_rules! create_tone_macros {
     ($($name:ident $tone:expr)+) => {

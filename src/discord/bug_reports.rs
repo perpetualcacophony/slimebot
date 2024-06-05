@@ -6,7 +6,7 @@ use poise::serenity_prelude::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-use crate::{discord::commands::SendMessageError, errors::CommandError};
+use crate::{errors::CommandError, errors::SendMessageError};
 
 pub async fn bug_reports(
     http: &Http,

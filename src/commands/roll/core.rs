@@ -6,17 +6,7 @@ use regex::Regex;
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
-#[derive(Debug, Error, PartialEq)]
-pub enum DiceRollError {
-    #[error("")]
-    NoFaces,
-    #[error("")]
-    InvalidExtra(String),
-    #[error("'{0}' is not a valid sign, expected '+' or '-'")]
-    InvalidExtraSign(String),
-    #[error("no match in `{0}`")]
-    NoMatch(String),
-}
+use crate::errors::DiceRollError;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Die {
@@ -276,7 +266,7 @@ pub struct RollResult {
 
 impl RollResult {
     #[allow(dead_code)] // used in a macro
-    fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
+    pub fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
         let rolls = rolls.into();
         let total = rolls.iter().copied().sum::<u8>() as isize + extra as isize;
 
@@ -349,7 +339,7 @@ mod tests {
     use tracing::trace;
     use tracing_test::traced_test;
 
-    use crate::functions::misc::{DiceRoll, RollResult};
+    use super::{DiceRoll, RollResult, RolledDie};
 
     use super::Die;
 
@@ -453,7 +443,7 @@ mod tests {
                         let rolls = vec![$($rolls),+].into_iter();
                         let dice = rolls.clone().map(|_| super::Die::new($faces));
                         let rolled_dice = rolls.zip(dice).map(|(roll, die)| die.as_rolled(roll));
-                        let vec: Vec<crate::functions::misc::RolledDie> = rolled_dice.collect();
+                        let vec: Vec<super::RolledDie> = rolled_dice.collect();
 
                         let dice_roll = super::DiceRoll::new(count, $faces, extra).unwrap();
                         let result = super::RollResult::new(dice_roll, vec, extra);

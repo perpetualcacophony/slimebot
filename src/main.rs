@@ -13,6 +13,7 @@ mod functions;
 
 mod utils;
 use utils::Context;
+use utils::Result;
 
 use poise::serenity_prelude::{self as serenity, GatewayIntents};
 
@@ -28,6 +29,8 @@ mod built_info {
     // The file has been placed there by the build script.
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
+
+mod commands;
 
 #[tokio::main]
 async fn main() {
