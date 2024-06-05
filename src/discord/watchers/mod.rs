@@ -19,8 +19,6 @@ macro_rules! include_str_static {
     };
 }
 
-use super::commands::SendMessageError;
-
 mod haiku;
 
 async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
@@ -146,12 +144,9 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
 
         if msg.content.starts_with("Look CL") || msg.content.starts_with("look CL") {
             msg.reply_ext(http, copypasta.trim_start_matches("Look CL, "))
-                .await
-                .map_err(SendMessageError::from)?;
+                .await?;
         } else {
-            msg.reply_ext(http, copypasta)
-                .await
-                .map_err(SendMessageError::from)?;
+            msg.reply_ext(http, copypasta).await?;
         }
     }
 
