@@ -4,15 +4,14 @@ use poise::serenity_prelude::{
     ShardMessenger,
 };
 
-use crate::{
-    functions::games::wordle::{
-        core::{guess::GuessSlice, AsEmoji},
-        Puzzle,
-    },
-    utils::{poise::ContextExt, Context},
-};
+use crate::utils::{poise::ContextExt, Context};
 
 use super::{GameContext, GameData};
+
+use super::super::{
+    core::{guess::GuessSlice, AsEmoji},
+    Puzzle,
+};
 
 pub struct GameMessage {
     msg: Message,

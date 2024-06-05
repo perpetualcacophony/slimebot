@@ -10,8 +10,6 @@ mod discord;
 
 mod errors;
 
-mod functions;
-
 mod utils;
 use utils::Context;
 use utils::Result;

@@ -4,11 +4,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{debug, trace};
 
-use crate::functions::games::wordle::{self, core};
-use wordle::core::guess::LetterState;
+use crate::commands::wordle::core::core;
 
 use core::{
-    guess::{Guess, PartialGuess},
+    guess::{Guess, LetterState, PartialGuess},
     AsLetters,
 };
 

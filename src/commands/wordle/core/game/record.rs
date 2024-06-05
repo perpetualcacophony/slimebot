@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Not};
 use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
 
-use crate::functions::games::wordle::core::{guess::GuessSlice, AsEmoji, GuessesRecord};
+use super::super::core::{guess::GuessSlice, AsEmoji, GuessesRecord};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {

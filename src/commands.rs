@@ -1,7 +1,7 @@
 macro_rules! list {
-    ($($module:ident$(: {$($cmd:ident),+})?),+) => {
+    ($($pub:vis $module:ident$(: {$($cmd:ident),+})?),+) => {
         $(
-            mod $module;
+            $pub mod $module;
             use $module::$module;
 
             $(
@@ -33,7 +33,7 @@ list! {
     roll: {d20},
     flip,
     version,
-    wordle,
+    pub wordle,
     help,
     eightball
 }

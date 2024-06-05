@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use poise::serenity_prelude::{
-    self,
-    futures::StreamExt,
-    CacheHttp, ChannelId, ComponentInteraction,
-    CreateInteractionResponseMessage, Http, Message, MessageId, ReactionType,
-    ShardMessenger, UserId,
+    self, futures::StreamExt, CacheHttp, ChannelId, ComponentInteraction,
+    CreateInteractionResponseMessage, Http, Message, MessageId, ReactionType, ShardMessenger,
+    UserId,
 };
 
 use crate::{
-    functions::games::wordle::core::AsEmoji,
     utils::{
         poise::ContextExt,
         serenity::{
@@ -23,7 +20,9 @@ use crate::{
 use self::{message::GameMessage, options::GameOptions};
 
 use super::{
-    core::{guess::GuessSlice, Guess, Guesses, PartialGuess, PartialGuessError, ToPartialGuess},
+    core::{
+        guess::GuessSlice, AsEmoji, Guess, Guesses, PartialGuess, PartialGuessError, ToPartialGuess,
+    },
     puzzle::Puzzle,
     DailyWordles, WordsList,
 };

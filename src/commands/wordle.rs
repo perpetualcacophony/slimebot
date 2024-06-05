@@ -3,16 +3,15 @@ use std::ops::Not;
 use tracing::{debug, instrument};
 
 use crate::utils::poise::{CommandResult, Context, ContextExt};
-use crate::{
-    errors::SendMessageError,
-    functions::games::wordle::{
-        core::{guess::GuessSlice, AsEmoji},
-        game::options::GameOptionsBuilder,
-    },
-    Result,
-};
+use crate::{errors::SendMessageError, Result};
 
-use crate::functions::games::wordle::{self, game::options::GameStyle};
+pub mod core;
+use core::{
+    self as wordle,
+    core::{guess::GuessSlice, AsEmoji},
+    game::options::GameOptionsBuilder,
+    game::options::GameStyle,
+};
 
 /// play wordle right from discord!
 #[instrument(skip_all)]

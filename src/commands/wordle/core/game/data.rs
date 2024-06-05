@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
+use super::{super::core::Guesses, Puzzle};
 use poise::serenity_prelude::{ChannelId, MessageId};
-
-use crate::functions::games::wordle::{core::Guesses, Puzzle};
 
 #[derive(Clone, Debug)]
 pub struct GameData {
