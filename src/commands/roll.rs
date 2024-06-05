@@ -1,6 +1,10 @@
 use tracing::instrument;
 
-use crate::utils::{poise::CommandResult, Context};
+use crate::utils::{
+    poise::{CommandResult, ContextExt},
+    Context,
+};
+use crate::Result;
 
 mod core;
 use core::DiceRoll;
@@ -11,7 +15,12 @@ use core::DiceRoll;
     prefix_command,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
+pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> Result<()> {
+    _roll(ctx, text).await?;
+    Ok(())
+}
+
+async fn _roll(ctx: Context<'_>, text: String) -> CommandResult {
     let roll = DiceRoll::parse(&text)?;
     let result = roll.result();
 
@@ -27,13 +36,18 @@ pub async fn roll(ctx: Context<'_>, #[rest] text: String) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn d20(ctx: Context<'_>) -> CommandResult {
+pub async fn d20(ctx: Context<'_>) -> Result<()> {
+    _d20(ctx).await?;
+    Ok(())
+}
+
+async fn _d20(ctx: Context<'_>) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
     let roll = DiceRoll::new(1, 20, 0).expect("hard-coded");
     let result = roll.result();
 
-    ctx.reply(format!("**{result}**")).await?;
+    ctx.reply_ext(format!("**{result}**")).await?;
 
     Ok(())
 }

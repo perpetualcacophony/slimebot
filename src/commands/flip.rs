@@ -13,7 +13,12 @@ use crate::utils::{
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) -> CommandResult {
+pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) -> crate::Result<()> {
+    _flip(ctx, coins, verbose).await?;
+    Ok(())
+}
+
+async fn _flip(ctx: Context<'_>, coins: Option<u8>, verbose: bool) -> CommandResult {
     let _typing = ctx.defer_or_broadcast().await?;
 
     let coins = coins.map(|int| if int == 0 { 1 } else { int }).unwrap_or(1);

@@ -8,7 +8,12 @@ use crate::utils::{
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
-pub async fn banban(ctx: Context<'_>) -> CommandResult {
+pub async fn banban(ctx: Context<'_>) -> crate::Result<()> {
+    _banban(ctx).await?;
+    Ok(())
+}
+
+async fn _banban(ctx: Context<'_>) -> CommandResult {
     if ctx.author().id == 497014954935713802 {
         super::ban::core::joke_ban(
             ctx,

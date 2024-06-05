@@ -9,6 +9,7 @@ use crate::{
         core::{guess::GuessSlice, AsEmoji},
         game::options::GameOptionsBuilder,
     },
+    Result,
 };
 
 use crate::functions::games::wordle::{self, game::options::GameStyle};
@@ -22,7 +23,12 @@ use crate::functions::games::wordle::{self, game::options::GameStyle};
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
     subcommands("daily", "random", "display", "role", "letters", "unused")
 )]
-pub async fn wordle(ctx: Context<'_>) -> CommandResult {
+pub async fn wordle(ctx: Context<'_>) -> Result<()> {
+    _wordle(ctx).await?;
+    Ok(())
+}
+
+async fn _wordle(ctx: Context<'_>) -> CommandResult {
     //let words = ctx.data().wordle.words();
     //let dailies = ctx.data().wordle.wordles();
 
@@ -47,7 +53,12 @@ pub async fn wordle(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
+async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> Result<()> {
+    _daily(ctx, style).await?;
+    Ok(())
+}
+
+async fn _daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
     let wordles = wordle.wordles();
 
@@ -133,34 +144,38 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
-    let wordle = ctx.data().wordle();
+async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> Result<()> {
+    let result: CommandResult = try {
+        let wordle = ctx.data().wordle();
 
-    debug!(data = ?wordle.game_data());
+        debug!(data = ?wordle.game_data());
 
-    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
-        ctx.reply_ephemeral(format!(
-            "there's already a game being played in this channel! {}",
-            data.message_id.link(ctx.channel_id(), ctx.guild_id()),
-        ))
-        .await?;
+        if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
+            ctx.reply_ephemeral(format!(
+                "there's already a game being played in this channel! {}",
+                data.message_id.link(ctx.channel_id(), ctx.guild_id()),
+            ))
+            .await?;
 
-        return Ok(());
-    } else {
-        let puzzle = wordle::Puzzle::random(wordle.words());
+            return Ok(());
+        } else {
+            let puzzle = wordle::Puzzle::random(wordle.words());
 
-        let mut game = wordle::Game::new(
-            ctx,
-            puzzle,
-            GameOptionsBuilder::default().style(style).build(),
-        )
-        .await?;
+            let mut game = wordle::Game::new(
+                ctx,
+                puzzle,
+                GameOptionsBuilder::default().style(style).build(),
+            )
+            .await?;
 
-        game.setup().await?;
+            game.setup().await?;
 
-        // play game
-        game.run().await?;
-    }
+            // play game
+            game.run().await?;
+        }
+    };
+
+    result?;
 
     Ok(())
 }
@@ -177,36 +192,42 @@ async fn display(
     ctx: Context<'_>,
     #[description = "the wordle's number"] number: u32,
     #[description = "the user to show results for (defaults to you)"] user: Option<User>,
-) -> CommandResult {
-    let _typing = ctx.defer_or_broadcast().await?;
+) -> Result<()> {
+    let result: CommandResult = try {
+        let _typing = ctx.defer_or_broadcast().await?;
 
-    let wordles = ctx.data().wordle.wordles();
+        let wordles = ctx.data().wordle.wordles();
 
-    if wordles.wordle_exists(number).await?.not() {
-        ctx.reply_ephemeral("that wordle doesn't exist!").await?;
-        return Ok(());
-    }
-
-    let user = user.as_ref().unwrap_or_else(|| ctx.author());
-
-    if let Some(game) = wordles.find_game(user.id, number).await? {
-        if game.num_guesses == 0 {
-            ctx.reply_ephemeral("that user has started the wordle but hasn't guessed anything!")
-                .await?;
+        if wordles.wordle_exists(number).await?.not() {
+            ctx.reply_ephemeral("that wordle doesn't exist!").await?;
+            return Ok(());
         }
 
-        let text = format!(
-            "wordle {} (`{}`):\n>>> {}",
-            number,
-            user.name,
-            game.as_emoji()
-        );
+        let user = user.as_ref().unwrap_or_else(|| ctx.author());
 
-        ctx.reply_ext(text).await?;
-    } else {
-        ctx.reply_ephemeral("that user hasn't started that wordle!")
-            .await?;
-    }
+        if let Some(game) = wordles.find_game(user.id, number).await? {
+            if game.num_guesses == 0 {
+                ctx.reply_ephemeral(
+                    "that user has started the wordle but hasn't guessed anything!",
+                )
+                .await?;
+            }
+
+            let text = format!(
+                "wordle {} (`{}`):\n>>> {}",
+                number,
+                user.name,
+                game.as_emoji()
+            );
+
+            ctx.reply_ext(text).await?;
+        } else {
+            ctx.reply_ephemeral("that user hasn't started that wordle!")
+                .await?;
+        }
+    };
+
+    result?;
 
     Ok(())
 }
@@ -220,22 +241,26 @@ async fn display(
     guild_only,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL | MANAGE_ROLES"
 )]
-async fn role(ctx: Context<'_>) -> CommandResult {
-    let config = ctx.data().config();
+async fn role(ctx: Context<'_>) -> Result<()> {
+    let result: CommandResult = try {
+        let config = ctx.data().config();
 
-    if let Some(role_id) = &config.wordle.role_id {
-        let member = ctx.author_member().await.expect("command is guild-only");
-        if member.roles.contains(role_id) {
-            member.remove_role(ctx, role_id).await?;
-            ctx.reply_ephemeral("Removed the wordle role!").await?;
+        if let Some(role_id) = &config.wordle.role_id {
+            let member = ctx.author_member().await.expect("command is guild-only");
+            if member.roles.contains(role_id) {
+                member.remove_role(ctx, role_id).await?;
+                ctx.reply_ephemeral("Removed the wordle role!").await?;
+            } else {
+                member.add_role(ctx, role_id).await?;
+                ctx.reply_ephemeral("Gave you the wordle role!").await?;
+            }
         } else {
-            member.add_role(ctx, role_id).await?;
-            ctx.reply_ephemeral("Gave you the wordle role!").await?;
+            ctx.reply_ephemeral("Error: there's no wordle role configured!")
+                .await?;
         }
-    } else {
-        ctx.reply_ephemeral("Error: there's no wordle role configured!")
-            .await?;
-    }
+    };
+
+    result?;
 
     Ok(())
 }
@@ -247,23 +272,27 @@ async fn role(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn letters(ctx: Context<'_>) -> CommandResult {
-    let wordle = ctx.data().wordle();
+async fn letters(ctx: Context<'_>) -> Result<()> {
+    let result: CommandResult = try {
+        let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
-        let guesses = &data.guesses;
+        if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
+            let guesses = &data.guesses;
 
-        let response = format!(
-            "guessed letters:\n{guessed}\n\nunused letters:\n{unused}",
-            guessed = guesses.letter_states().as_emoji(),
-            unused = guesses.unused_letters().as_emoji()
-        );
+            let response = format!(
+                "guessed letters:\n{guessed}\n\nunused letters:\n{unused}",
+                guessed = guesses.letter_states().as_emoji(),
+                unused = guesses.unused_letters().as_emoji()
+            );
 
-        ctx.reply(response).await?;
-    } else {
-        ctx.reply_ephemeral("there isn't a game active in this channel!")
-            .await?;
-    }
+            ctx.reply(response).await?;
+        } else {
+            ctx.reply_ephemeral("there isn't a game active in this channel!")
+                .await?;
+        }
+    };
+
+    result?;
 
     Ok(())
 }
@@ -275,22 +304,26 @@ async fn letters(ctx: Context<'_>) -> CommandResult {
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-async fn unused(ctx: Context<'_>) -> CommandResult {
-    let wordle = ctx.data().wordle();
+async fn unused(ctx: Context<'_>) -> Result<()> {
+    let result: CommandResult = try {
+        let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
-        let guesses = &data.guesses;
+        if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
+            let guesses = &data.guesses;
 
-        let response = format!(
-            "unused letters:\n{unused}",
-            unused = guesses.unused_letters().as_emoji()
-        );
+            let response = format!(
+                "unused letters:\n{unused}",
+                unused = guesses.unused_letters().as_emoji()
+            );
 
-        ctx.reply(response).await?;
-    } else {
-        ctx.reply_ephemeral("there isn't a game active in this channel!")
-            .await?;
-    }
+            ctx.reply(response).await?;
+        } else {
+            ctx.reply_ephemeral("there isn't a game active in this channel!")
+                .await?;
+        }
+    };
+
+    result?;
 
     Ok(())
 }

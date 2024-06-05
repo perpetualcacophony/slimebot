@@ -16,7 +16,12 @@ use crate::{
     prefix_command,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn fox(ctx: Context<'_>) -> CommandResult {
+pub async fn fox(ctx: Context<'_>) -> crate::Result<()> {
+    _fox(ctx).await?;
+    Ok(())
+}
+
+async fn _fox(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
     #[derive(Deserialize)]

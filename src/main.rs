@@ -3,6 +3,7 @@
 #![feature(macro_metavar_expr)]
 #![feature(let_chains)]
 #![feature(associated_type_defaults)]
+#![feature(try_blocks)]
 
 /// Functionality called from Discord.
 mod discord;

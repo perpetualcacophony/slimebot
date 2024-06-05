@@ -7,11 +7,17 @@ use crate::{
         poise::{CommandResult, ContextExt},
         Context,
     },
+    Result,
 };
 
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
-pub async fn uptime(ctx: Context<'_>) -> CommandResult {
+pub async fn uptime(ctx: Context<'_>) -> Result<()> {
+    _uptime(ctx).await?;
+    Ok(())
+}
+
+async fn _uptime(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
     let started = ctx.data().started;

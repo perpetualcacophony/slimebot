@@ -28,13 +28,19 @@ pub async fn pfp(
     #[flag]
     #[description = "show the user's global profile picture, ignoring if they have a server one set"]
     global: bool,
-) -> CommandResult {
+) -> crate::Result<()> {
     ctx.log_command().await;
 
     if ctx.defer().await.is_err() {
         error!("failed to defer - lag will cause errors!");
     }
 
+    _pfp(ctx, user, global).await?;
+
+    Ok(())
+}
+
+async fn _pfp(ctx: Context<'_>, user: Option<User>, global: bool) -> CommandResult {
     if ctx.guild().is_some() {
         let guild = ctx
             .guild()

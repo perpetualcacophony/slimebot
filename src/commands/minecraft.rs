@@ -50,7 +50,12 @@ struct ApiResponsePlayer {
     prefix_command,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> CommandResult {
+pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Result<()> {
+    _minecraft(ctx, server).await?;
+    Ok(())
+}
+
+async fn _minecraft(ctx: Context<'_>, server: Option<String>) -> CommandResult {
     ctx.log_command().await;
 
     let address = server.unwrap_or("162.218.211.126".to_owned());

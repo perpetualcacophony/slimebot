@@ -16,7 +16,12 @@ use crate::{
     prefix_command,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn borzoi(ctx: Context<'_>) -> CommandResult {
+pub async fn borzoi(ctx: Context<'_>) -> crate::Result<()> {
+    _borzoi(ctx).await?;
+    Ok(())
+}
+
+async fn _borzoi(ctx: Context<'_>) -> CommandResult {
     ctx.log_command().await;
 
     #[derive(Deserialize)]

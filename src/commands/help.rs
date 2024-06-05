@@ -16,7 +16,12 @@ use crate::{
 pub async fn help(
     ctx: Context<'_>,
     #[description = "specific command to display help for"] command: Option<String>,
-) -> CommandResult {
+) -> crate::Result<()> {
+    _help(ctx, command).await?;
+    Ok(())
+}
+
+async fn _help(ctx: Context<'_>, command: Option<String>) -> CommandResult {
     poise::builtins::help(
         ctx,
         command.as_deref(),

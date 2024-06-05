@@ -15,7 +15,12 @@ use crate::{
     prefix_command,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> CommandResult {
+pub async fn cat(ctx: Context<'_>, #[flag] gif: bool) -> crate::Result<()> {
+    _cat(ctx, gif).await?;
+    Ok(())
+}
+
+async fn _cat(ctx: Context<'_>, gif: bool) -> CommandResult {
     ctx.log_command().await;
 
     let (url, filename) = if gif {
