@@ -1,5 +1,4 @@
 use poise::serenity_prelude::{Mentionable, User};
-use poise::CreateReply;
 use std::ops::Not;
 use tracing::{debug, instrument};
 
@@ -71,7 +70,7 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let mut playable = wordles.playable_for(ctx.author().id).await?;
 
     if let Some(daily) = playable.next() {
-        if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+        if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
             ctx.reply_ephemeral(format!(
                 "there's already a game being played in this channel! {}",
                 data.message_id.link(ctx.channel_id(), ctx.guild_id()),
@@ -92,7 +91,7 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
             game.run().await?;
 
             if let Some(completed) = wordle
-                .wordles
+                .wordles()
                 .find_game(ctx.author().id, daily.puzzle.number)
                 .await?
                 && let Some(channel) = &ctx.data().config().wordle.channel_id
@@ -137,9 +136,9 @@ async fn daily(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
 async fn random(ctx: Context<'_>, style: Option<GameStyle>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    debug!(?wordle.game_data);
+    debug!(data = ?wordle.game_data());
 
-    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
         ctx.reply_ephemeral(format!(
             "there's already a game being played in this channel! {}",
             data.message_id.link(ctx.channel_id(), ctx.guild_id()),
@@ -184,13 +183,7 @@ async fn display(
     let wordles = ctx.data().wordle.wordles();
 
     if wordles.wordle_exists(number).await?.not() {
-        ctx.send(
-            CreateReply::default()
-                .content("that wordle doesn't exist!")
-                .reply(true)
-                .ephemeral(true),
-        )
-        .await?;
+        ctx.reply_ephemeral("that wordle doesn't exist!").await?;
         return Ok(());
     }
 
@@ -198,13 +191,8 @@ async fn display(
 
     if let Some(game) = wordles.find_game(user.id, number).await? {
         if game.num_guesses == 0 {
-            ctx.send(
-                CreateReply::default()
-                    .content("that user has started the wordle but hasn't guessed anything!")
-                    .reply(true)
-                    .ephemeral(true),
-            )
-            .await?;
+            ctx.reply_ephemeral("that user has started the wordle but hasn't guessed anything!")
+                .await?;
         }
 
         let text = format!(
@@ -214,15 +202,10 @@ async fn display(
             game.as_emoji()
         );
 
-        ctx.reply(text).await?;
+        ctx.reply_ext(text).await?;
     } else {
-        ctx.send(
-            CreateReply::default()
-                .content("that user hasn't started that wordle!")
-                .reply(true)
-                .ephemeral(true),
-        )
-        .await?;
+        ctx.reply_ephemeral("that user hasn't started that wordle!")
+            .await?;
     }
 
     Ok(())
@@ -267,7 +250,7 @@ async fn role(ctx: Context<'_>) -> CommandResult {
 async fn letters(ctx: Context<'_>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
         let guesses = &data.guesses;
 
         let response = format!(
@@ -278,7 +261,7 @@ async fn letters(ctx: Context<'_>) -> CommandResult {
 
         ctx.reply(response).await?;
     } else {
-        ctx.reply("there isn't a game active in this channel!")
+        ctx.reply_ephemeral("there isn't a game active in this channel!")
             .await?;
     }
 
@@ -295,7 +278,7 @@ async fn letters(ctx: Context<'_>) -> CommandResult {
 async fn unused(ctx: Context<'_>) -> CommandResult {
     let wordle = ctx.data().wordle();
 
-    if let Some(data) = wordle.game_data.get(ctx.channel_id()).await {
+    if let Some(data) = wordle.game_data().get(ctx.channel_id()).await {
         let guesses = &data.guesses;
 
         let response = format!(
@@ -305,7 +288,7 @@ async fn unused(ctx: Context<'_>) -> CommandResult {
 
         ctx.reply(response).await?;
     } else {
-        ctx.reply("there isn't a game active in this channel!")
+        ctx.reply_ephemeral("there isn't a game active in this channel!")
             .await?;
     }
 

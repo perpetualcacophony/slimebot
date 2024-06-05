@@ -6,8 +6,6 @@
 
 /// Functionality called from Discord.
 mod discord;
-#[allow(clippy::wildcard_imports)]
-use mongodb::Database;
 
 mod errors;
 
@@ -16,53 +14,13 @@ mod functions;
 mod utils;
 use utils::Context;
 
-use poise::{
-    serenity_prelude::{self as serenity, GatewayIntents},
-    PrefixFrameworkOptions,
-};
+use poise::serenity_prelude::{self as serenity, GatewayIntents};
 
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
 mod framework;
 use framework::data::PoiseData;
-
-use functions::games::wordle::{game::GamesCache, DailyWordles, WordsList};
-
-use crate::utils::serenity::channel::ChannelIdExt;
-
-#[derive(Debug, Clone)]
-struct WordleData {
-    words: WordsList,
-    wordles: DailyWordles,
-    game_data: GamesCache,
-}
-
-impl WordleData {
-    fn new(db: &Database) -> Self {
-        let words = WordsList::load();
-        let wordles = DailyWordles::new(db);
-        let game_data = GamesCache::new();
-
-        Self {
-            words,
-            wordles,
-            game_data,
-        }
-    }
-
-    const fn words(&self) -> &WordsList {
-        &self.words
-    }
-
-    const fn wordles(&self) -> &DailyWordles {
-        &self.wordles
-    }
-
-    const fn game_data(&self) -> &GamesCache {
-        &self.game_data
-    }
-}
 
 type DiscordToken = String;
 

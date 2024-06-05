@@ -20,6 +20,9 @@ pub use daily::DailyWordles;
 pub mod game;
 pub use game::{Game, GameRecord};
 
+mod data;
+pub use data::WordleData;
+
 /*
 fn create_menu(daily_available: bool) -> CreateReply {
     let menu_text = if daily_available {

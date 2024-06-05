@@ -1,4 +1,4 @@
-use crate::WordleData;
+use crate::functions::games::wordle::WordleData;
 
 use mongodb::Database;
 
