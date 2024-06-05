@@ -6,6 +6,7 @@ macro_rules! list {
 
             $(
                 $(
+                    #[allow(unused_imports)]
                     use $module::$cmd;
                 )+
             )?

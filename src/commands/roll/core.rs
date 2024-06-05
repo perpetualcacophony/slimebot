@@ -3,7 +3,6 @@ use std::{fmt::Display, iter::Sum, ops::Neg};
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use regex::Regex;
 
-use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
 use crate::errors::DiceRollError;
