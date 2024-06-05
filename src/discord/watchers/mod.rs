@@ -13,7 +13,13 @@ use crate::{
     },
 };
 
-use crate::errors::SendMessageError;
+macro_rules! include_str_static {
+    ($path:literal) => {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/", $path))
+    };
+}
+
+use super::commands::SendMessageError;
 
 mod haiku;
 
@@ -108,7 +114,7 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
         );
 
         msg.channel_id
-            .say_ext(http, "https://files.catbox.moe/v7itt0.webp")
+            .say_ext(http, include_str_static!("biden_L_url.txt"))
             .await?;
     }
 
@@ -136,18 +142,16 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
             msg.content
         );
 
+        let copypasta = include_str_static!("look_cl_copypasta.txt");
+
         if msg.content.starts_with("Look CL") || msg.content.starts_with("look CL") {
-            msg.reply_ext(http,
-                "I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            msg.reply_ext(http, copypasta.trim_start_matches("Look CL, "))
+                .await
+                .map_err(SendMessageError::from)?;
         } else {
-            msg.reply_ext(http,
-                "Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct."
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            msg.reply_ext(http, copypasta)
+                .await
+                .map_err(SendMessageError::from)?;
         }
     }
 
