@@ -4,12 +4,10 @@ use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
 };
-use struct_field_names_as_array::FieldNamesAsArray;
 use thiserror::Error as ThisError;
 use tokio::sync::mpsc;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
-use valuable::{Valuable, Value};
 
 use crate::{
     framework::event_handler::{self, HandlerError},
