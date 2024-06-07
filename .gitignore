@@ -15,3 +15,5 @@
 !example-compose.yaml
 
 /wordle/
+
+/macros/Cargo.lock
