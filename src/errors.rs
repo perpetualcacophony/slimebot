@@ -1,11 +1,20 @@
-use std::error::Error as _;
+use std::{error::Error as _, fmt::Display};
 
-use poise::{serenity_prelude as serenity, BoxFuture, Context, FrameworkError};
+use poise::{
+    serenity_prelude::{self as serenity, Permissions},
+    BoxFuture, Context, FrameworkError,
+};
+use struct_field_names_as_array::FieldNamesAsArray;
 use thiserror::Error as ThisError;
+use tokio::sync::mpsc;
 use tracing::{error, error_span, warn, Instrument};
 use tracing_unwrap::ResultExt;
+use valuable::{Valuable, Value};
 
-use crate::{framework::event_handler, PoiseData};
+use crate::{
+    framework::event_handler::{self, HandlerError},
+    PoiseData,
+};
 
 pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxFuture<()> {
     Box::pin(async {
@@ -43,6 +52,9 @@ async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
             CommandError::DiceRoll(err) => warn!("{err}"),
             other => error!("{}", other.source().expect("all variants have a source")),
         },
+        Error::Handler(handler) => match handler {
+            _ => error!("{handler}"),
+        },
     }
 }
 
@@ -59,41 +71,78 @@ pub enum CommandError {
     #[error("error from mongodb: {0}")]
     MongoDb(#[from] mongodb::error::Error),
     #[error("error from event handler: {0}")]
-    EventHandler(#[from] event_handler::Error),
+    EventHandler(#[from] event_handler::HandlerError),
 }
 
 #[derive(Debug, ThisError)]
 pub enum Error {
     #[error(transparent)]
     Command(#[from] CommandError),
+    #[error(transparent)]
+    Handler(#[from] HandlerError),
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("message failed to send")]
-pub struct SendMessageError {
-    #[from]
-    pub source: serenity::Error,
+pub enum SendMessageError {
+    #[error(transparent)]
+    Permissions(#[from] MissingPermissionsError),
+    #[error(transparent)]
+    MessageTooLong(#[from] MessageTooLongError),
+    #[error("boop")]
+    Other(serenity::Error),
+}
+
+impl From<serenity::Error> for SendMessageError {
+    fn from(value: serenity::Error) -> Self {
+        match value {
+            serenity::Error::Model(ref model) => match model {
+                serenity::ModelError::InvalidPermissions { required, present } => {
+                    Self::Permissions(MissingPermissionsError {
+                        required: *required,
+                        present: *present,
+                    })
+                }
+                serenity::ModelError::MessageTooLong(len) => {
+                    Self::MessageTooLong(MessageTooLongError { length: *len })
+                }
+                _ => Self::Other(value),
+            },
+            _ => Self::Other(value),
+        }
+    }
+}
+
+#[derive(Debug, ThisError)]
+#[error("missing permissions: {}", required.difference(*present))]
+struct MissingPermissionsError {
+    required: Permissions,
+    present: Permissions,
+}
+
+#[derive(Debug, ThisError)]
+#[error("message is too long")]
+struct MessageTooLongError {
+    length: usize,
+}
+
+macro_rules! error_fields {
+    ($level:expr; $var:expr => $struct:ty[$($field:ident$($print:tt)?)*]) => {
+        tracing::event!(
+            $level,
+
+            $(
+                $field = $($print)?$var.$field,
+            )*
+
+            "{}", $var,
+        )
+    };
 }
 
 impl SendMessageError {
-    pub fn new(source: serenity::Error) -> Self {
-        Self { source }
-    }
-
     pub fn backoff(self) -> backoff::Error<Self> {
-        use serenity::Error as E;
-
-        match self.source {
-            E::Model(ref model) => {
-                use serenity::ModelError as M;
-
-                match model {
-                    M::InvalidPermissions { .. } | M::MessageTooLong(..) => {
-                        backoff::Error::permanent(self)
-                    }
-                    _ => backoff::Error::transient(self),
-                }
-            }
+        match self {
+            Self::MessageTooLong(_) | Self::Permissions(_) => backoff::Error::permanent(self),
             _ => backoff::Error::transient(self),
         }
     }
@@ -101,7 +150,18 @@ impl SendMessageError {
 
 impl From<SendMessageError> for serenity::Error {
     fn from(val: SendMessageError) -> Self {
-        val.source
+        match val {
+            SendMessageError::MessageTooLong(err) => {
+                Self::Model(serenity::ModelError::MessageTooLong(err.length))
+            }
+            SendMessageError::Permissions(err) => {
+                Self::Model(serenity::ModelError::InvalidPermissions {
+                    required: err.required,
+                    present: err.present,
+                })
+            }
+            SendMessageError::Other(source) => source,
+        }
     }
 }
 
@@ -115,4 +175,80 @@ pub enum DiceRollError {
     InvalidExtraSign(String),
     #[error("no match in `{0}`")]
     NoMatch(String),
+}
+
+pub trait TracingError: std::error::Error {
+    fn level(&self) -> tracing::Level {
+        tracing::Level::ERROR
+    }
+
+    fn event(&self) {
+        match self.__level() {
+            tracing::Level::ERROR => error!("{}", self.to_string()),
+            tracing::Level::WARN => warn!("{}", self.to_string()),
+            _ => unreachable!(),
+        }
+    }
+
+    fn __level(&self) -> tracing::Level {
+        let level = self.level();
+        assert!(level <= tracing::Level::WARN);
+        level
+    }
+}
+
+impl TracingError for SendMessageError {
+    fn event(&self) {
+        match self {
+            Self::MessageTooLong(err) => {
+                error_fields!(tracing::Level::ERROR; err => MessageTooLongError[length]);
+            }
+            Self::Permissions(err) => {
+                error_fields!(tracing::Level::ERROR; err => MissingPermissionsError[required% present%])
+            }
+            other => error!("{}", other),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ErrorSender {
+    tx: mpsc::Sender<FrameworkError<'static, PoiseData, Error>>,
+}
+
+impl ErrorSender {
+    fn new(tx: mpsc::Sender<FrameworkError<'static, PoiseData, Error>>) -> Self {
+        Self { tx }
+    }
+
+    pub async fn send(&self, err: FrameworkError<'static, PoiseData, Error>) {
+        self.tx.send(err).await;
+    }
+}
+
+pub struct ErrorHandler {
+    rx: mpsc::Receiver<FrameworkError<'static, PoiseData, Error>>,
+}
+
+impl ErrorHandler {
+    fn new(rx: mpsc::Receiver<FrameworkError<'static, PoiseData, Error>>) -> Self {
+        Self { rx }
+    }
+
+    pub fn channel() -> (ErrorSender, ErrorHandler) {
+        let (tx, rx) = mpsc::channel(10);
+        (ErrorSender::new(tx), ErrorHandler::new(rx))
+    }
+
+    async fn recv(&mut self) -> Option<FrameworkError<'static, PoiseData, Error>> {
+        self.rx.recv().await
+    }
+
+    pub fn spawn(mut self) {
+        tokio::spawn(async move {
+            while let Some(err) = self.recv().await {
+                todo!("handle the error")
+            }
+        });
+    }
 }

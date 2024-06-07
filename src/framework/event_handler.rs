@@ -5,23 +5,24 @@ use poise::{
     FrameworkContext,
 };
 use thiserror::Error as ThisError;
+use tokio::task::JoinSet;
 use tracing::trace;
 
-use crate::{errors::CommandError, PoiseData};
+use crate::{
+    errors::{CommandError, SendMessageError},
+    PoiseData,
+};
 
 #[derive(Debug, ThisError)]
-pub enum Error {
+pub enum HandlerError {
     #[error(transparent)]
     MessageWatchers(#[from] MessageWatchersErrors),
     #[error(transparent)]
-    CommandError(Box<CommandError>),
-}
-
-// this error needs to be boxed, so doing it in the From impl for convenience
-impl From<CommandError> for Error {
-    fn from(value: CommandError) -> Self {
-        Self::CommandError(Box::new(value))
-    }
+    SendMessage(#[from] SendMessageError),
+    #[error(transparent)]
+    MongoDb(#[from] mongodb::error::Error),
+    #[error(transparent)]
+    Serenity(#[from] serenity::Error),
 }
 
 #[derive(Debug)]
@@ -90,7 +91,7 @@ async fn event_handler(
     event: &FullEvent,
     framework_ctx: FrameworkContext<'_, PoiseData, crate::errors::Error>,
     data: &PoiseData,
-) -> Result<(), Error> {
+) -> Result<(), HandlerError> {
     let filter_watcher_msg = move |msg: &Message| {
         !msg.is_own(&serenity_ctx.cache)
             && !msg.is_private()
@@ -98,26 +99,20 @@ async fn event_handler(
     };
 
     match event {
-        FullEvent::Message { new_message: msg } if filter_watcher_msg(msg) => {
+        FullEvent::Message {
+            new_message: ref msg,
+        } if filter_watcher_msg(msg) => {
             use crate::discord::watchers::*;
 
             let http = serenity_ctx.http();
 
-            let results: Result<MessageWatchersErrors, ()> = tokio::join!(
+            tokio::try_join!(
                 vore(http, &data.db, msg),
                 l_biden(http, msg),
                 look_cl(http, msg),
                 watch_haiku(http, msg),
             )
-            .try_into();
-
-            // have to flip these because the TryFrom impl is backwards
-            let results = match results {
-                Ok(err) => Err(err),
-                Err(_) => Ok(()),
-            };
-
-            results?;
+            .map(|_| ())?;
         }
         FullEvent::ReactionAdd {
             add_reaction: reaction,
@@ -144,7 +139,6 @@ pub fn poise<'a>(
     Box::pin(async move {
         event_handler(serenity_ctx, event, framework_ctx, data)
             .await
-            .map_err(CommandError::from)
             .map_err(crate::errors::Error::from)
     })
 }

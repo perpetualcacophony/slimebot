@@ -6,13 +6,16 @@ use poise::serenity_prelude::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-use crate::{errors::CommandError, errors::SendMessageError};
+use crate::{
+    errors::{CommandError, SendMessageError},
+    framework::event_handler::HandlerError,
+};
 
 pub async fn bug_reports(
     http: &Http,
     add_reaction: Reaction,
     channel: &ChannelId,
-) -> Result<(), CommandError> {
+) -> Result<(), HandlerError> {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
     let ladybugs = add_reaction

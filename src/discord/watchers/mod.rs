@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, GuildId, Http, Message, UserId};
+use poise::serenity_prelude::{Cache, CacheHttp, GuildId, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
 use crate::{
     errors::CommandError,
+    framework::event_handler::HandlerError,
     utils::{
         format_duration::FormatDuration,
         serenity::channel::{ChannelIdExt, MessageExt},
@@ -20,6 +21,68 @@ macro_rules! include_str_static {
 }
 
 mod haiku;
+
+struct FilterSet<Event> {
+    filters: Vec<Box<dyn Fn(&Event) -> bool>>,
+}
+
+impl<Event> FilterSet<Event> {
+    /// Same as [Self::default].
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn with(mut self, filter: impl Fn(&Event) -> bool + 'static) -> Self {
+        self.filters.push(Box::new(filter));
+        self
+    }
+
+    fn filters(&self) -> &[impl Fn(&Event) -> bool] {
+        &self.filters
+    }
+
+    fn test_event<'event>(&self, event: &'event Event) -> Option<&'event Event> {
+        for filter in self.filters() {
+            if !filter(event) {
+                return None;
+            }
+        }
+
+        Some(event)
+    }
+}
+
+impl<T> Default for FilterSet<T> {
+    fn default() -> Self {
+        Self {
+            filters: Vec::new(),
+        }
+    }
+}
+
+type MessageFilter = FilterSet<Message>;
+
+impl MessageFilter {
+    fn in_guild(self, guild_id: Option<GuildId>) -> Self {
+        self.with(move |msg| msg.guild_id == guild_id)
+    }
+
+    fn not_own(self, cache: &'static Cache) -> Self {
+        self.with(move |msg| !msg.is_own(cache))
+    }
+
+    fn test<'msg>(&self, msg: &'msg Message) -> Option<&'msg Message> {
+        self.test_event(msg)
+    }
+}
+
+trait Handler {
+    type Event;
+    type CheckOutput = ();
+
+    fn check(event: &Self::Event) -> Option<Self::CheckOutput>;
+    async fn action(event: &Self::Event) -> crate::Result<()>;
+}
 
 async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
     info!(
@@ -46,7 +109,7 @@ async fn check_vore(content: &str) -> bool {
 
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
-pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), CommandError> {
+pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), HandlerError> {
     if check_vore(&msg.content).await {
         log_watcher(http, msg).await;
 
@@ -98,7 +161,7 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), Comma
 
 // watches all channels for "L" and responds with the biden image
 #[instrument(skip_all, level = "trace")]
-pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if msg.content == "L" {
         info!(
             "@{} (#{}): {}",
@@ -121,7 +184,7 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
 
 // watches all channels for "CL" and reponds with the Look CL copypasta
 #[instrument(skip_all, level = "trace")]
-pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if msg
         .content
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~', '#', '^'], " ")
@@ -154,7 +217,7 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
 }
 
 #[instrument(skip_all)]
-pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if let Some(haiku) = haiku::check_haiku(&msg.content) {
         let haiku = haiku
             .iter()
