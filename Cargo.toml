@@ -48,8 +48,6 @@ tracing-test = "0.2.4"
 tracing-unwrap = { version = "0.10.0", default-features = false }
 time = "0.3.36"
 backoff = { version = "0.4.0", features = ["tokio"] }
-struct-field-names-as-array = "0.3.0"
-valuable = { version = "0.1.0", features = ["derive"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
