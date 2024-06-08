@@ -82,7 +82,7 @@ pub enum Error {
 }
 
 #[derive(Debug, thiserror::Error, TracingError)]
-#[level(tracing::Level::ERROR)]
+#[level(ERROR)]
 pub enum SendMessageError {
     #[error(transparent)]
     Permissions(#[from] MissingPermissionsError),
@@ -120,7 +120,7 @@ impl TracingError for serenity::Error {
 
 #[derive(Debug, ThisError, TracingError)]
 #[error("missing permissions: {}", required.difference(*present))]
-#[level(tracing::Level::ERROR)]
+#[level(ERROR)]
 struct MissingPermissionsError {
     #[display]
     required: Permissions,
@@ -129,7 +129,7 @@ struct MissingPermissionsError {
 }
 
 #[derive(Debug, ThisError, TracingError)]
-#[level(tracing::Level::ERROR)]
+#[level(ERROR)]
 #[error("message is too long")]
 struct MessageTooLongError {
     length: usize,

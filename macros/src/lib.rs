@@ -1,8 +1,9 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, ParseStream},
-    Expr, Fields, Meta, Variant,
+    punctuated::Punctuated,
+    Expr, Fields, Meta, Path, PathSegment, Variant,
 };
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, Ident, Token};
 use tracing::Value;
@@ -113,9 +114,20 @@ struct AttrArgs {
 
 impl Parse for AttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            level: input.parse()?,
-        })
+        let path: Path = input.parse()?;
+
+        let level = if let Some(ident) = path.get_ident() {
+            let mut path: Path = syn::parse_str("tracing::Level")?;
+            path.segments.push(PathSegment {
+                ident: ident.clone(),
+                arguments: syn::PathArguments::None,
+            });
+            path
+        } else {
+            path
+        };
+
+        Ok(Self { level })
     }
 }
 
