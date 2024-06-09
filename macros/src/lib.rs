@@ -1,77 +1,50 @@
-use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use std::{borrow::Cow, collections::HashSet};
+
+use proc_macro2::{Punct, Span, TokenStream};
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Expr, Fields, Meta, Path, PathSegment, Variant,
+    spanned::Spanned,
+    token::Token,
+    Fields, LitStr, Meta, PatPath, Path, PathSegment, Variant,
 };
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, Ident, Token};
-use tracing::Value;
+use tracing::{span::Id, Value};
 
-#[proc_macro_derive(TracingError, attributes(level, display, default))]
+mod attributes;
+
+#[proc_macro_derive(TracingError, attributes(event, field))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let attr = &input
+    let event = &input
         .attrs
         .iter()
         .find(|attr| {
             attr.path()
                 .get_ident()
-                .is_some_and(|ident| &ident.to_string() == "level")
+                .is_some_and(|ident| &ident.to_string() == "event")
         })
-        .expect("no level attr");
+        .expect("no event attr");
 
-    let level = attr
-        .parse_args::<AttrArgs>()
-        .expect("attr syntax invalid")
-        .level;
+    let meta = event
+        .parse_args::<attributes::event::MetaList>()
+        .expect("attr syntax invalid");
+    let level = &meta.level().unwrap().level;
 
-    let expanded = match input.data {
+    let function_body = match input.data {
         Data::Struct(data) => {
-            let fields = data.fields;
-            match fields {
-                Fields::Named(fields) => {
-                    let fields = fields.named;
-                    let field_values = fields.iter().map(|field| {
-                        let name = field.ident.as_ref().unwrap();
+            let tracing_fields = tracing_fields::tracing_fields(&data.fields);
+            let tracing_body = TracingEventExpr::new(level.clone(), Some(tracing_fields), true);
 
-                        if field.attrs.iter().any(|attr| {
-                            attr.path()
-                                .get_ident()
-                                .is_some_and(|ident| &ident.to_string() == "display")
-                        }) {
-                            quote! { #name = tracing::field::display(self.#name) }
-                        } else if field.attrs.iter().any(|attr| {
-                            attr.path()
-                                .get_ident()
-                                .is_some_and(|ident| &ident.to_string() == "debug")
-                        }) {
-                            quote! { #name = tracing::field::debug(self.#name) }
-                        } else {
-                            quote! { #name = self.#name }
-                        }
-                    });
-                    let name = input.ident;
-
-                    quote! {
-                        impl TracingError for #name {
-                            fn event(&self) {
-                                tracing::event!(
-                                    #level,
-                                    #(#field_values,)*
-                                    "{}", self.to_string()
-                                )
-                            }
-                        }
-                    }
-                }
-                _ => todo!(),
+            quote! {
+                tracing::event!(
+                    #tracing_body
+                )
             }
         }
         Data::Enum(data) => {
-            let name = input.ident;
-
             let variants = data.variants.iter().map(|variant| {
                 match &variant.fields {
                     Fields::Unnamed(fields) => {
@@ -85,31 +58,32 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 quote! { #ident(err) => TracingError::event(err) }
             });
 
-            //panic!(
-            //   "{:?}",
-            //    variants.map(|ts| ts.to_string()).collect::<Vec<_>>()
-            //);
-
             quote! {
-                impl TracingError for #name {
-                    fn event(&self) {
-                        match self {
-                            #(
-                                Self::#variants
-                            ),*
-                        }
-                    }
+                match self {
+                    #(
+                        Self::#variants
+                    ),*
                 }
             }
         }
         _ => unimplemented!(),
     };
 
+    let name = input.ident;
+
+    let expanded = quote! {
+        impl TracingError for #name {
+            fn event(&self) {
+                #function_body
+            }
+        }
+    };
+
     proc_macro::TokenStream::from(expanded)
 }
 
 struct AttrArgs {
-    level: syn::Path,
+    path: syn::Path,
 }
 
 impl Parse for AttrArgs {
@@ -127,7 +101,7 @@ impl Parse for AttrArgs {
             path
         };
 
-        Ok(Self { level })
+        Ok(Self { path: level })
     }
 }
 
@@ -175,3 +149,202 @@ impl<T: tracing::Value + std::fmt::Debug> AsTracingSymbol for T {
         Some(TracingSymbol::Display)
     }
 }*/
+
+struct FieldAttr {
+    args: Punctuated<FieldAttrArg, Token![,]>,
+}
+
+impl Parse for FieldAttr {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            args: Punctuated::parse_terminated(input)?,
+        })
+    }
+}
+
+#[derive(Hash, Debug)]
+enum FieldAttrArg {
+    DisplayMode(TracingDisplayMode),
+    Rename(FieldAttrArgRename),
+}
+
+#[derive(Hash, Debug)]
+struct FieldAttrArgRename {
+    rename: Ident,
+    eq_token: Token![=],
+    expr: LitStr,
+}
+
+impl Parse for FieldAttrArgRename {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let rename: Ident = input.parse()?;
+
+        assert_eq!(&rename.to_string(), "rename");
+
+        let eq_token = input.parse()?;
+        let expr = input.parse()?;
+
+        Ok(Self {
+            rename,
+            eq_token,
+            expr,
+        })
+    }
+}
+
+impl Parse for FieldAttrArg {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        // Do not do this.
+        if input.fork().parse::<TracingDisplayMode>().is_ok() {
+            return Ok(Self::DisplayMode(input.parse::<TracingDisplayMode>()?));
+        }
+
+        // Do not do this.
+        if input.fork().parse::<FieldAttrArgRename>().is_ok() {
+            return Ok(Self::Rename(input.parse::<FieldAttrArgRename>()?));
+        }
+
+        Err(input.error("unrecognized argument"))
+    }
+}
+
+mod tracing_fields;
+
+fn display_mode_from_attrs(attrs: &[Attribute]) -> TracingDisplayMode {
+    if let Some(field_attr) = attrs.find_attribute("field") {
+        let parsed: FieldAttr = field_attr.parse_args().expect("display_mode_from_attrs");
+
+        if let Some(display_arg) = parsed
+            .args
+            .into_iter()
+            .filter_map(|arg| {
+                if let FieldAttrArg::DisplayMode(display) = arg {
+                    Some(display)
+                } else {
+                    None
+                }
+            })
+            .next()
+        {
+            return display_arg;
+        }
+    }
+
+    TracingDisplayMode::Value
+}
+
+fn rename_from_attrs(attrs: &[Attribute]) -> Option<LitStr> {
+    if let Some(field_attr) = attrs.find_attribute("field") {
+        let parsed: FieldAttr = field_attr.parse_args().expect("rename_from_attrs");
+
+        return parsed
+            .args
+            .into_iter()
+            .filter_map(|arg| {
+                if let FieldAttrArg::Rename(rename) = arg {
+                    Some(rename.expr)
+                } else {
+                    None
+                }
+            })
+            .next();
+    }
+
+    None
+}
+
+mod tracing_field;
+
+#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
+enum TracingDisplayMode {
+    Value,
+    Display,
+    Debug,
+    Skip,
+}
+
+impl Parse for TracingDisplayMode {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let maybe_ident: Option<Ident> = input.parse()?;
+
+        let name = maybe_ident.map(|ident| ident.to_string());
+
+        let mode = match name.as_deref() {
+            Some("display") => Ok(Self::Display),
+            Some("debug") => Ok(Self::Debug),
+            Some("value") | None => Ok(Self::Value),
+            Some("skip") => Ok(Self::Skip),
+            Some(_) => Err(input.error("invalid display arg")),
+        };
+
+        mode
+    }
+}
+
+impl ToTokens for TracingDisplayMode {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Value | Self::Skip => (),
+            Self::Display => tokens.append(Punct::new('%', proc_macro2::Spacing::Alone)),
+            Self::Debug => tokens.append(Punct::new('?', proc_macro2::Spacing::Alone)),
+        }
+    }
+}
+
+struct TracingEventExpr<'a> {
+    level: syn::ExprPath,
+    fields: Option<tracing_fields::TracingFields<'a>>,
+    display: bool,
+}
+
+impl<'a> TracingEventExpr<'a> {
+    fn new(level: Path, fields: Option<tracing_fields::TracingFields<'a>>, display: bool) -> Self {
+        Self {
+            level: syn::ExprPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: level,
+            },
+            fields,
+            display,
+        }
+    }
+}
+
+impl ToTokens for TracingEventExpr<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.level.to_tokens(tokens);
+
+        if self.fields.is_some() || self.display {
+            <Token![,]>::default().to_tokens(tokens);
+        }
+
+        if let Some(fields) = &self.fields {
+            fields.to_tokens(tokens);
+
+            if self.display {
+                <Token![,]>::default().to_tokens(tokens);
+            }
+        }
+
+        if self.display {
+            quote! { "{}", self }.to_tokens(tokens);
+        }
+    }
+}
+
+trait FindAttribute<'attr>: IntoIterator<Item = &'attr Attribute> + Sized {
+    fn find_attribute(self, name: &str) -> Option<&'attr Attribute> {
+        self.into_iter().find(|attr| {
+            attr.path()
+                .get_ident()
+                .is_some_and(|ident| &ident.to_string() == name)
+        })
+    }
+
+    fn contains_attribute(self, name: &str) -> bool {
+        self.find_attribute(name).is_some()
+    }
+}
+
+impl<'attr, It> FindAttribute<'attr> for It where It: IntoIterator<Item = &'attr Attribute> {}

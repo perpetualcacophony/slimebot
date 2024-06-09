@@ -47,7 +47,7 @@ pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxF
 async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
     match err {
         Error::Command(cmd) => match cmd {
-            CommandError::SendMessage(err) => error!("{err}"),
+            CommandError::SendMessage(err) => err.event(),
             CommandError::DiceRoll(err) => warn!("{err}"),
             other => error!("{}", other.source().expect("all variants have a source")),
         },
@@ -82,7 +82,7 @@ pub enum Error {
 }
 
 #[derive(Debug, thiserror::Error, TracingError)]
-#[level(ERROR)]
+#[event(level = ERROR)]
 pub enum SendMessageError {
     #[error(transparent)]
     Permissions(#[from] MissingPermissionsError),
@@ -120,16 +120,16 @@ impl TracingError for serenity::Error {
 
 #[derive(Debug, ThisError, TracingError)]
 #[error("missing permissions: {}", required.difference(*present))]
-#[level(ERROR)]
+#[event(level = ERROR)]
 struct MissingPermissionsError {
-    #[display]
+    #[field(debug, rename = "renamed")]
     required: Permissions,
-    #[display]
+    #[field(debug)]
     present: Permissions,
 }
 
 #[derive(Debug, ThisError, TracingError)]
-#[level(ERROR)]
+#[event(level = ERROR)]
 #[error("message is too long")]
 struct MessageTooLongError {
     length: usize,
