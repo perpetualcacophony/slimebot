@@ -210,15 +210,16 @@ impl Parse for FieldAttrArg {
 
 mod tracing_fields;
 
-fn display_mode_from_attrs(attrs: &[Attribute]) -> TracingDisplayMode {
+fn display_mode_from_attrs(attrs: &[Attribute]) -> attributes::field::ArgPrintLevel {
     if let Some(field_attr) = attrs.find_attribute("field") {
-        let parsed: FieldAttr = field_attr.parse_args().expect("display_mode_from_attrs");
+        let parsed: attributes::field::MetaList =
+            field_attr.parse_args().expect("display_mode_from_attrs");
 
         if let Some(display_arg) = parsed
             .args
             .into_iter()
             .filter_map(|arg| {
-                if let FieldAttrArg::DisplayMode(display) = arg {
+                if let attributes::field::Argument::PrintLevel(display) = arg {
                     Some(display)
                 } else {
                     None
@@ -230,24 +231,15 @@ fn display_mode_from_attrs(attrs: &[Attribute]) -> TracingDisplayMode {
         }
     }
 
-    TracingDisplayMode::Value
+    attributes::field::ArgPrintLevel::Value
 }
 
 fn rename_from_attrs(attrs: &[Attribute]) -> Option<LitStr> {
     if let Some(field_attr) = attrs.find_attribute("field") {
-        let parsed: FieldAttr = field_attr.parse_args().expect("rename_from_attrs");
+        let parsed: attributes::field::MetaList =
+            field_attr.parse_args().expect("rename_from_attrs");
 
-        return parsed
-            .args
-            .into_iter()
-            .filter_map(|arg| {
-                if let FieldAttrArg::Rename(rename) = arg {
-                    Some(rename.expr)
-                } else {
-                    None
-                }
-            })
-            .next();
+        return parsed.rename().map(|arg| arg.lit.clone());
     }
 
     None

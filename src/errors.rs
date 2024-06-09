@@ -119,13 +119,19 @@ impl TracingError for serenity::Error {
 }
 
 #[derive(Debug, ThisError, TracingError)]
-#[error("missing permissions: {}", required.difference(*present))]
+#[error("missing permissions: {}", self.missing())]
 #[event(level = ERROR)]
 struct MissingPermissionsError {
-    #[field(debug, rename = "renamed")]
+    #[field(print = Display)]
     required: Permissions,
-    #[field(debug)]
+    #[field(print = Display)]
     present: Permissions,
+}
+
+impl MissingPermissionsError {
+    fn missing(&self) -> Permissions {
+        self.required.difference(self.present)
+    }
 }
 
 #[derive(Debug, ThisError, TracingError)]
