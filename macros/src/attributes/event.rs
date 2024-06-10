@@ -1,7 +1,6 @@
 use proc_macro2::Span;
 use syn::{
     parse::{discouraged::Speculative, Parse},
-    punctuated::Punctuated,
     Token,
 };
 

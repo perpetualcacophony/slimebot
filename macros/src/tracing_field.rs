@@ -1,4 +1,4 @@
-use proc_macro2::{Punct, TokenStream};
+use proc_macro2::TokenStream;
 
 use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 
@@ -13,8 +13,6 @@ use syn::Expr;
 use syn::Ident;
 
 use std::borrow::Cow;
-
-use super::TracingDisplayMode;
 
 pub(crate) struct TracingField<'i> {
     pub(crate) name: Cow<'i, Ident>,
