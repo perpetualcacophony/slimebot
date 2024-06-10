@@ -7,7 +7,7 @@ use quote::ToTokens;
 use syn::punctuated::Punctuated;
 
 use crate::{
-    display_mode_from_attrs,
+    attributes::field::TracingPrintLevel,
     tracing_field::{self, TracingField},
 };
 
@@ -50,7 +50,12 @@ impl<'a> FromIterator<&'a Field> for TracingFields<'a> {
                 .enumerate()
                 .map(|(index, field)| {
                     TracingField::new_numbered(
-                        display_mode_from_attrs(&field.attrs),
+                        crate::attributes::Field::try_from(field.attrs.as_slice())
+                            .ok()
+                            .map(|field| field.print_level().cloned())
+                            .flatten()
+                            .map(|arg| TracingPrintLevel::from(&arg))
+                            .unwrap_or_default(),
                         index,
                         field.span(),
                     )

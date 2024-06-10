@@ -210,41 +210,6 @@ impl Parse for FieldAttrArg {
 
 mod tracing_fields;
 
-fn display_mode_from_attrs(attrs: &[Attribute]) -> attributes::field::ArgPrintLevel {
-    if let Some(field_attr) = attrs.find_attribute("field") {
-        let parsed: attributes::field::MetaList =
-            field_attr.parse_args().expect("display_mode_from_attrs");
-
-        if let Some(display_arg) = parsed
-            .args
-            .into_iter()
-            .filter_map(|arg| {
-                if let attributes::field::Argument::PrintLevel(display) = arg {
-                    Some(display)
-                } else {
-                    None
-                }
-            })
-            .next()
-        {
-            return display_arg;
-        }
-    }
-
-    attributes::field::ArgPrintLevel::Value
-}
-
-fn rename_from_attrs(attrs: &[Attribute]) -> Option<LitStr> {
-    if let Some(field_attr) = attrs.find_attribute("field") {
-        let parsed: attributes::field::MetaList =
-            field_attr.parse_args().expect("rename_from_attrs");
-
-        return parsed.rename().map(|arg| arg.lit.clone());
-    }
-
-    None
-}
-
 mod tracing_field;
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
