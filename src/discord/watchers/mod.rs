@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
 use crate::{
-    errors::CommandError,
     framework::event_handler::HandlerError,
     utils::{
         format_duration::FormatDuration,

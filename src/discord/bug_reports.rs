@@ -6,10 +6,7 @@ use poise::serenity_prelude::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-use crate::{
-    errors::{CommandError, SendMessageError},
-    framework::event_handler::HandlerError,
-};
+use crate::{errors::SendMessageError, framework::event_handler::HandlerError};
 
 pub async fn bug_reports(
     http: &Http,

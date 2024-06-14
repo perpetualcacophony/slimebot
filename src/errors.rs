@@ -1,9 +1,10 @@
-use std::{error::Error as _, fmt::Display};
+use std::error::Error as _;
 
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
 };
+use slimebot_macros::TracingError;
 use thiserror::Error as ThisError;
 use tokio::sync::mpsc;
 use tracing::{error, error_span, warn, Instrument};
@@ -46,7 +47,7 @@ pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxF
 async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
     match err {
         Error::Command(cmd) => match cmd {
-            CommandError::SendMessage(err) => error!("{err}"),
+            CommandError::SendMessage(err) => err.event(),
             CommandError::DiceRoll(err) => warn!("{err}"),
             other => error!("{}", other.source().expect("all variants have a source")),
         },
@@ -60,14 +61,19 @@ async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
 pub enum CommandError {
     #[error("input error: {0}")]
     SendMessage(#[from] SendMessageError),
+
     #[error("other serenity error: {0}")]
     Serenity(#[from] serenity::Error),
+
     #[error("other reqwest error: {0}")]
     Reqwest(#[from] reqwest::Error),
+
     #[error("")]
     DiceRoll(#[from] DiceRollError),
+
     #[error("error from mongodb: {0}")]
     MongoDb(#[from] mongodb::error::Error),
+
     #[error("error from event handler: {0}")]
     EventHandler(#[from] event_handler::HandlerError),
 }
@@ -80,13 +86,17 @@ pub enum Error {
     Handler(#[from] HandlerError),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, TracingError)]
+#[span(level = ERROR)]
 pub enum SendMessageError {
     #[error(transparent)]
     Permissions(#[from] MissingPermissionsError),
+
     #[error(transparent)]
     MessageTooLong(#[from] MessageTooLongError),
+
     #[error("boop")]
+    #[event(level = ERROR)]
     Other(serenity::Error),
 }
 
@@ -110,31 +120,28 @@ impl From<serenity::Error> for SendMessageError {
     }
 }
 
-#[derive(Debug, ThisError)]
-#[error("missing permissions: {}", required.difference(*present))]
-struct MissingPermissionsError {
+#[derive(Debug, ThisError, TracingError)]
+#[error("missing permissions: {}", self.missing())]
+#[event(level = ERROR)]
+pub struct MissingPermissionsError {
+    #[field(print = Display)]
     required: Permissions,
+
+    #[field(print = Display)]
     present: Permissions,
 }
 
-#[derive(Debug, ThisError)]
-#[error("message is too long")]
-struct MessageTooLongError {
-    length: usize,
+impl MissingPermissionsError {
+    fn missing(&self) -> Permissions {
+        self.required.difference(self.present)
+    }
 }
 
-macro_rules! error_fields {
-    ($level:expr; $var:expr => $struct:ty[$($field:ident$($print:tt)?)*]) => {
-        tracing::event!(
-            $level,
-
-            $(
-                $field = $($print)?$var.$field,
-            )*
-
-            "{}", $var,
-        )
-    };
+#[derive(Debug, ThisError, TracingError)]
+#[event(level = ERROR)]
+#[error("message is too long")]
+pub struct MessageTooLongError {
+    pub length: usize,
 }
 
 impl SendMessageError {
@@ -176,26 +183,10 @@ pub enum DiceRollError {
 }
 
 pub trait TracingError: std::error::Error {
-    fn level(&self) -> tracing::Level {
-        tracing::Level::ERROR
-    }
-
-    fn event(&self) {
-        match self.__level() {
-            tracing::Level::ERROR => error!("{}", self.to_string()),
-            tracing::Level::WARN => warn!("{}", self.to_string()),
-            _ => unreachable!(),
-        }
-    }
-
-    fn __level(&self) -> tracing::Level {
-        let level = self.level();
-        assert!(level <= tracing::Level::WARN);
-        level
-    }
+    fn event(&self);
 }
 
-impl TracingError for SendMessageError {
+/*impl TracingError for SendMessageError {
     fn event(&self) {
         match self {
             Self::MessageTooLong(err) => {
@@ -207,7 +198,7 @@ impl TracingError for SendMessageError {
             other => error!("{}", other),
         }
     }
-}
+}*/
 
 #[derive(Clone, Debug)]
 pub struct ErrorSender {
@@ -222,6 +213,12 @@ impl ErrorSender {
     pub async fn send(&self, err: FrameworkError<'static, PoiseData, Error>) {
         self.tx.send(err).await;
     }
+}
+
+fn boop() {
+    let err: MessageTooLongError = MessageTooLongError { length: 10 };
+
+    //let level = err.level();
 }
 
 pub struct ErrorHandler {
