@@ -1,42 +1,55 @@
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse_macro_input, Data, DeriveInput, Token};
-use syn::{Fields, Path};
+use attribute_derive::FromAttr;
+use quote::quote;
 
-mod attributes;
+#[derive(attribute_derive::FromAttr)]
+#[attribute(ident = field)]
+struct FieldAttribute {
+    #[attribute(optional)]
+    pub level: tracing::TracingPrintLevel,
+
+    pub rename: Option<String>,
+}
+
+#[derive(attribute_derive::FromAttr)]
+#[attribute(ident = event)]
+struct EventAttribute {
+    level: tracing::Level,
+}
 
 #[proc_macro_derive(TracingError, attributes(event, field))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let expanded = expand(input);
+    expanded
+        .map(quote::ToTokens::into_token_stream)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
 
-    let event = &input
-        .attrs
-        .iter()
-        .find(|attr| {
-            attr.path()
-                .get_ident()
-                .is_some_and(|ident| &ident.to_string() == "event")
-        })
-        .expect("no event attr");
+mod tracing;
 
-    let meta = event
-        .parse_args::<attributes::event::MetaList>()
-        .expect("attr syntax invalid");
-    let level = &meta.level().unwrap().level;
+fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
+    let event = EventAttribute::from_attributes(&input.attrs)?;
 
-    let function_body = match input.data {
+    use syn::Data;
+    let function_body: Vec<syn::Stmt> = match input.data {
         Data::Struct(data) => {
-            let tracing_fields = tracing_fields::tracing_fields(&data.fields);
-            let tracing_body = TracingEventExpr::new(level.clone(), Some(tracing_fields), true);
+            let tracing_fields: Vec<tracing::Field> = data
+                .fields
+                .into_iter()
+                .map(tracing::Field::try_from)
+                .collect::<Result<_, _>>()?;
 
-            quote! {
-                tracing::event!(
-                    #tracing_body
-                )
+            let event = tracing::Event::new(event.level, tracing_fields, true);
+            let tracing_event = event.into_macro_call();
+
+            syn::parse_quote! {
+                #tracing_event
             }
         }
         Data::Enum(data) => {
             let variants = data.variants.iter().map(|variant| {
+                use syn::Fields;
                 match &variant.fields {
                     Fields::Unnamed(fields) => {
                         assert!(fields.unnamed.len() == 1);
@@ -49,7 +62,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 quote! { #ident(err) => TracingError::event(err) }
             });
 
-            quote! {
+            syn::parse_quote! {
                 match self {
                     #(
                         Self::#variants
@@ -62,59 +75,11 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let name = input.ident;
 
-    let expanded = quote! {
+    Ok(syn::parse_quote! {
         impl TracingError for #name {
             fn event(&self) {
-                #function_body
+                #(#function_body)*
             }
         }
-    };
-
-    proc_macro::TokenStream::from(expanded)
-}
-
-mod tracing_fields;
-
-mod tracing_field;
-
-struct TracingEventExpr<'a> {
-    level: syn::ExprPath,
-    fields: Option<tracing_fields::TracingFields<'a>>,
-    display: bool,
-}
-
-impl<'a> TracingEventExpr<'a> {
-    fn new(level: Path, fields: Option<tracing_fields::TracingFields<'a>>, display: bool) -> Self {
-        Self {
-            level: syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path: level,
-            },
-            fields,
-            display,
-        }
-    }
-}
-
-impl ToTokens for TracingEventExpr<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.level.to_tokens(tokens);
-
-        if self.fields.is_some() || self.display {
-            <Token![,]>::default().to_tokens(tokens);
-        }
-
-        if let Some(fields) = &self.fields {
-            fields.to_tokens(tokens);
-
-            if self.display {
-                <Token![,]>::default().to_tokens(tokens);
-            }
-        }
-
-        if self.display {
-            quote! { "{}", self }.to_tokens(tokens);
-        }
-    }
+    })
 }
