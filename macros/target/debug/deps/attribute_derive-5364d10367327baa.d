@@ -1,0 +1,11 @@
+/home/kate/code/slimebot/macros/target/debug/deps/libattribute_derive-5364d10367327baa.rmeta: /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/lib.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/std_impls.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/syn_impls.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/utils.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/parsing.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/from_partial.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/../docs/traits.html
+
+/home/kate/code/slimebot/macros/target/debug/deps/attribute_derive-5364d10367327baa.d: /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/lib.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/std_impls.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/syn_impls.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/utils.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/parsing.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/from_partial.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/../docs/traits.html
+
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/lib.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/std_impls.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/syn_impls.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/utils.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/parsing.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/from_partial.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/attribute-derive-0.9.1/src/../docs/traits.html:

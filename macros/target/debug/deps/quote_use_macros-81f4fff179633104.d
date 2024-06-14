@@ -1,0 +1,10 @@
+/home/kate/code/slimebot/macros/target/debug/deps/libquote_use_macros-81f4fff179633104.so: /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/lib.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/use_parser.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/core.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/std.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/2021.rs
+
+/home/kate/code/slimebot/macros/target/debug/deps/quote_use_macros-81f4fff179633104.d: /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/lib.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/use_parser.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/core.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/std.rs /home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/2021.rs
+
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/lib.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/use_parser.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/core.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/std.rs:
+/home/kate/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-use-macros-0.8.0/src/prelude/2021.rs:
