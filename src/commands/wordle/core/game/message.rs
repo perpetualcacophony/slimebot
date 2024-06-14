@@ -6,7 +6,7 @@ use poise::serenity_prelude::{
 
 use crate::utils::{poise::ContextExt, Context};
 
-use super::{GameContext, GameData};
+use super::{options::GameStyle, GameContext, GameData};
 
 use super::super::{
     core::{guess::GuessSlice, AsEmoji},
@@ -15,6 +15,7 @@ use super::super::{
 
 pub struct GameMessage {
     msg: Message,
+    style: GameStyle,
 }
 
 impl GameMessage {
@@ -59,7 +60,7 @@ impl GameMessage {
         self.msg.await_component_interactions(shard).stream()
     }
 
-    fn content(data: &impl AsRef<GameData>) -> String {
+    fn content(data: &impl AsRef<GameData>, style: GameStyle) -> String {
         let data = data.as_ref();
 
         format!(
@@ -70,19 +71,20 @@ impl GameMessage {
                 .guesses
                 .limit
                 .map_or("∞".to_owned(), |lim| lim.to_string()),
-            emojis = data.guesses.as_emoji()
+            emojis = data.guesses.emoji_with_style(style)
         )
     }
 
-    fn builder(data: impl AsRef<GameData>) -> EditMessage {
+    fn builder(data: impl AsRef<GameData>, style: GameStyle) -> EditMessage {
         EditMessage::new()
-            .content(Self::content(&data))
+            .content(Self::content(&data, style))
             .components(Self::buttons(&data))
     }
 
-    pub async fn new(ctx: Context<'_>, puzzle: &Puzzle) -> Result<Self> {
+    pub async fn new(ctx: Context<'_>, puzzle: &Puzzle, style: GameStyle) -> Result<Self> {
         Ok(Self {
             msg: Self::loading_msg(ctx, puzzle).await?,
+            style,
         })
     }
 
@@ -107,7 +109,7 @@ impl GameMessage {
         cache_http: impl CacheHttp,
         data: impl AsRef<GameData>,
     ) -> Result<()> {
-        let builder = Self::builder(data);
+        let builder = Self::builder(data, self.style);
         self.msg.edit(cache_http, builder).await?;
 
         Ok(())

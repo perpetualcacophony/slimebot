@@ -72,7 +72,7 @@ impl<'a> Game<'a> {
 
         let data = ctx.data();
         let puzzle = puzzle.into();
-        let msg = GameMessage::new(ctx, &puzzle).await?;
+        let msg = GameMessage::new(ctx, &puzzle, options.style).await?;
 
         Ok(Self {
             puzzle: Arc::new(puzzle),
