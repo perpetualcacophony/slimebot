@@ -1,9 +1,11 @@
 use std::{fmt, future::Future, pin::Pin};
 
+use crate::errors::TracingError;
 use poise::{
     serenity_prelude::{self as serenity, CacheHttp, FullEvent, Message},
     FrameworkContext,
 };
+use slimebot_macros::TracingError;
 use thiserror::Error as ThisError;
 use tracing::trace;
 
@@ -12,20 +14,27 @@ use crate::{
     PoiseData,
 };
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, ThisError, TracingError)]
+#[span]
 pub enum HandlerError {
     #[error(transparent)]
     MessageWatchers(#[from] MessageWatchersErrors),
+
     #[error(transparent)]
     SendMessage(#[from] SendMessageError),
+
     #[error(transparent)]
+    #[event(level = ERROR)]
     MongoDb(#[from] mongodb::error::Error),
+
     #[error(transparent)]
+    #[event(level = ERROR)]
     Serenity(#[from] serenity::Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, TracingError)]
 pub struct MessageWatchersErrors {
+    #[field(print = Debug)]
     failures: Vec<CommandError>,
 }
 

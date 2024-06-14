@@ -1,5 +1,3 @@
-use std::error::Error as _;
-
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
@@ -7,7 +5,7 @@ use poise::{
 use slimebot_macros::TracingError;
 use thiserror::Error as ThisError;
 use tokio::sync::mpsc;
-use tracing::{error, error_span, warn, Instrument};
+use tracing::{error, error_span, Instrument};
 use tracing_unwrap::ResultExt;
 
 use crate::{
@@ -45,43 +43,41 @@ pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxF
     })
 }
 async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
-    match err {
-        Error::Command(cmd) => match cmd {
-            CommandError::SendMessage(err) => err.event(),
-            CommandError::DiceRoll(err) => warn!("{err}"),
-            other => error!("{}", other.source().expect("all variants have a source")),
-        },
-        Error::Handler(handler) => match handler {
-            _ => error!("{handler}"),
-        },
-    }
+    err.event();
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, ThisError, TracingError)]
+#[span(level = WARN)]
 pub enum CommandError {
     #[error("input error: {0}")]
     SendMessage(#[from] SendMessageError),
 
     #[error("other serenity error: {0}")]
+    #[event(level = ERROR)]
     Serenity(#[from] serenity::Error),
 
     #[error("other reqwest error: {0}")]
+    #[event(level = ERROR)]
     Reqwest(#[from] reqwest::Error),
 
     #[error("")]
+    #[event(level = ERROR)]
     DiceRoll(#[from] DiceRollError),
 
     #[error("error from mongodb: {0}")]
+    #[event(level = ERROR)]
     MongoDb(#[from] mongodb::error::Error),
 
     #[error("error from event handler: {0}")]
     EventHandler(#[from] event_handler::HandlerError),
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, ThisError, TracingError)]
+#[span]
 pub enum Error {
     #[error(transparent)]
     Command(#[from] CommandError),
+
     #[error(transparent)]
     Handler(#[from] HandlerError),
 }
@@ -174,10 +170,13 @@ impl From<SendMessageError> for serenity::Error {
 pub enum DiceRollError {
     #[error("")]
     NoFaces,
+
     #[error("")]
     InvalidExtra(String),
+
     #[error("'{0}' is not a valid sign, expected '+' or '-'")]
     InvalidExtraSign(String),
+
     #[error("no match in `{0}`")]
     NoMatch(String),
 }
@@ -213,12 +212,6 @@ impl ErrorSender {
     pub async fn send(&self, err: FrameworkError<'static, PoiseData, Error>) {
         self.tx.send(err).await;
     }
-}
-
-fn boop() {
-    let err: MessageTooLongError = MessageTooLongError { length: 10 };
-
-    //let level = err.level();
 }
 
 pub struct ErrorHandler {
