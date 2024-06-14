@@ -1,4 +1,4 @@
-use std::{error::Error as _, fmt::Display};
+use std::error::Error as _;
 
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
@@ -139,20 +139,6 @@ impl MissingPermissionsError {
 #[error("message is too long")]
 struct MessageTooLongError {
     length: usize,
-}
-
-macro_rules! error_fields {
-    ($level:expr; $var:expr => $struct:ty[$($field:ident$($print:tt)?)*]) => {
-        tracing::event!(
-            $level,
-
-            $(
-                $field = $($print)?$var.$field,
-            )*
-
-            "{}", $var,
-        )
-    };
 }
 
 impl SendMessageError {
