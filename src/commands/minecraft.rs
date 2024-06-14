@@ -46,7 +46,11 @@ pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Resul
                     .await?;
             }
             api::Response::Offline(response) => {
-                todo!()
+                ctx.say_ext(format!(
+                    "{host} is offline!",
+                    host = response.host().map(ToString::to_string).unwrap_or(address)
+                ))
+                .await?;
             }
         }
     };
@@ -85,14 +89,23 @@ pub mod api {
                 .query(&[("query", false)])
                 .build()?;
             let response = client.execute(request).await?;
-            Ok(response.json().await?)
+            Ok(response
+                .json()
+                .await
+                .expect("deserializing to Response should not fail"))
         }
     }
 
     #[derive(serde::Deserialize)]
     pub struct ResponseOffline {
-        //pub ip_address: IpAddr,
-        //pub host: url::Host,
+        pub ip_address: Option<std::net::IpAddr>,
+        pub host: Option<url::Host>,
+    }
+
+    impl ResponseOffline {
+        pub fn host(&self) -> Option<&url::Host> {
+            self.host.as_ref()
+        }
     }
 
     #[derive(serde::Deserialize)]
@@ -212,7 +225,7 @@ pub mod api {
 
     #[derive(serde::Deserialize)]
     pub struct ResponseOnline {
-        pub host: String,
+        host: String,
 
         pub version: Version,
 
@@ -235,7 +248,9 @@ pub mod api {
                     .expect("should start with png header")
                     .to_owned();
 
-                let image_data = base64::prelude::BASE64_STANDARD.decode(base64).unwrap();
+                let image_data = base64::prelude::BASE64_STANDARD
+                    .decode(base64)
+                    .expect("field should be valid base64");
 
                 let file_to_upload =
                     reqwest::multipart::Part::bytes(image_data).file_name("image.png");
@@ -253,7 +268,10 @@ pub mod api {
 
                 debug!(code = %response.status());
 
-                Ok(Some(reqwest::Url::parse(&response.text().await?)?))
+                Ok(Some(
+                    reqwest::Url::parse(&response.text().await.expect("response should have text"))
+                        .expect("response should be a url"),
+                ))
             } else {
                 Ok(None)
             }
