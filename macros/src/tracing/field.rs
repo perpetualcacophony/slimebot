@@ -327,7 +327,7 @@ impl TryFrom<syn::Field> for Full<'_> {
         let field_name = FieldName::try_from((field.clone(), attr.rename.as_ref().cloned()))?;
 
         if let Some(ident) = &field.ident {
-            let value = TracingValue::new_self_field(attr.level, ident.clone());
+            let value = TracingValue::new_self_field(attr.print, ident.clone());
             Ok(Self::new(field_name, value))
         } else {
             Err(Self::Error::new(
@@ -375,7 +375,7 @@ impl<'a> TryFrom<&'a syn::Field> for Full<'a> {
     fn try_from(value: &'a syn::Field) -> Result<Self, Self::Error> {
         Ok(Self::new_self_field(
             value.ident.as_ref().unwrap(),
-            FieldAttribute::from_attributes(&value.attrs)?.level,
+            FieldAttribute::from_attributes(&value.attrs)?.print,
         ))
     }
 }

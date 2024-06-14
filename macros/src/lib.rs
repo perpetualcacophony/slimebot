@@ -5,7 +5,7 @@ use quote::quote;
 #[attribute(ident = field)]
 struct FieldAttribute {
     #[attribute(optional)]
-    pub level: tracing::TracingPrintLevel,
+    pub print: tracing::TracingPrintLevel,
 
     pub rename: Option<String>,
 }
