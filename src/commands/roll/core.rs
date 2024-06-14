@@ -9,16 +9,16 @@ use crate::errors::DiceRollError;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Die {
-    pub faces: u8,
+    pub faces: isize,
 }
 
 impl Die {
-    fn new(faces: u8) -> Self {
+    fn new(faces: isize) -> Self {
         assert!(faces > 0, "die cannot have 0 faces");
         Self { faces }
     }
 
-    fn as_rolled(&self, value: u8) -> RolledDie {
+    fn as_rolled(&self, value: isize) -> RolledDie {
         RolledDie { die: *self, value }
     }
 
@@ -33,11 +33,11 @@ impl Die {
         self.as_rolled(value)
     }
 
-    pub const fn min(&self) -> u8 {
+    pub const fn min(&self) -> isize {
         1
     }
 
-    pub fn max(&self) -> u8 {
+    pub fn max(&self) -> isize {
         self.faces
     }
 }
@@ -51,7 +51,7 @@ impl Default for Die {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RolledDie {
     die: Die,
-    value: u8,
+    value: isize,
 }
 
 impl RolledDie {
@@ -73,7 +73,7 @@ pub struct Dice {
 }
 
 impl Dice {
-    pub fn new(count: usize, faces: u8) -> Self {
+    pub fn new(count: usize, faces: isize) -> Self {
         let vec = vec![Die::new(faces); count];
         Self { vec, index: 0 }
     }
@@ -82,23 +82,23 @@ impl Dice {
         Roll::new(self.clone(), rng)
     }
 
-    pub fn len(&self) -> usize {
-        ExactSizeIterator::len(self)
+    pub fn len(&self) -> isize {
+        ExactSizeIterator::len(self) as isize
     }
 
     #[instrument]
-    pub fn lowest_roll(&self) -> usize {
+    pub fn lowest_roll(&self) -> isize {
         debug!(len = ?self.len());
         self.len()
     }
 
     #[instrument]
-    pub fn highest_roll(&self) -> usize {
+    pub fn highest_roll(&self) -> isize {
         let highest = self.clone().fold(0, |sum, die| sum + die.max());
 
         debug!(highest);
 
-        highest as usize
+        highest
     }
 }
 
@@ -128,10 +128,6 @@ impl<It: Iterator<Item = Die>> Roll<It> {
     fn new(iter: It, rng: StdRng) -> Self {
         Self { iter, rng }
     }
-
-    fn total(self, extra: i8) -> isize {
-        self.sum::<u8>() as isize + extra as isize
-    }
 }
 
 impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
@@ -143,7 +139,7 @@ impl<It: Iterator<Item = Die>> Iterator for Roll<It> {
     }
 }
 
-impl Sum<RolledDie> for u8 {
+impl Sum<RolledDie> for isize {
     fn sum<I: Iterator<Item = RolledDie>>(iter: I) -> Self {
         iter.map(|roll| roll.value).sum()
     }
@@ -152,12 +148,12 @@ impl Sum<RolledDie> for u8 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DiceRoll {
     pub dice: Dice,
-    pub extra: i8,
+    pub extra: isize,
     rng: StdRng,
 }
 
 impl DiceRoll {
-    pub fn new(count: usize, faces: u8, extra: i8) -> Result<Self, DiceRollError> {
+    pub fn new(count: usize, faces: isize, extra: isize) -> Result<Self, DiceRollError> {
         let dice = Dice::new(count, faces);
 
         let seed: [u8; 32] = rand::random();
@@ -172,8 +168,8 @@ impl DiceRoll {
     }
 
     pub fn total(&self) -> isize {
-        let sum = self.rolls().sum::<u8>() as isize;
-        sum + self.extra as isize
+        let sum = self.rolls().sum::<isize>();
+        sum + self.extra
     }
 
     pub fn result(self) -> RollResult {
@@ -204,7 +200,7 @@ impl DiceRoll {
                     .map_or(Ok(1), |mat| mat.as_str().parse())
                     .unwrap_or(1);
                 trace!(?count);
-                let faces: u8 = caps
+                let faces: isize = caps
                     .get(2)
                     .ok_or(DiceRollError::NoFaces)?
                     .as_str()
@@ -215,7 +211,7 @@ impl DiceRoll {
                 let extra_unsigned = caps.get(4).map(|mat| {
                     let int = mat
                         .as_str()
-                        .parse::<i8>()
+                        .parse::<isize>()
                         .map_err(|_| DiceRollError::InvalidExtra(mat.as_str().to_owned()));
 
                     int.unwrap_or_default()
@@ -247,27 +243,27 @@ impl DiceRoll {
     }
 
     pub fn min(&self) -> isize {
-        self.dice.lowest_roll() as isize + self.extra as isize
+        self.dice.lowest_roll() + self.extra
     }
 
     pub fn max(&self) -> isize {
-        let highest = self.dice.highest_roll() as isize;
-        highest + self.extra as isize
+        let highest = self.dice.highest_roll();
+        highest + self.extra
     }
 }
 
 pub struct RollResult {
     dice_roll: DiceRoll,
     rolls: Vec<RolledDie>,
-    extra: i8,
+    extra: isize,
     total: isize,
 }
 
 impl RollResult {
     #[allow(dead_code)] // used in a macro
-    pub fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: i8) -> Self {
+    pub fn new(dice_roll: DiceRoll, rolls: impl Into<Vec<RolledDie>>, extra: isize) -> Self {
         let rolls = rolls.into();
-        let total = rolls.iter().copied().sum::<u8>() as isize + extra as isize;
+        let total = rolls.iter().copied().sum::<isize>() + extra;
 
         Self {
             dice_roll,
@@ -394,7 +390,7 @@ mod tests {
 
         for _ in 1..1000 {
             let rolls = roll.rolls();
-            let sum: u8 = rolls.clone().sum();
+            let sum: isize = rolls.clone().sum();
             trace!(sum, ?rolls);
             assert!(range.contains(&sum))
         }
