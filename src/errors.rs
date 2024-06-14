@@ -61,14 +61,19 @@ async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
 pub enum CommandError {
     #[error("input error: {0}")]
     SendMessage(#[from] SendMessageError),
+
     #[error("other serenity error: {0}")]
     Serenity(#[from] serenity::Error),
+
     #[error("other reqwest error: {0}")]
     Reqwest(#[from] reqwest::Error),
+
     #[error("")]
     DiceRoll(#[from] DiceRollError),
+
     #[error("error from mongodb: {0}")]
     MongoDb(#[from] mongodb::error::Error),
+
     #[error("error from event handler: {0}")]
     EventHandler(#[from] event_handler::HandlerError),
 }
@@ -121,6 +126,7 @@ impl From<serenity::Error> for SendMessageError {
 pub struct MissingPermissionsError {
     #[field(print = Display)]
     required: Permissions,
+
     #[field(print = Display)]
     present: Permissions,
 }

@@ -5,7 +5,6 @@ use poise::{
     FrameworkContext,
 };
 use thiserror::Error as ThisError;
-use tokio::task::JoinSet;
 use tracing::trace;
 
 use crate::{
