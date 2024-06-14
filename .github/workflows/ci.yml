@@ -5,7 +5,7 @@ on:
     paths-ignore: [ "README.md" ]
     branches: [ "main" ]
   
-  pull_request: [opened, synchronize, reopened]
+on: pull_request
 
 env:
   CARGO_TERM_COLOR: always
