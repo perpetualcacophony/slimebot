@@ -82,13 +82,16 @@ pub enum Error {
 }
 
 #[derive(Debug, thiserror::Error, TracingError)]
-#[event(level = ERROR)]
+#[span(level = ERROR)]
 pub enum SendMessageError {
     #[error(transparent)]
     Permissions(#[from] MissingPermissionsError),
+
     #[error(transparent)]
     MessageTooLong(#[from] MessageTooLongError),
+
     #[error("boop")]
+    #[event(level = ERROR)]
     Other(serenity::Error),
 }
 
@@ -112,16 +115,10 @@ impl From<serenity::Error> for SendMessageError {
     }
 }
 
-impl TracingError for serenity::Error {
-    fn event(&self) {
-        error!("{}", self)
-    }
-}
-
 #[derive(Debug, ThisError, TracingError)]
 #[error("missing permissions: {}", self.missing())]
 #[event(level = ERROR)]
-struct MissingPermissionsError {
+pub struct MissingPermissionsError {
     #[field(print = Display)]
     required: Permissions,
     #[field(print = Display)]
@@ -137,8 +134,8 @@ impl MissingPermissionsError {
 #[derive(Debug, ThisError, TracingError)]
 #[event(level = ERROR)]
 #[error("message is too long")]
-struct MessageTooLongError {
-    length: usize,
+pub struct MessageTooLongError {
+    pub length: usize,
 }
 
 impl SendMessageError {

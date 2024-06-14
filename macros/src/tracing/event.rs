@@ -17,6 +17,8 @@ pub struct Event<'a> {
 
     /// Whether or not to include the error's [Display] implementation in the event's message.
     display: bool,
+
+    custom_display: Option<syn::Expr>,
 }
 
 impl<'a> Event<'a> {
@@ -26,6 +28,20 @@ impl<'a> Event<'a> {
             level,
             fields,
             display,
+            custom_display: None,
+        }
+    }
+
+    pub fn new_custom(
+        level: tracing::Level,
+        fields: Vec<tracing::Field<'a>>,
+        custom: syn::Expr,
+    ) -> Self {
+        Self {
+            level,
+            fields,
+            display: true,
+            custom_display: Some(custom),
         }
     }
 
@@ -52,7 +68,11 @@ impl quote::ToTokens for Event<'_> {
         }
 
         if self.display {
-            quote! { "{}", self }.to_tokens(tokens);
+            if let Some(expr) = &self.custom_display {
+                quote! { "{}", #expr }.to_tokens(tokens);
+            } else {
+                quote! { "{}", self }.to_tokens(tokens);
+            }
         }
     }
 }
