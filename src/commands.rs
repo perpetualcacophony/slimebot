@@ -30,7 +30,7 @@ list! {
     borzoi,
     cat,
     fox,
-    minecraft,
+    pub minecraft,
     roll: {d20},
     flip,
     version,

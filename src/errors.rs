@@ -70,6 +70,9 @@ pub enum CommandError {
 
     #[error("error from event handler: {0}")]
     EventHandler(#[from] event_handler::HandlerError),
+
+    #[error("error from minecraft api: {0}")]
+    MinecraftApi(#[from] crate::commands::minecraft::api::Error),
 }
 
 #[derive(Debug, ThisError, TracingError)]

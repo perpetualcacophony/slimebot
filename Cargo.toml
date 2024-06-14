@@ -49,6 +49,8 @@ tracing-unwrap = { version = "0.10.0", default-features = false }
 time = "0.3.36"
 backoff = { version = "0.4.0", features = ["tokio"] }
 slimebot_macros = { path = "./macros" }
+url = { version = "2.5.1", features = ["serde"] }
+base64 = "0.22.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
