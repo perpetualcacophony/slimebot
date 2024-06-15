@@ -60,12 +60,13 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
 
             let span = SpanAttribute::from_attributes(&input.attrs)?;
             let level = span.level;
-            let name = input.ident.to_string().to_snake_case();
 
             let variants = data
                 .variants
                 .iter()
                 .map(|variant| {
+                    let span_name = variant.ident.to_string().to_snake_case();
+
                     use syn::Fields;
                     match &variant.fields {
                         Fields::Unnamed(fields) => {
@@ -76,7 +77,7 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
 
                     let ident = &variant.ident;
 
-                    let match_body = if let Some(attr) = variant
+                    let match_return = if let Some(attr) = variant
                         .attrs
                         .iter()
                         .find(|attr| attr.path().is_ident("event"))
@@ -94,13 +95,17 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
                         quote! { TracingError::event(err) }
                     };
 
-                    Ok(quote! { #ident(err) => #match_body })
+                    Ok(quote! {
+                        #ident(err) => {
+                            let span = ::tracing::span!(#level, #span_name);
+                            let _enter = span.enter();
+
+                            #match_return
+                        }
+                    })
                 })
                 .collect::<Result<Vec<_>, syn::Error>>()?;
             syn::parse_quote! {
-                let span = ::tracing::span!(#level, #name);
-                let _enter = span.enter();
-
                 match self {
                     #(
                         Self::#variants
