@@ -18,6 +18,9 @@ jobs:
     steps:    
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Install mongod (test dependency)
+      run: apt install mongodb-org-server
   
     - name: Install rust
       uses: dtolnay/rust-toolchain@nightly
