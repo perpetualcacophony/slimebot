@@ -3,8 +3,10 @@ use proc_macro2::TokenStream;
 
 use quote::{quote, ToTokens};
 
-use crate::tracing::TracingPrintLevel;
-use crate::FieldAttribute;
+use crate::tracing_error;
+
+use tracing_error::tracing::TracingPrintLevel;
+use tracing_error::FieldAttribute;
 
 use syn::{spanned::Spanned, Token};
 
