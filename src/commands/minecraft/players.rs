@@ -230,7 +230,7 @@ mod tests {
         {$($backend:ty as $mod_name:ident $block:block)+} => {
             $(
             paste::paste! {
-                mod [<$mod_name backend>] {
+                mod [<$mod_name _ backend>] {
                     use super::consts::*;
                     use super::Result;
                     type Players = super::Players<super::$backend>;
