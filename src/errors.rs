@@ -10,6 +10,7 @@ use tracing_unwrap::ResultExt;
 
 use crate::{
     framework::event_handler::{self, HandlerError},
+    utils::poise::ContextExt,
     PoiseData,
 };
 
@@ -42,8 +43,16 @@ pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxF
         };
     })
 }
-async fn handle_error(err: Error, _ctx: Context<'_, PoiseData, Error>) {
+async fn handle_error(mut err: Error, ctx: Context<'_, PoiseData, Error>) {
+    if let Error::Command(CommandError::Minecraft(
+        crate::commands::minecraft::Error::AlreadyClaimed(ref mut err),
+    )) = err
+    {
+        err.update_user_nick(ctx, ctx.guild_id()).await;
+    }
+
     err.event();
+    ctx.reply_ext(err.to_string()).await;
 }
 
 #[derive(Debug, ThisError, TracingError)]
@@ -72,7 +81,7 @@ pub enum CommandError {
     EventHandler(#[from] event_handler::HandlerError),
 
     #[error("error from minecraft api: {0}")]
-    MinecraftApi(#[from] crate::commands::minecraft::api::Error),
+    Minecraft(#[from] crate::commands::minecraft::Error),
 }
 
 #[derive(Debug, ThisError, TracingError)]

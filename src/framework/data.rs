@@ -18,6 +18,7 @@ pub struct PoiseData {
     pub(crate) started: UtcDateTime,
     pub(crate) wordle: WordleData,
     error_tx: ErrorSender,
+    minecraft: crate::commands::minecraft::Data,
 }
 
 impl PoiseData {
@@ -47,6 +48,7 @@ impl PoiseData {
             started,
             wordle,
             error_tx,
+            minecraft: crate::commands::minecraft::Data::new(),
         }
     }
 
@@ -65,5 +67,9 @@ impl PoiseData {
 
     pub(crate) fn error_tx(&self) -> ErrorSender {
         self.error_tx.clone()
+    }
+
+    pub(crate) const fn minecraft(&self) -> &crate::commands::minecraft::Data {
+        &self.minecraft
     }
 }

@@ -1,24 +1,49 @@
 use crate::{commands::LogCommands, utils::poise::ContextExt};
 
 use crate::utils::{poise::CommandResult, Context};
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity};
 use tracing::{debug, instrument};
 
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
     prefix_command,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
+    subcommands("claim")
 )]
 pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Result<()> {
     ctx.log_command().await;
 
     let result: CommandResult = try {
+        let data = ctx.data().minecraft();
+
         let address = server.unwrap_or("162.218.211.126".to_owned());
-        let response = api::Response::get(&address).await?;
+        let response = api::Response::get(&address).await.map_err(Error::Api)?;
 
         match response {
             api::Response::Online(response) => {
+                let mut players_fields = Vec::with_capacity(response.players.online);
+                for player in &response.players {
+                    let description = if let Some(serenity_id) = data
+                        .players()
+                        .player_from_minecraft(player.name())
+                        .await
+                        .expect("infallible")
+                    {
+                        let user = serenity_id.to_user(ctx).await?;
+
+                        if let Some(guild_id) = ctx.guild_id() {
+                            user.nick_in(ctx, guild_id).await.unwrap_or(user.name)
+                        } else {
+                            user.name
+                        }
+                    } else {
+                        "".to_owned()
+                    };
+
+                    players_fields.push((player.name(), description, false))
+                }
+
                 let mut embed = serenity::CreateEmbed::new()
                     .title(format!(
                         "{host} ({version})",
@@ -30,14 +55,9 @@ pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Resul
                         count = response.players.online,
                         motd = response.motd.clean()
                     ))
-                    .fields(
-                        response
-                            .players
-                            .iter()
-                            .map(|player| (player.name(), "", false)),
-                    );
+                    .fields(players_fields);
 
-                if let Some(url) = response.icon_url().await? {
+                if let Some(url) = response.icon_url().await.map_err(Error::Api)? {
                     debug!(%url);
                     embed = embed.thumbnail(url.to_string());
                 }
@@ -53,6 +73,33 @@ pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Resul
                 .await?;
             }
         }
+    };
+
+    result?;
+
+    Ok(())
+}
+
+#[instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn claim(ctx: Context<'_>, username: String) -> crate::Result<()> {
+    let result: CommandResult = try {
+        let data = ctx.data().minecraft();
+        data.players()
+            .add_username(ctx.author().id, username.clone())
+            .await
+            .expect("error is infallible")
+            .map_err(Error::AlreadyClaimed)?;
+
+        ctx.reply_ext(format!(
+            "claimed minecraft account {name}!",
+            name = username
+        ))
+        .await?;
     };
 
     result?;
@@ -288,4 +335,245 @@ pub mod api {
             &self.clean
         }
     }
+}
+
+mod players {
+    use poise::serenity_prelude as serenity;
+
+    use super::ErrorAlreadyClaimed;
+
+    pub trait Backend {
+        type Error;
+        type Result<T> = std::result::Result<T, Self::Error>;
+
+        // read
+        async fn player_from_minecraft(
+            &self,
+            username: &str,
+        ) -> Self::Result<Option<serenity::UserId>>;
+        async fn player_from_discord(&self, id: serenity::UserId) -> Self::Result<Vec<String>>;
+
+        // update
+        async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> Self::Result<Result<(), ErrorAlreadyClaimed>>;
+    }
+
+    #[derive(Debug, Default)]
+    pub struct Players<Backend> {
+        backend: std::sync::Arc<Backend>,
+    }
+
+    impl<B> Clone for Players<B> {
+        fn clone(&self) -> Self {
+            Self {
+                backend: self.backend.clone(),
+            }
+        }
+    }
+
+    impl<B: Backend> Players<B> {
+        pub async fn player_from_minecraft(
+            &self,
+            username: &str,
+        ) -> B::Result<Option<serenity::UserId>> {
+            self.backend.player_from_minecraft(username).await
+        }
+
+        pub async fn player_from_discord(&self, id: serenity::UserId) -> B::Result<Vec<String>> {
+            self.backend.player_from_discord(id).await
+        }
+
+        pub async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> B::Result<Result<(), ErrorAlreadyClaimed>> {
+            self.backend.add_username(id, username).await
+        }
+    }
+
+    pub type HashMap = tokio::sync::RwLock<std::collections::HashMap<String, serenity::UserId>>;
+
+    pub type PlayersHashMap = Players<HashMap>;
+
+    impl PlayersHashMap {
+        pub fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    impl BackendInfallible
+        for tokio::sync::RwLock<std::collections::HashMap<String, serenity::UserId>>
+    {
+        async fn player_from_minecraft(&self, username: &str) -> Option<serenity::UserId> {
+            let guard = self.read().await;
+            guard.get(username).copied()
+        }
+
+        async fn player_from_discord(&self, id: serenity::UserId) -> Vec<String> {
+            let guard = self.read().await;
+            guard
+                .iter()
+                .filter_map(|(name, val_id)| (*val_id == id).then_some(name.clone()))
+                .collect()
+        }
+
+        async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> Result<(), ErrorAlreadyClaimed> {
+            let mut guard = self.write().await;
+            if guard.insert(username.clone(), id).is_some() {
+                Err(ErrorAlreadyClaimed::new(id, None, username))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    trait BackendInfallible {
+        async fn player_from_minecraft(&self, username: &str) -> Option<serenity::UserId>;
+        async fn player_from_discord(&self, id: serenity::UserId) -> Vec<String>;
+        async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> Result<(), ErrorAlreadyClaimed>;
+    }
+    impl<B: BackendInfallible> Backend for B {
+        type Error = std::convert::Infallible;
+
+        async fn player_from_minecraft(
+            &self,
+            username: &str,
+        ) -> Self::Result<Option<serenity::UserId>> {
+            Ok(BackendInfallible::player_from_minecraft(self, username).await)
+        }
+
+        async fn player_from_discord(&self, id: serenity::UserId) -> Self::Result<Vec<String>> {
+            Ok(BackendInfallible::player_from_discord(self, id).await)
+        }
+
+        async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> Self::Result<Result<(), ErrorAlreadyClaimed>> {
+            Ok(BackendInfallible::add_username(self, id, username).await)
+        }
+    }
+}
+pub use players::Players;
+
+#[derive(Debug)]
+pub struct Data<B = players::HashMap> {
+    players: Players<B>,
+}
+
+impl<B> Data<B> {
+    fn players(&self) -> Players<B> {
+        self.players.clone()
+    }
+}
+
+impl Data<players::HashMap> {
+    pub fn new() -> Self {
+        Self {
+            players: Players::new(),
+        }
+    }
+}
+
+impl<B> Clone for Data<B> {
+    fn clone(&self) -> Self {
+        Self {
+            players: self.players.clone(),
+        }
+    }
+}
+
+use crate::errors::TracingError;
+#[derive(Debug, Clone, thiserror::Error, slimebot_macros::TracingError)]
+#[event(level = WARN)]
+pub struct ErrorAlreadyClaimed {
+    #[field(print = Display)]
+    user_id: serenity::UserId,
+    user_name: Option<String>,
+    minecraft_username: String,
+}
+
+impl ErrorAlreadyClaimed {
+    fn new(
+        user_id: serenity::UserId,
+        user_name: Option<String>,
+        minecraft_username: String,
+    ) -> Self {
+        Self {
+            user_id,
+            user_name,
+            minecraft_username,
+        }
+    }
+
+    fn from_serenity(user: &serenity::User, minecraft_username: String) -> Self {
+        Self::new(user.id, Some(user.name.clone()), minecraft_username)
+    }
+
+    fn set_user_name(&mut self, new: String) {
+        self.user_name = Some(new)
+    }
+
+    pub async fn update_user_name(
+        &mut self,
+        cache_http: impl serenity::CacheHttp,
+    ) -> serenity::Result<()> {
+        let user = self.user_id.to_user(cache_http).await?;
+        self.set_user_name(user.name);
+        Ok(())
+    }
+
+    pub async fn update_user_nick(
+        &mut self,
+        cache_http: impl serenity::CacheHttp,
+        guild_id: Option<serenity::GuildId>,
+    ) -> serenity::Result<()> {
+        let user = self.user_id.to_user(&cache_http).await?;
+        let nick = if let Some(guild_id) = guild_id {
+            user.nick_in(&cache_http, guild_id)
+                .await
+                .unwrap_or(user.name)
+        } else {
+            user.name
+        };
+        self.set_user_name(nick);
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for ErrorAlreadyClaimed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let already_claimed_by = if let Some(ref name) = self.user_name {
+            format!("{name} ({id})", id = self.user_id)
+        } else {
+            format!("user {id}", id = self.user_id)
+        };
+
+        write!(
+            f,
+            "minecraft user {username} already claimed by {already_claimed_by}",
+            username = self.minecraft_username
+        )
+    }
+}
+
+#[derive(Debug, thiserror::Error, slimebot_macros::TracingError)]
+pub enum Error {
+    #[error(transparent)]
+    AlreadyClaimed(#[from] ErrorAlreadyClaimed),
+    #[error(transparent)]
+    Api(#[from] api::Error),
 }
