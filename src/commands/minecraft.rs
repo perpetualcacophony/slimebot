@@ -546,6 +546,160 @@ mod players {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::Players;
+        use pretty_assertions::assert_eq;
+
+        type Result = std::result::Result<(), Box<dyn std::error::Error>>;
+
+        mod consts {
+            use poise::serenity_prelude as serenity;
+
+            pub const USER_ID_FOO: serenity::UserId = serenity::UserId::new(1);
+            pub const MINECRAFT_USERNAME_FOO: &str = "foo";
+
+            pub const USER_ID_BAR: serenity::UserId = serenity::UserId::new(2);
+            pub const MINECRAFT_USERNAME_BAR: &str = "bar";
+
+            pub const USER_ID_BAZ: serenity::UserId = serenity::UserId::new(3);
+            pub const MINECRAFT_USERNAME_BAZ: &str = "baz";
+        }
+
+        mod hash_map_backend {
+            use super::super::HashMap as Backend;
+            type Players = super::Players<Backend>;
+            use super::assert_eq;
+
+            use super::consts::*;
+
+            use super::Result;
+
+            #[tracing_test::traced_test]
+            #[tokio::test]
+            async fn add() -> Result {
+                let players = Players::new();
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_FOO.to_owned())
+                    .await?
+                    .expect("map is empty");
+
+                players
+                    .add_username(USER_ID_BAR, MINECRAFT_USERNAME_BAR.to_owned())
+                    .await?
+                    .expect("not already added");
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_BAZ.to_owned())
+                    .await?
+                    .expect("a user can claim multiple minecraft usernames");
+
+                Ok(())
+            }
+
+            #[tracing_test::traced_test]
+            #[tokio::test]
+            async fn already_claimed() -> Result {
+                let players = Players::new();
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_FOO.to_owned())
+                    .await?
+                    .expect("map is empty");
+
+                players
+                    .add_username(USER_ID_BAR, MINECRAFT_USERNAME_FOO.to_owned())
+                    .await?
+                    .expect_err("a username cannot be claimed twice");
+
+                Ok(())
+            }
+
+            #[tracing_test::traced_test]
+            #[tokio::test]
+            async fn get_minecraft_username() -> Result {
+                let players = Players::new();
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_FOO.to_owned())
+                    .await?
+                    .expect("map is empty");
+
+                players
+                    .add_username(USER_ID_BAR, MINECRAFT_USERNAME_BAR.to_owned())
+                    .await?
+                    .expect("not already added");
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_BAZ.to_owned())
+                    .await?
+                    .expect("a user can claim multiple minecraft usernames");
+
+                assert!(players
+                    .player_from_discord(USER_ID_FOO)
+                    .await?
+                    .contains(&MINECRAFT_USERNAME_FOO.to_string()));
+
+                assert!(players
+                    .player_from_discord(USER_ID_FOO)
+                    .await?
+                    .contains(&MINECRAFT_USERNAME_BAZ.to_string()));
+
+                assert!(!players
+                    .player_from_discord(USER_ID_BAR)
+                    .await?
+                    .contains(&MINECRAFT_USERNAME_FOO.to_string()));
+
+                Ok(())
+            }
+
+            #[tracing_test::traced_test]
+            #[tokio::test]
+            async fn get_discord_id() -> Result {
+                let players = Players::new();
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_FOO.to_owned())
+                    .await?
+                    .expect("map is empty");
+
+                players
+                    .add_username(USER_ID_BAR, MINECRAFT_USERNAME_BAR.to_owned())
+                    .await?
+                    .expect("not already added");
+
+                players
+                    .add_username(USER_ID_FOO, MINECRAFT_USERNAME_BAZ.to_owned())
+                    .await?
+                    .expect("a user can claim multiple minecraft usernames");
+
+                assert_eq!(
+                    players
+                        .player_from_minecraft(MINECRAFT_USERNAME_FOO)
+                        .await?,
+                    Some(USER_ID_FOO)
+                );
+
+                assert_eq!(
+                    players
+                        .player_from_minecraft(MINECRAFT_USERNAME_BAR)
+                        .await?,
+                    Some(USER_ID_BAR)
+                );
+
+                assert_eq!(
+                    players
+                        .player_from_minecraft(MINECRAFT_USERNAME_BAZ)
+                        .await?,
+                    Some(USER_ID_FOO)
+                );
+
+                Ok(())
+            }
+        }
+    }
 }
 pub use players::Players;
 
