@@ -18,7 +18,7 @@ pub struct PoiseData {
     pub(crate) started: UtcDateTime,
     pub(crate) wordle: WordleData,
     error_tx: ErrorSender,
-    minecraft: crate::commands::minecraft::modname::Data,
+    minecraft: crate::commands::minecraft::Data,
 }
 
 impl PoiseData {
@@ -42,7 +42,7 @@ impl PoiseData {
         let (error_tx, error_rx) = ErrorHandler::channel();
         error_rx.spawn();
 
-        let minecraft = crate::commands::minecraft::modname::Data::new_mongodb(&db);
+        let minecraft = crate::commands::minecraft::Data::new_mongodb(&db);
 
         Self {
             config,
@@ -71,7 +71,7 @@ impl PoiseData {
         self.error_tx.clone()
     }
 
-    pub(crate) const fn minecraft(&self) -> &crate::commands::minecraft::modname::Data {
+    pub(crate) const fn minecraft(&self) -> &crate::commands::minecraft::Data {
         &self.minecraft
     }
 }
