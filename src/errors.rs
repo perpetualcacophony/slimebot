@@ -194,6 +194,8 @@ pub enum DiceRollError {
 }
 
 pub trait TracingError: std::error::Error {
+    const LEVEL: tracing::Level;
+
     fn event(&self);
 }
 
@@ -250,5 +252,38 @@ impl ErrorHandler {
                 todo!("handle the error")
             }
         });
+    }
+}
+
+trait ErrorEmbed: std::error::Error + TracingError {
+    fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed {
+        let level = Self::LEVEL;
+        let color = level_to_color(level);
+
+        let title: String = level
+            .to_string()
+            .chars()
+            .enumerate()
+            .map(|(n, ch)| {
+                if n == 0 {
+                    ch.to_uppercase().next().unwrap_or(ch)
+                } else {
+                    ch
+                }
+            })
+            .collect();
+
+        serenity::CreateEmbed::new()
+            .color(color)
+            .description(self.to_string())
+            .title(title)
+    }
+}
+
+fn level_to_color(level: tracing::Level) -> serenity::Color {
+    match level {
+        tracing::Level::ERROR => serenity::Color::RED,
+        tracing::Level::WARN => serenity::Color::GOLD,
+        _ => serenity::Color::FOOYOO,
     }
 }

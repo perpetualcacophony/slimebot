@@ -38,7 +38,7 @@ mod tracing;
 
 fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
     use syn::Data;
-    let function_body: Vec<syn::Stmt> = match input.data {
+    let (function_body, level): (Vec<syn::Stmt>, tracing::Level) = match input.data {
         Data::Struct(data) => {
             let attr = EventAttribute::from_attributes(&input.attrs)?;
 
@@ -51,9 +51,12 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
             let event = tracing::Event::new(attr.level, tracing_fields, true);
             let tracing_event = event.into_macro_call();
 
-            syn::parse_quote! {
-                #tracing_event
-            }
+            (
+                syn::parse_quote! {
+                    #tracing_event
+                },
+                attr.level,
+            )
         }
         Data::Enum(data) => {
             use heck::ToSnakeCase;
@@ -105,13 +108,16 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
                     })
                 })
                 .collect::<Result<Vec<_>, syn::Error>>()?;
-            syn::parse_quote! {
-                match self {
-                    #(
-                        Self::#variants
-                    ),*
-                }
-            }
+            (
+                syn::parse_quote! {
+                    match self {
+                        #(
+                            Self::#variants
+                        ),*
+                    }
+                },
+                span.level,
+            )
         }
         _ => unimplemented!(),
     };
@@ -120,6 +126,8 @@ fn expand(input: syn::DeriveInput) -> syn::Result<syn::ItemImpl> {
 
     Ok(syn::parse_quote! {
         impl TracingError for #name {
+            const LEVEL: ::tracing::Level = #level;
+
             fn event(&self) {
                 #(#function_body)*
             }

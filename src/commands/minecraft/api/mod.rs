@@ -24,8 +24,14 @@ impl Request {
         let request = client
             .get(Self::url(host)?)
             .query(&[("query", false)])
-            .build()?;
-        let response = client.execute(request).await?;
+            .build()
+            .expect("building request should not fail");
+
+        let response = client
+            .execute(request)
+            .await
+            .map_err(errors::ReqwestClientError::or_server::<errors::MinecraftApiError>)?;
+
         Ok(response
             .json()
             .await
@@ -63,39 +69,10 @@ impl Response {
     }
 }
 
-use crate::errors::TracingError;
+pub mod errors;
+pub use errors::Error;
 
-#[derive(Debug, thiserror::Error, TracingError)]
-#[span]
-pub enum Error {
-    #[error(transparent)]
-    #[event(level = WARN)]
-    ParseUrl(#[from] url::ParseError),
-
-    #[error(transparent)]
-    #[event(level = ERROR)]
-    Server(reqwest::Error),
-
-    #[error(transparent)]
-    #[event(level = ERROR)]
-    Unknown(reqwest::Error),
-}
-
-impl From<reqwest::Error> for Error {
-    fn from(error: reqwest::Error) -> Self {
-        if error
-            .status()
-            .as_ref()
-            .is_some_and(reqwest::StatusCode::is_server_error)
-        {
-            Self::Server(error)
-        } else {
-            Self::Unknown(error)
-        }
-    }
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
+type Result<T, E = errors::Error> = std::result::Result<T, E>;
 
 #[derive(serde::Deserialize)]
 pub struct Version {
@@ -145,7 +122,6 @@ mod players {
 }
 use base64::Engine;
 pub use players::Players;
-use slimebot_macros::TracingError;
 use tracing::debug;
 
 #[derive(serde::Deserialize)]
@@ -187,7 +163,7 @@ impl ResponseOnline {
 
             let image_data = base64::prelude::BASE64_STANDARD
                 .decode(base64)
-                .expect("field should be valid base64");
+                .expect("icon field should be valid base64");
 
             let file_to_upload = reqwest::multipart::Part::bytes(image_data).file_name("image.png");
 
@@ -200,7 +176,8 @@ impl ResponseOnline {
                 .post("https://litterbox.catbox.moe/resources/internals/api.php ")
                 .multipart(form)
                 .send()
-                .await?;
+                .await
+                .map_err(errors::ReqwestClientError::or_server::<errors::ImageHostError>)?;
 
             debug!(code = %response.status());
 
