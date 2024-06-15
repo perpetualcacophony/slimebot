@@ -1,6 +1,6 @@
 use poise::serenity_prelude as serenity;
 
-use crate::errors::TracingError;
+use crate::errors::{ErrorEmbedOptions as _, TracingError};
 
 #[derive(Debug, Clone, thiserror::Error, slimebot_macros::TracingError)]
 #[event(level = WARN)]
@@ -72,6 +72,36 @@ impl std::fmt::Display for ErrorAlreadyClaimed {
             "minecraft user {username} already claimed by {already_claimed_by}",
             username = self.minecraft_username
         )
+    }
+}
+
+impl crate::errors::ErrorEmbed for ErrorAlreadyClaimed {
+    fn create_embed(
+        &self,
+        ctx: poise::Context<'_, crate::framework::data::PoiseData, crate::errors::Error>,
+    ) -> serenity::CreateEmbed {
+        let mut embed = serenity::CreateEmbed::new()
+            .color(self.color())
+            .description(self.description())
+            .title(self.title());
+
+        let footer = match (self.footer_text(), self.footer_icon_url()) {
+            (Some(text), Some(icon)) => Some(serenity::CreateEmbedFooter::new(text).icon_url(icon)),
+            (Some(text), None) => Some(serenity::CreateEmbedFooter::new(text)),
+            _ => None,
+        };
+
+        if let Some(footer) = footer {
+            embed = embed.footer(footer)
+        }
+
+        embed
+    }
+}
+
+impl crate::errors::ErrorEmbedOptions for ErrorAlreadyClaimed {
+    fn color(&self) -> serenity::Color {
+        serenity::Color::GOLD
     }
 }
 

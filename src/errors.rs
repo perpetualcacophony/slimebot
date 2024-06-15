@@ -51,6 +51,10 @@ async fn handle_error(mut err: Error, ctx: Context<'_, PoiseData, Error>) {
         err.update_user_nick(ctx, ctx.guild_id())
             .await
             .expect("updating error should not fail");
+
+        /*         let embed = err.create_embed(ctx);
+        ctx.send_ext(poise::CreateReply::default().embed(embed))
+            .await; */
     }
 
     err.event();
@@ -197,11 +201,29 @@ pub enum DiceRollError {
     NoMatch(String),
 }
 
-pub trait TracingError: std::error::Error {
-    const LEVEL: tracing::Level;
+pub trait TracingError: std::fmt::Display {
+    //const LEVEL: tracing::Level;
+    fn level(&self) -> tracing::Level;
 
     fn event(&self);
+
+    fn source(&self) -> Option<&(dyn TracingError + 'static)> {
+        None
+    }
+
+    fn root_cause(&self) -> Option<&(dyn TracingError + 'static)> {
+        self.source()
+            .map(|source| source.root_cause().unwrap_or(source))
+    }
 }
+
+/* impl<T: TracingError> TracingError for &T {
+    const LEVEL: tracing::Level = T::LEVEL;
+
+    fn event(&self) {
+        T::event(self)
+    }
+} */
 
 /*impl TracingError for SendMessageError {
     fn event(&self) {
@@ -259,35 +281,83 @@ impl ErrorHandler {
     }
 } */
 
-trait ErrorEmbed: std::error::Error + TracingError {
-    fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed {
-        let level = Self::LEVEL;
-        let color = level_to_color(level);
+/* impl<T: TracingError + std::error::Error> ErrorEmbed for T {
+    default fn color(&self) -> serenity::Color {
+        match self.level() {
+            tracing::Level::ERROR => serenity::Color::RED,
+            tracing::Level::WARN => serenity::Color::GOLD,
+            _ => serenity::Color::FOOYOO,
+        }
+    }
+} */
 
-        let title: String = level
-            .to_string()
-            .chars()
-            .enumerate()
-            .map(|(n, ch)| {
-                if n == 0 {
-                    ch.to_uppercase().next().unwrap_or(ch)
-                } else {
-                    ch
-                }
-            })
-            .collect();
+pub trait ErrorEmbed: std::fmt::Display {
+    fn source(&self) -> Option<&(dyn ErrorEmbed + 'static)> {
+        None
+    }
 
-        serenity::CreateEmbed::new()
-            .color(color)
-            .description(self.to_string())
-            .title(title)
+    fn root_cause(&self) -> Option<&(dyn ErrorEmbed + 'static)> {
+        self.source()
+            .map(|source| source.root_cause().unwrap_or(source))
+    }
+
+    //fn timestamp()
+
+    fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed;
+
+    /*     async fn send_embed(
+        &self,
+        ctx: Context<'_, PoiseData, Error>,
+    ) -> serenity::Result<serenity::Message> {
+        let embed = self.create_embed(ctx);
+
+        let message = ctx
+            .send_ext(poise::CreateReply::default().reply(true).embed(embed))
+            .await?
+            .into_message()
+            .await?;
+
+        Ok(message)
+    } */
+}
+
+pub trait ErrorEmbedOptions: std::fmt::Display {
+    fn color(&self) -> serenity::Color;
+
+    fn footer_text(&self) -> Option<impl Into<String>> {
+        None::<String>
+    }
+
+    fn footer_icon_url(&self) -> Option<impl Into<String>> {
+        None::<String>
+    }
+
+    fn title(&self) -> impl Into<String> {
+        "boop"
+    }
+
+    fn description(&self) -> impl Into<String> {
+        self.to_string()
     }
 }
 
-fn level_to_color(level: tracing::Level) -> serenity::Color {
-    match level {
-        tracing::Level::ERROR => serenity::Color::RED,
-        tracing::Level::WARN => serenity::Color::GOLD,
-        _ => serenity::Color::FOOYOO,
+impl<T: ErrorEmbedOptions> ErrorEmbed for T {
+    default fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed {
+        let mut embed = serenity::CreateEmbed::new()
+            .color(self.color())
+            .description(self.description())
+            .title(self.title());
+
+        let footer = match (self.footer_text(), self.footer_icon_url()) {
+            (Some(text), Some(icon)) => Some(serenity::CreateEmbedFooter::new(text).icon_url(icon)),
+            (Some(text), None) => Some(serenity::CreateEmbedFooter::new(text)),
+            _ => None,
+        };
+
+        if let Some(footer) = footer {
+            embed = embed.footer(footer)
+        }
+
+        embed
     }
 }

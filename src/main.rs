@@ -4,6 +4,7 @@
 #![feature(let_chains)]
 #![feature(associated_type_defaults)]
 #![feature(try_blocks)]
+#![feature(min_specialization)]
 
 /// Functionality called from Discord.
 mod discord;
