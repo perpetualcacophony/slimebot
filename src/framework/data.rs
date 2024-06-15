@@ -42,13 +42,15 @@ impl PoiseData {
         let (error_tx, error_rx) = ErrorHandler::channel();
         error_rx.spawn();
 
+        let minecraft = crate::commands::minecraft::Data::new_mongodb(&db);
+
         Self {
             config,
             db,
             started,
             wordle,
             error_tx,
-            minecraft: crate::commands::minecraft::Data::new(),
+            minecraft,
         }
     }
 

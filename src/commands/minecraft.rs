@@ -24,11 +24,8 @@ pub async fn minecraft(ctx: Context<'_>, server: Option<String>) -> crate::Resul
             api::Response::Online(response) => {
                 let mut players_fields = Vec::with_capacity(response.players.online);
                 for player in &response.players {
-                    let description = if let Some(serenity_id) = data
-                        .players()
-                        .player_from_minecraft(player.name())
-                        .await
-                        .expect("infallible")
+                    let description = if let Some(serenity_id) =
+                        data.players().player_from_minecraft(player.name()).await?
                     {
                         let user = serenity_id.to_user(ctx).await?;
 
@@ -91,8 +88,7 @@ pub async fn claim(ctx: Context<'_>, username: String) -> crate::Result<()> {
         let data = ctx.data().minecraft();
         data.players()
             .add_username(ctx.author().id, username.clone())
-            .await
-            .expect("error is infallible")
+            .await?
             .map_err(Error::AlreadyClaimed)?;
 
         ctx.reply_ext(format!(
@@ -338,7 +334,7 @@ pub mod api {
 }
 
 mod players {
-    use poise::serenity_prelude as serenity;
+    use poise::serenity_prelude::{self as serenity, futures::StreamExt};
 
     use super::ErrorAlreadyClaimed;
 
@@ -395,6 +391,14 @@ mod players {
         }
     }
 
+    impl<B> From<B> for Players<B> {
+        fn from(value: B) -> Self {
+            Self {
+                backend: std::sync::Arc::new(value),
+            }
+        }
+    }
+
     pub type HashMap = tokio::sync::RwLock<std::collections::HashMap<String, serenity::UserId>>;
 
     pub type PlayersHashMap = Players<HashMap>;
@@ -402,6 +406,14 @@ mod players {
     impl PlayersHashMap {
         pub fn new() -> Self {
             Self::default()
+        }
+    }
+
+    pub type PlayersMongoDb = Players<MongoDb>;
+
+    impl PlayersMongoDb {
+        pub fn new(collection: mongodb::Collection<Record>) -> Self {
+            MongoDb::new(collection).into()
         }
     }
 
@@ -466,11 +478,79 @@ mod players {
             Ok(BackendInfallible::add_username(self, id, username).await)
         }
     }
+
+    #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+    pub struct Record {
+        minecraft_username: String,
+        discord_id: serenity::UserId,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct MongoDb {
+        collection: mongodb::Collection<Record>,
+    }
+
+    impl MongoDb {
+        pub fn new(collection: mongodb::Collection<Record>) -> Self {
+            Self { collection }
+        }
+    }
+
+    impl Backend for MongoDb {
+        type Error = mongodb::error::Error;
+
+        async fn player_from_minecraft(
+            &self,
+            username: &str,
+        ) -> Self::Result<Option<serenity::UserId>> {
+            self.collection
+                .find_one(mongodb::bson::doc! { "minecraft_username": username }, None)
+                .await
+                .map(|op| op.map(|record| record.discord_id))
+        }
+
+        async fn player_from_discord(&self, id: serenity::UserId) -> Self::Result<Vec<String>> {
+            let id = &mongodb::bson::ser::to_bson(&id).expect("UserId implements Deserialize");
+            let mut vec = Vec::new();
+
+            while let Some(record) = self
+                .collection
+                .find(mongodb::bson::doc! { "discord_id": id }, None)
+                .await?
+                .next()
+                .await
+            {
+                let record = record?;
+                vec.push(record.minecraft_username);
+            }
+
+            Ok(vec)
+        }
+
+        async fn add_username(
+            &self,
+            id: serenity::UserId,
+            username: String,
+        ) -> Self::Result<Result<(), ErrorAlreadyClaimed>> {
+            if let Some(user_id) = self.player_from_minecraft(&username).await? {
+                Ok(Err(ErrorAlreadyClaimed::new(user_id, None, username)))
+            } else {
+                let record = Record {
+                    minecraft_username: username,
+                    discord_id: id,
+                };
+
+                self.collection.insert_one(record, None).await?;
+
+                Ok(Ok(()))
+            }
+        }
+    }
 }
 pub use players::Players;
 
 #[derive(Debug)]
-pub struct Data<B = players::HashMap> {
+pub struct Data<B = players::MongoDb> {
     players: Players<B>,
 }
 
@@ -481,9 +561,17 @@ impl<B> Data<B> {
 }
 
 impl Data<players::HashMap> {
-    pub fn new() -> Self {
+    pub fn new_map() -> Self {
         Self {
-            players: Players::new(),
+            players: Players::<players::HashMap>::new(),
+        }
+    }
+}
+
+impl Data<players::MongoDb> {
+    pub fn new_mongodb(db: &mongodb::Database) -> Self {
+        Self {
+            players: Players::<players::MongoDb>::new(db.collection("minecraft")),
         }
     }
 }
@@ -574,6 +662,11 @@ impl std::fmt::Display for ErrorAlreadyClaimed {
 pub enum Error {
     #[error(transparent)]
     AlreadyClaimed(#[from] ErrorAlreadyClaimed),
+
     #[error(transparent)]
     Api(#[from] api::Error),
+
+    #[error("error from mongodb: {0}")]
+    #[event(level = ERROR)]
+    MongoDb(#[from] mongodb::error::Error),
 }
