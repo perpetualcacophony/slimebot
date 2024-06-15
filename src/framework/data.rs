@@ -1,6 +1,6 @@
 use crate::{
     commands::wordle::core::WordleData,
-    errors::{ErrorHandler, ErrorSender},
+    //errors::{ErrorHandler, ErrorSender},
 };
 
 use mongodb::Database;
@@ -17,7 +17,7 @@ pub struct PoiseData {
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
     pub(crate) wordle: WordleData,
-    error_tx: ErrorSender,
+    //error_tx: ErrorSender,
     minecraft: crate::commands::minecraft::Data,
 }
 
@@ -39,8 +39,8 @@ impl PoiseData {
 
         let wordle = WordleData::new(&db);
 
-        let (error_tx, error_rx) = ErrorHandler::channel();
-        error_rx.spawn();
+        /* let (error_tx, error_rx) = ErrorHandler::channel();
+        error_rx.spawn(); */
 
         let minecraft = crate::commands::minecraft::Data::new_mongodb(&db);
 
@@ -49,7 +49,7 @@ impl PoiseData {
             db,
             started,
             wordle,
-            error_tx,
+            //error_tx,
             minecraft,
         }
     }
@@ -67,9 +67,9 @@ impl PoiseData {
         &self.wordle
     }
 
-    pub(crate) fn error_tx(&self) -> ErrorSender {
+    /* pub(crate) fn error_tx(&self) -> ErrorSender {
         self.error_tx.clone()
-    }
+    } */
 
     pub(crate) const fn minecraft(&self) -> &crate::commands::minecraft::Data {
         &self.minecraft

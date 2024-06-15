@@ -4,7 +4,7 @@ use poise::{
 };
 use slimebot_macros::TracingError;
 use thiserror::Error as ThisError;
-use tokio::sync::mpsc;
+//use tokio::sync::mpsc;
 use tracing::{error, error_span, Instrument};
 use tracing_unwrap::ResultExt;
 
@@ -48,11 +48,15 @@ async fn handle_error(mut err: Error, ctx: Context<'_, PoiseData, Error>) {
         crate::commands::minecraft::Error::AlreadyClaimed(ref mut err),
     )) = err
     {
-        err.update_user_nick(ctx, ctx.guild_id()).await;
+        err.update_user_nick(ctx, ctx.guild_id())
+            .await
+            .expect("updating error should not fail");
     }
 
     err.event();
-    ctx.reply_ext(err.to_string()).await;
+    ctx.reply_ext(err.to_string())
+        .await
+        .expect("sending error message should not fail");
 }
 
 #[derive(Debug, ThisError, TracingError)]
@@ -213,7 +217,7 @@ pub trait TracingError: std::error::Error {
     }
 }*/
 
-#[derive(Clone, Debug)]
+/* #[derive(Clone, Debug)]
 pub struct ErrorSender {
     tx: mpsc::Sender<FrameworkError<'static, PoiseData, Error>>,
 }
@@ -253,7 +257,7 @@ impl ErrorHandler {
             }
         });
     }
-}
+} */
 
 trait ErrorEmbed: std::error::Error + TracingError {
     fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed {
