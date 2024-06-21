@@ -92,9 +92,22 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b48808b337d6b74c15ff9becfc0e139fe2b4e2b224d670a0ecdb46b0b2d3d9b"
 dependencies = [
- "attribute-derive-macro",
+ "attribute-derive-macro 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive-where",
- "manyhow",
+ "manyhow 0.10.4",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+]
+
+[[package]]
+name = "attribute-derive"
+version = "0.9.1"
+source = "git+https://github.com/perpetualcacophony/attribute-derive#cb5e168b305da8640ba746f374483aa442913960"
+dependencies = [
+ "attribute-derive-macro 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "derive-where",
+ "manyhow 0.10.4",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -108,7 +121,22 @@ checksum = "5b19cbd63850ecff821c413e12846a67ec9f4ce7309c70959b94ecf9b2575ee2"
 dependencies = [
  "collection_literals",
  "interpolator",
- "manyhow",
+ "manyhow 0.10.4",
+ "proc-macro-utils",
+ "proc-macro2",
+ "quote",
+ "quote-use",
+ "syn 2.0.66",
+]
+
+[[package]]
+name = "attribute-derive-macro"
+version = "0.9.1"
+source = "git+https://github.com/perpetualcacophony/attribute-derive#cb5e168b305da8640ba746f374483aa442913960"
+dependencies = [
+ "collection_literals",
+ "interpolator",
+ "manyhow 0.10.4",
  "proc-macro-utils",
  "proc-macro2",
  "quote",
@@ -1395,7 +1423,19 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f91ea592d76c0b6471965708ccff7e6a5d277f676b90ab31f4d3f3fc77fade64"
 dependencies = [
- "manyhow-macros",
+ "manyhow-macros 0.10.4",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+]
+
+[[package]]
+name = "manyhow"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02bc2a348104913df6d14170bedef54faf224a0970ec7b1f8750748ab94fcd52"
+dependencies = [
+ "manyhow-macros 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -1406,6 +1446,17 @@ name = "manyhow-macros"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c64621e2c08f2576e4194ea8be11daf24ac01249a4f53cd8befcbb7077120ead"
+dependencies = [
+ "proc-macro-utils",
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "manyhow-macros"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "532aa12d5846b38a524b3acd99fb74dc8a5f193b33e65dac142ef92bd60f9416"
 dependencies = [
  "proc-macro-utils",
  "proc-macro2",
@@ -2577,6 +2628,7 @@ dependencies = [
  "slimebot_macros",
  "temp-mongo",
  "thiserror",
+ "thisslime",
  "time",
  "tinyvec",
  "tokio",
@@ -2591,7 +2643,7 @@ dependencies = [
 name = "slimebot_macros"
 version = "0.1.0"
 dependencies = [
- "attribute-derive",
+ "attribute-derive 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "heck 0.5.0",
  "proc-macro2",
  "quote",
@@ -2810,6 +2862,43 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "thisslime"
+version = "0.1.0"
+source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+dependencies = [
+ "thisslime-derive",
+ "tracing",
+]
+
+[[package]]
+name = "thisslime-core"
+version = "0.1.0"
+source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+dependencies = [
+ "attribute-derive 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+ "tracing",
+]
+
+[[package]]
+name = "thisslime-derive"
+version = "0.1.0"
+source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+dependencies = [
+ "attribute-derive 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "heck 0.5.0",
+ "manyhow 0.11.1",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+ "thisslime-core",
+ "tracing",
 ]
 
 [[package]]

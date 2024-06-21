@@ -1,11 +1,16 @@
+use std::fmt::Display;
+
+use chrono::format::Item;
+use mongodb::bson::document::Iter;
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
 };
-use slimebot_macros::TracingError;
+
 use thiserror::Error as ThisError;
+use thisslime::TracingError;
 //use tokio::sync::mpsc;
-use tracing::{error, error_span, Instrument};
+use tracing::{error, error_span, Instrument, Span};
 use tracing_unwrap::ResultExt;
 
 use crate::{
@@ -13,6 +18,8 @@ use crate::{
     utils::poise::ContextExt,
     PoiseData,
 };
+
+pub mod tracing_error;
 
 pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxFuture<()> {
     Box::pin(async {
@@ -201,22 +208,6 @@ pub enum DiceRollError {
     NoMatch(String),
 }
 
-pub trait TracingError: std::fmt::Display {
-    //const LEVEL: tracing::Level;
-    fn level(&self) -> tracing::Level;
-
-    fn event(&self);
-
-    fn source(&self) -> Option<&(dyn TracingError + 'static)> {
-        None
-    }
-
-    fn root_cause(&self) -> Option<&(dyn TracingError + 'static)> {
-        self.source()
-            .map(|source| source.root_cause().unwrap_or(source))
-    }
-}
-
 /* impl<T: TracingError> TracingError for &T {
     const LEVEL: tracing::Level = T::LEVEL;
 
@@ -292,17 +283,6 @@ impl ErrorHandler {
 } */
 
 pub trait ErrorEmbed: std::fmt::Display {
-    fn source(&self) -> Option<&(dyn ErrorEmbed + 'static)> {
-        None
-    }
-
-    fn root_cause(&self) -> Option<&(dyn ErrorEmbed + 'static)> {
-        self.source()
-            .map(|source| source.root_cause().unwrap_or(source))
-    }
-
-    //fn timestamp()
-
     fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed;
 
     /*     async fn send_embed(
@@ -359,5 +339,15 @@ impl<T: ErrorEmbedOptions> ErrorEmbed for T {
         }
 
         embed
+    }
+}
+
+trait SlimebotError: std::error::Error + TracingError + ErrorEmbed {
+    fn source(&self) -> Option<&(dyn SlimebotError + 'static)> {
+        None
+    }
+
+    fn root_cause(&self) -> Option<&(dyn SlimebotError + 'static)> {
+        SlimebotError::source(self).map(|source| SlimebotError::source(source).unwrap_or(source))
     }
 }
