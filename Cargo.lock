@@ -1287,6 +1287,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kwordle"
+version = "0.2.0"
+source = "git+https://github.com/perpetualcacophony/kwordle#1041cb46249741cadd9a8b01dfc6bc9cffc34e6a"
+dependencies = [
+ "rand",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2584,6 +2592,7 @@ dependencies = [
  "chrono",
  "config",
  "git2",
+ "kwordle",
  "mongodb",
  "openssl",
  "paste",
