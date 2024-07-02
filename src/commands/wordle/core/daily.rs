@@ -52,8 +52,11 @@ impl DailyWordles {
             .filter(|daily| daily.is_expired().not()))
     }
 
-    pub async fn refresh(&self, words: impl AsRef<WordsList>) -> DbResult<Option<DailyWordle>> {
-        let new_word = words.as_ref().random_answer();
+    pub async fn refresh(
+        &self,
+        words: impl AsRef<kwordle::WordsList<5>>,
+    ) -> DbResult<Option<DailyWordle>> {
+        let new_word = words.as_ref().answers.random();
 
         if let Some(latest) = self.latest_not_expired().await? {
             if latest.is_old() {
@@ -66,7 +69,7 @@ impl DailyWordles {
         Ok(None)
     }
 
-    pub async fn new_daily(&self, word: &Word) -> DbResult<DailyWordle> {
+    pub async fn new_daily(&self, word: &kwordle::Word<5>) -> DbResult<DailyWordle> {
         let latest_number = self.latest().await?.map_or(0, |daily| daily.puzzle.number);
 
         debug!(latest_number);
