@@ -49,6 +49,7 @@ time = "0.3.36"
 backoff = { version = "0.4.0", features = ["tokio"] }
 url = { version = "2.5.1", features = ["serde"] }
 base64 = "0.22.1"
+kwordle = { git = "https://github.com/perpetualcacophony/kwordle" }
 thisslime = "0.5.1"
 
 [dev-dependencies]
