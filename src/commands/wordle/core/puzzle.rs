@@ -16,19 +16,19 @@ pub enum Puzzle {
 }
 
 impl Puzzle {
-    pub fn random(words: &WordsList) -> Self {
-        let answer = words.random_answer();
+    pub fn random(words: &kwordle::WordsList<5>) -> Self {
+        let answer = words.answers.random();
 
         Self::Random(answer)
     }
 
     #[allow(dead_code)] // this is used in a macro
-    pub fn guess_str(&self, word: &impl AsLetters) -> Guess {
-        self.answer().guess_str(word)
+    pub fn guess_str(&self, list: &kwordle::WordsList<5>, s: &str) -> kwordle::Guess<5> {
+        self.answer().guess_str(list, s).unwrap()
     }
 
-    pub fn guess(&self, partial: PartialGuess) -> Guess {
-        self.answer().guess(partial)
+    pub fn guess(&self, word: &kwordle::Word<5>) -> kwordle::Guess<5> {
+        self.answer().guess_word(*word)
     }
 
     pub fn is_daily(&self) -> bool {
@@ -40,7 +40,7 @@ impl Puzzle {
         matches!(self, Self::Random(..))
     }
 
-    pub fn answer(&self) -> &Word {
+    pub fn answer(&self) -> &kwordle::Word<5> {
         match self {
             Self::Random(answer) => answer,
             Self::Daily(daily) => &daily.answer,
