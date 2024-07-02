@@ -89,43 +89,13 @@ dependencies = [
 [[package]]
 name = "attribute-derive"
 version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b48808b337d6b74c15ff9becfc0e139fe2b4e2b224d670a0ecdb46b0b2d3d9b"
-dependencies = [
- "attribute-derive-macro 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "derive-where",
- "manyhow 0.10.4",
- "proc-macro2",
- "quote",
- "syn 2.0.66",
-]
-
-[[package]]
-name = "attribute-derive"
-version = "0.9.1"
 source = "git+https://github.com/perpetualcacophony/attribute-derive#cb5e168b305da8640ba746f374483aa442913960"
 dependencies = [
- "attribute-derive-macro 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "attribute-derive-macro",
  "derive-where",
  "manyhow 0.10.4",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
-]
-
-[[package]]
-name = "attribute-derive-macro"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b19cbd63850ecff821c413e12846a67ec9f4ce7309c70959b94ecf9b2575ee2"
-dependencies = [
- "collection_literals",
- "interpolator",
- "manyhow 0.10.4",
- "proc-macro-utils",
- "proc-macro2",
- "quote",
- "quote-use",
  "syn 2.0.66",
 ]
 
@@ -2625,7 +2595,6 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
- "slimebot_macros",
  "temp-mongo",
  "thiserror",
  "thisslime",
@@ -2637,18 +2606,6 @@ dependencies = [
  "tracing-test",
  "tracing-unwrap",
  "url",
-]
-
-[[package]]
-name = "slimebot_macros"
-version = "0.1.0"
-dependencies = [
- "attribute-derive 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "heck 0.5.0",
- "proc-macro2",
- "quote",
- "syn 2.0.66",
- "tracing",
 ]
 
 [[package]]
@@ -2878,7 +2835,7 @@ name = "thisslime-core"
 version = "0.1.0"
 source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
 dependencies = [
- "attribute-derive 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "attribute-derive",
  "heck 0.5.0",
  "proc-macro2",
  "quote",
@@ -2891,7 +2848,7 @@ name = "thisslime-derive"
 version = "0.1.0"
 source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
 dependencies = [
- "attribute-derive 0.9.1 (git+https://github.com/perpetualcacophony/attribute-derive)",
+ "attribute-derive",
  "heck 0.5.0",
  "manyhow 0.11.1",
  "proc-macro2",
