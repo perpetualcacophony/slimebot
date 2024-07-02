@@ -11,7 +11,7 @@ use crate::framework::data::UtcDateTime;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Puzzle {
-    Random(Word),
+    Random(kwordle::Word<5>),
     Daily(DailyPuzzle),
 }
 
@@ -65,12 +65,12 @@ impl Puzzle {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DailyPuzzle {
     pub number: u32,
-    answer: Word,
+    answer: kwordle::Word<5>,
     pub started: UtcDateTime,
 }
 
 impl DailyPuzzle {
-    pub fn new(number: u32, answer: Word) -> Self {
+    pub fn new(number: u32, answer: kwordle::Word<5>) -> Self {
         Self {
             number,
             answer,
