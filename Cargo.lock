@@ -1289,7 +1289,7 @@ dependencies = [
 [[package]]
 name = "kwordle"
 version = "0.2.0"
-source = "git+https://github.com/perpetualcacophony/kwordle?rev=c6e2eccba1f863abed92d769c99cfeed68a149c6#c6e2eccba1f863abed92d769c99cfeed68a149c6"
+source = "git+https://github.com/perpetualcacophony/kwordle?branch=master#c6e2eccba1f863abed92d769c99cfeed68a149c6"
 dependencies = [
  "rand",
  "serde",
