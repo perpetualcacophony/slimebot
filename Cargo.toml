@@ -49,8 +49,8 @@ time = "0.3.36"
 backoff = { version = "0.4.0", features = ["tokio"] }
 url = { version = "2.5.1", features = ["serde"] }
 base64 = "0.22.1"
-thisslime = "0.5.1"
-kwordle = { git = "https://github.com/perpetualcacophony/kwordle", rev = "c6e2eccba1f863abed92d769c99cfeed68a149c6", features = [
+thisslime = { git = "https://github.com/perpetualcacophony/thisslime" }
+kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "master", features = [
     "serde_derive",
 ] }
 
