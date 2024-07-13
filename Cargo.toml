@@ -52,6 +52,7 @@ base64 = "0.22.1"
 thisslime = { git = "https://github.com/perpetualcacophony/thisslime" }
 kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "master", features = [
     "serde_derive",
+    "classic_words",
 ] }
 
 [dev-dependencies]
