@@ -48,10 +48,10 @@ mod message;
 
 pub struct Game<'a> {
     puzzle: Arc<Puzzle>,
-    guesses: Guesses,
+    guesses: kwordle::Guesses<5>,
     ctx: Context<'a>,
     msg: GameMessage,
-    words: &'a WordsList,
+    words: &'a kwordle::WordsList<5>,
     dailies: &'a DailyWordles,
     cache: &'a GamesCache,
     users: Users<'a>,
@@ -76,7 +76,7 @@ impl<'a> Game<'a> {
 
         Ok(Self {
             puzzle: Arc::new(puzzle),
-            guesses: Guesses::new(options.guesses_limit),
+            guesses: kwordle::Guesses::new(options.guesses_limit),
             ctx,
             msg,
             words: data.wordle().words(),
@@ -129,10 +129,10 @@ impl<'a> Game<'a> {
         self.puzzle.clone()
     }
 
-    pub fn guess(&mut self, partial: PartialGuess) -> Guess {
-        let new = self.puzzle.guess(partial);
+    pub fn guess(&mut self, word: kwordle::Word<5>) -> kwordle::Guess<5> {
+        let new = self.puzzle.guess(&word);
         self.guesses.push(new);
-        self.guesses.last().expect("just added one")
+        self.guesses.latest().expect("just added one")
     }
 
     // pub async fn finish(&mut self, text: impl AsRef<str>) -> SerenityResult<()> {
@@ -145,7 +145,7 @@ impl<'a> Game<'a> {
     // }
 
     pub fn is_solved(&self) -> bool {
-        self.guesses.last_is_solved()
+        self.guesses.latest_is_correct()
     }
 
     pub fn state(&self, finished: bool) -> GameRecord {
@@ -169,8 +169,8 @@ impl<'a> Game<'a> {
         loop {
             tokio::select! {
                 Some(msg) = messages.next() => {
-                    if let Some(partial) = msg.find_guess(ctx).await? {
-                        self.guess(partial);
+                    if let Some(word) = msg.find_guess(ctx).await? {
+                        self.guess(word);
 
                         let data = self.cache.set(*self.msg.channel_id(), self.data()).await;
                         self.msg.edit(ctx, data).await?;
@@ -246,24 +246,24 @@ trait MessageExt {
     async fn find_guess(
         &self,
         ctx: GameContext<'_>,
-    ) -> serenity_prelude::Result<Option<PartialGuess>>;
+    ) -> serenity_prelude::Result<Option<kwordle::Word<5>>>;
 }
 
 impl MessageExt for Message {
     async fn find_guess(
         &self,
         ctx: GameContext<'_>,
-    ) -> serenity_prelude::Result<Option<PartialGuess>> {
+    ) -> serenity_prelude::Result<Option<kwordle::Word<5>>> {
         let question_mark: ReactionType = ReactionType::Unicode("❓".to_owned());
         let check_mark: ReactionType = ReactionType::Unicode("✅".to_owned());
 
-        match self.content.to_partial_guess(ctx.words()) {
-            Ok(partial) => {
+        match kwordle::Word::from_str(ctx.words_list, &self.content) {
+            Ok(word) => {
                 self.react(ctx, check_mark).await?;
-                Ok(Some(partial))
+                Ok(Some(word))
             }
             Err(err) => match err {
-                PartialGuessError::NotInList(..) => {
+                kwordle::word::ParseWordError::NotInList { .. } => {
                     self.react(ctx, question_mark).await?;
                     Ok(None)
                 }
@@ -339,7 +339,7 @@ impl ComponentInteractionExt for ComponentInteraction {
 #[derive(Copy, Clone)]
 struct GameContext<'a> {
     poise: Context<'a>,
-    words_list: &'a WordsList,
+    words_list: &'a kwordle::WordsList<5>,
 }
 
 impl<'a> GameContext<'a> {
@@ -351,7 +351,7 @@ impl<'a> GameContext<'a> {
         self.poise_context().author().id
     }
 
-    fn words(&self) -> &WordsList {
+    fn words(&self) -> &kwordle::WordsList<5> {
         self.words_list
     }
 }
@@ -379,7 +379,7 @@ impl AsRef<ShardMessenger> for GameContext<'_> {
 }
 
 impl AsRef<WordsList> for GameContext<'_> {
-    fn as_ref(&self) -> &WordsList {
+    fn as_ref(&self) -> &kwordle::WordsList<5> {
         self.words()
     }
 }

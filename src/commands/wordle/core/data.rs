@@ -4,14 +4,14 @@ use super::{game::GamesCache, DailyWordles, WordsList};
 
 #[derive(Debug, Clone)]
 pub struct WordleData {
-    words: WordsList,
+    words: kwordle::WordsList<5>,
     wordles: DailyWordles,
     game_data: GamesCache,
 }
 
 impl WordleData {
     pub fn new(db: &Database) -> Self {
-        let words = WordsList::load();
+        let words = kwordle::classic::words_list();
         let wordles = DailyWordles::new(db);
         let game_data = GamesCache::new();
 
@@ -22,7 +22,7 @@ impl WordleData {
         }
     }
 
-    pub const fn words(&self) -> &WordsList {
+    pub const fn words(&self) -> &kwordle::WordsList<5> {
         &self.words
     }
 
