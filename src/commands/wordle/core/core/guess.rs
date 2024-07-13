@@ -255,18 +255,10 @@ impl ToPartialGuess for Message {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GuessesRecord(Vec<Guess>);
+pub struct GuessesRecord(Vec<kwordle::Guess>);
 
-impl<T: Into<Vec<Guess>>> From<T> for GuessesRecord {
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
-impl AsRef<[Guess]> for GuessesRecord {
-    fn as_ref(&self) -> &[Guess] {
-        self.0.as_ref()
-    }
+impl From<kwordle::Guesses> for GuessesRecord {
+    fn from
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
