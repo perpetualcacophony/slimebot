@@ -54,6 +54,7 @@ thisslime = { git = "https://github.com/perpetualcacophony/thisslime" }
 kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "master", features = [
     "serde_derive",
     "classic_words",
+    "step",
 ] }
 
 [dev-dependencies]
