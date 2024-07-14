@@ -6,13 +6,13 @@ use poise::serenity_prelude::{
 #[allow(unused_imports)]
 use tracing::{debug, info, trace};
 
-use crate::{discord::commands::SendMessageError, errors::CommandError};
+use crate::{errors::SendMessageError, framework::event_handler::HandlerError};
 
 pub async fn bug_reports(
     http: &Http,
     add_reaction: Reaction,
     channel: &ChannelId,
-) -> Result<(), CommandError> {
+) -> Result<(), HandlerError> {
     let ladybug_reaction = ReactionType::Unicode("🐞".to_string());
 
     let ladybugs = add_reaction

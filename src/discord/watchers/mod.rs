@@ -1,15 +1,87 @@
 use chrono::{DateTime, Utc};
 use mongodb::{bson::doc, options::FindOneOptions, Database};
-use poise::serenity_prelude::{CacheHttp, CreateMessage, GuildId, Http, Message, UserId};
+use poise::serenity_prelude::{Cache, CacheHttp, GuildId, Http, Message, UserId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::{errors::CommandError, FormatDuration};
+use crate::{
+    framework::event_handler::HandlerError,
+    utils::{
+        format_duration::FormatDuration,
+        serenity::channel::{ChannelIdExt, MessageExt},
+    },
+};
 
-use super::commands::SendMessageError;
+macro_rules! include_str_static {
+    ($path:literal) => {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/", $path))
+    };
+}
 
 mod haiku;
+
+struct FilterSet<Event> {
+    filters: Vec<Box<dyn Fn(&Event) -> bool>>,
+}
+
+impl<Event> FilterSet<Event> {
+    /// Same as [Self::default].
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn with(mut self, filter: impl Fn(&Event) -> bool + 'static) -> Self {
+        self.filters.push(Box::new(filter));
+        self
+    }
+
+    fn filters(&self) -> &[impl Fn(&Event) -> bool] {
+        &self.filters
+    }
+
+    fn test_event<'event>(&self, event: &'event Event) -> Option<&'event Event> {
+        for filter in self.filters() {
+            if !filter(event) {
+                return None;
+            }
+        }
+
+        Some(event)
+    }
+}
+
+impl<T> Default for FilterSet<T> {
+    fn default() -> Self {
+        Self {
+            filters: Vec::new(),
+        }
+    }
+}
+
+type MessageFilter = FilterSet<Message>;
+
+impl MessageFilter {
+    fn in_guild(self, guild_id: Option<GuildId>) -> Self {
+        self.with(move |msg| msg.guild_id == guild_id)
+    }
+
+    fn not_own(self, cache: &'static Cache) -> Self {
+        self.with(move |msg| !msg.is_own(cache))
+    }
+
+    fn test<'msg>(&self, msg: &'msg Message) -> Option<&'msg Message> {
+        self.test_event(msg)
+    }
+}
+
+trait Handler {
+    type Event;
+    type CheckOutput = ();
+
+    fn check(event: &Self::Event) -> Option<Self::CheckOutput>;
+    async fn action(event: &Self::Event) -> crate::Result<()>;
+}
 
 async fn log_watcher(http: impl CacheHttp, new_message: &Message) {
     info!(
@@ -36,7 +108,7 @@ async fn check_vore(content: &str) -> bool {
 
 // watches all channels for a mention of vore and responds with time statistics
 #[instrument(skip_all, level = "trace")]
-pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), CommandError> {
+pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), HandlerError> {
     if check_vore(&msg.content).await {
         log_watcher(http, msg).await;
 
@@ -70,15 +142,14 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), Comma
             let time = new_mention.timestamp - last.timestamp;
 
             msg.channel_id
-                .say(
+                .say_ext(
                     http,
                     format!(
                         "~~{time}~~ 0 days without mentioning vore",
                         time = time.format_largest()
                     ),
                 )
-                .await
-                .map_err(SendMessageError::from)?;
+                .await?;
         }
 
         vore_mentions.insert_one(new_mention, None).await?;
@@ -89,14 +160,13 @@ pub async fn vore(http: &Http, db: &Database, msg: &Message) -> Result<(), Comma
 
 // watches all channels for "L" and responds with the biden image
 #[instrument(skip_all, level = "trace")]
-pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if msg.content == "L" {
         info!(
             "@{} (#{}): {}",
             msg.author.name,
             msg.channel(http)
-                .await
-                .expect("message should have a channel")
+                .await?
                 .guild()
                 .expect("channel should be inside a guild")
                 .name(),
@@ -104,12 +174,8 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
         );
 
         msg.channel_id
-            .send_message(
-                http,
-                CreateMessage::new().content("https://files.catbox.moe/v7itt0.webp"),
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            .say_ext(http, include_str_static!("biden_L_url.txt"))
+            .await?;
     }
 
     Ok(())
@@ -117,7 +183,7 @@ pub async fn l_biden(http: &Http, msg: &Message) -> Result<(), CommandError> {
 
 // watches all channels for "CL" and reponds with the Look CL copypasta
 #[instrument(skip_all, level = "trace")]
-pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if msg
         .content
         .replace(['.', ',', ':', ';', '(', ')', '!', '?', '~', '#', '^'], " ")
@@ -136,20 +202,13 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
             msg.content
         );
 
+        let copypasta = include_str_static!("look_cl_copypasta.txt");
+
         if msg.content.starts_with("Look CL") || msg.content.starts_with("look CL") {
-            msg.channel_id.send_message(http, CreateMessage::new()
-                .content("I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(msg)
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            msg.reply_ext(http, copypasta.trim_start_matches("Look CL, "))
+                .await?;
         } else {
-            msg.channel_id.send_message(http, CreateMessage::new()
-                .content("Look CL, I wouldn't have wasted my time critiquing if I didn't think anafublic was a good writer. I would love to get feedback like this. Praise doesn't help you grow and I shared my honest impression as a reader with which you seem to mostly agree. As for my \"preaching post,\" I don't accept the premise that only ones bettors are qualified to share their opinion. Siskel and Ebert didn't know jack about making movies. As for me being \"lazy,\" that's the point. Reading shouldn't have to be work. If it is, you're doing something wrong. And I'm not being an asshole, I'm simply being direct.")
-                .reference_message(msg)
-            )
-            .await
-            .map_err(SendMessageError::from)?;
+            msg.reply_ext(http, copypasta).await?;
         }
     }
 
@@ -157,7 +216,7 @@ pub async fn look_cl(http: &Http, msg: &Message) -> Result<(), CommandError> {
 }
 
 #[instrument(skip_all)]
-pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), CommandError> {
+pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), HandlerError> {
     if let Some(haiku) = haiku::check_haiku(&msg.content) {
         let haiku = haiku
             .iter()
@@ -167,7 +226,7 @@ pub async fn watch_haiku(http: &Http, msg: &Message) -> Result<(), CommandError>
 
         let txt = format!("beep boop! i found a haiku:\n{haiku}\nsometimes i make mistakes");
 
-        msg.reply(http, txt).await.map_err(SendMessageError::from)?;
+        msg.reply_ext(http, txt).await?;
     }
 
     Ok(())

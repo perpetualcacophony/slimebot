@@ -1,4 +1,6 @@
-use poise::serenity_prelude::{self, CacheHttp, ChannelId, EditChannel, GuildChannel};
+use poise::serenity_prelude::{self, CacheHttp, ChannelId, EditChannel, GuildChannel, Message};
+
+use crate::errors::SendMessageError;
 
 trait RenameGuildChannel {
     async fn rename(
@@ -33,5 +35,45 @@ impl RenameChannelId for ChannelId {
         name: &str,
     ) -> serenity_prelude::Result<GuildChannel> {
         self.edit(cache_http, EditChannel::new().name(name)).await
+    }
+}
+
+pub trait ChannelIdExt {
+    async fn say_ext(
+        self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError>;
+}
+
+impl ChannelIdExt for ChannelId {
+    async fn say_ext(
+        self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError> {
+        self.say(cache_http, content)
+            .await
+            .map_err(SendMessageError::from)
+    }
+}
+
+pub trait MessageExt {
+    async fn reply_ext(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError>;
+}
+
+impl MessageExt for Message {
+    async fn reply_ext(
+        &self,
+        cache_http: impl CacheHttp,
+        content: impl Into<String>,
+    ) -> Result<Message, SendMessageError> {
+        self.reply(cache_http, content)
+            .await
+            .map_err(SendMessageError::from)
     }
 }
