@@ -9,7 +9,6 @@ RUN cargo +nightly chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
-COPY --from=planner /app/macros macros
 RUN cargo +nightly chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
 COPY . .
 RUN cargo +nightly build --release --target x86_64-unknown-linux-musl --bin slimebot
