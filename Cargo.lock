@@ -2729,7 +2729,11 @@ dependencies = [
 [[package]]
 name = "thisslime"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+=======
+source = "git+https://github.com/perpetualcacophony/thisslime#ee464d940e1b8e1c037cda5f42f892926028eece"
+>>>>>>> 4883c7b20c1ed12245fb4775524469cb906bbaa1
 dependencies = [
  "thisslime-core",
  "thisslime-derive",
@@ -2739,7 +2743,11 @@ dependencies = [
 [[package]]
 name = "thisslime-core"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+=======
+source = "git+https://github.com/perpetualcacophony/thisslime#ee464d940e1b8e1c037cda5f42f892926028eece"
+>>>>>>> 4883c7b20c1ed12245fb4775524469cb906bbaa1
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",
@@ -2753,7 +2761,11 @@ dependencies = [
 [[package]]
 name = "thisslime-derive"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+=======
+source = "git+https://github.com/perpetualcacophony/thisslime#ee464d940e1b8e1c037cda5f42f892926028eece"
+>>>>>>> 4883c7b20c1ed12245fb4775524469cb906bbaa1
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",
