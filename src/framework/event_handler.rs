@@ -1,12 +1,11 @@
 use std::{fmt, future::Future, pin::Pin};
 
-use crate::errors::TracingError;
 use poise::{
     serenity_prelude::{self as serenity, CacheHttp, FullEvent, Message},
     FrameworkContext,
 };
-use slimebot_macros::TracingError;
 use thiserror::Error as ThisError;
+use thisslime::TracingError;
 use tracing::trace;
 
 use crate::{

@@ -2824,8 +2824,9 @@ dependencies = [
 [[package]]
 name = "thisslime"
 version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
 dependencies = [
+ "thisslime-core",
  "thisslime-derive",
  "tracing",
 ]
@@ -2833,10 +2834,11 @@ dependencies = [
 [[package]]
 name = "thisslime-core"
 version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",
+ "paste",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -2846,7 +2848,7 @@ dependencies = [
 [[package]]
 name = "thisslime-derive"
 version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#d00ca3b3a10f14264efe3ba1b1caf158c8cd0b57"
+source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",

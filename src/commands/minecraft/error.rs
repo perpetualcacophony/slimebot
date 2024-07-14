@@ -1,8 +1,8 @@
 use poise::serenity_prelude as serenity;
 
-use crate::errors::{ErrorEmbedOptions as _, TracingError};
+use crate::errors::ErrorEmbedOptions as _;
 
-#[derive(Debug, Clone, thiserror::Error, slimebot_macros::TracingError)]
+#[derive(Debug, Clone, thiserror::Error, thisslime::TracingError)]
 #[event(level = WARN)]
 pub struct ErrorAlreadyClaimed {
     #[field(print = Display)]
@@ -105,7 +105,7 @@ impl crate::errors::ErrorEmbedOptions for ErrorAlreadyClaimed {
     }
 }
 
-#[derive(Debug, thiserror::Error, slimebot_macros::TracingError)]
+#[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
     #[error(transparent)]
     AlreadyClaimed(#[from] ErrorAlreadyClaimed),

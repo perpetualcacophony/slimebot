@@ -64,7 +64,7 @@ async fn handle_error(mut err: Error, ctx: Context<'_, PoiseData, Error>) {
             .await; */
     }
 
-    err.event();
+    err.trace();
     ctx.reply_ext(err.to_string())
         .await
         .expect("sending error message should not fail");

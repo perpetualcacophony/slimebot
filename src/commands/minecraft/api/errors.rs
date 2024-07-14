@@ -1,5 +1,4 @@
-use crate::errors::TracingError;
-use slimebot_macros::TracingError;
+use thisslime::TracingError;
 
 #[derive(Debug, thiserror::Error, TracingError)]
 #[span]
