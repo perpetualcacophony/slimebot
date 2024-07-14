@@ -5,6 +5,7 @@
 #![feature(associated_type_defaults)]
 #![feature(try_blocks)]
 #![feature(min_specialization)]
+#![feature(const_option)]
 
 /// Functionality called from Discord.
 mod discord;
