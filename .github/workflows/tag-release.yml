@@ -1,0 +1,29 @@
+name: Tag release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+env:
+  VERSION: ${{ github.head_ref }}
+
+jobs:
+  add_tag:
+    if: ${{ startsWith(github.head_ref, 'release/') && github.event.pull_request.merged }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add tag
+        run: git tag ${VERSION#release/}
+
+      - name: Push tag
+        run: git push --tags
