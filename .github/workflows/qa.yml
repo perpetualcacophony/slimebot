@@ -3,7 +3,7 @@ name: Release QA
 on:
   push:
     branches:
-      - release/**
+      - release/v[0-9]**
 
 env:
   VERSION: ${{ github.ref_name }}
