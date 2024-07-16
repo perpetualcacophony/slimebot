@@ -1,17 +1,46 @@
-name: CI
+name: Release QA
 
 on:
   push:
-    paths-ignore: [ "README.md" ]
-    branches: [ "main" ]
+    branches:
+      - release/**
 
-  pull_request:
-    types: [opened, synchronize, reopened]
-    
 env:
-  CARGO_TERM_COLOR: always
+  VERSION: ${{ github.ref_name }}
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+  
+    steps:    
+    - name: Checkout repository
+      uses: actions/checkout@v4
+  
+    - name: Install rust
+      uses: dtolnay/rust-toolchain@nightly
+
+    - name: Cache rust
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build
+      run: cargo build
+
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226
+
+    - name: Build image
+      uses: docker/build-push-action@v5
+      with:
+        push: false
+
   tests:
     runs-on: ubuntu-latest
 
@@ -29,7 +58,7 @@ jobs:
         echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
         sudo apt-get update
         sudo apt-get install -y mongodb-org-server
-  
+
     - name: Install rust
       uses: dtolnay/rust-toolchain@nightly
 
