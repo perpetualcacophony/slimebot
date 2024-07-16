@@ -2,8 +2,7 @@ name: Package release
 
 on:
   push:
-    # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags: [ 'v[0-9]{2}.[0-9]{2}*' ]
 
 env:
   # Use docker.io for Docker Hub if empty
