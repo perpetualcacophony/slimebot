@@ -114,8 +114,7 @@ impl BotConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(try_from = "String")]
+#[derive(Clone, Debug)]
 pub struct RepoName {
     user: String,
     repo: String,
@@ -162,6 +161,19 @@ impl TryFrom<String> for RepoName {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from_str(&value).ok_or(value)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for RepoName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str_instrumented(&s).ok_or(serde::de::Error::invalid_value(
+            serde::de::Unexpected::Str(&s),
+            &"<user>/<repo>",
+        ))
     }
 }
 
