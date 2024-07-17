@@ -14,7 +14,10 @@ use tracing::{error, error_span, Instrument, Span};
 use tracing_unwrap::ResultExt;
 
 use crate::{
-    framework::event_handler::{self, HandlerError},
+    framework::{
+        config::ConfigError,
+        event_handler::{self, HandlerError},
+    },
     utils::poise::ContextExt,
     PoiseData,
 };
@@ -97,6 +100,9 @@ pub enum CommandError {
 
     #[error("error from minecraft api: {0}")]
     Minecraft(#[from] crate::commands::minecraft::Error),
+
+    #[error("missing configuration for this command: ")]
+    Config(#[from] ConfigError),
 }
 
 #[derive(Debug, ThisError, TracingError)]

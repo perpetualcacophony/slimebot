@@ -6,6 +6,12 @@ use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ConfigError {
+    #[error(transparent)]
+    Bot(#[from] BotConfigError),
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub bot: BotConfig,
@@ -28,6 +34,12 @@ impl Config {
             None
         }
     }
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum BotConfigError {
+    #[error("no github repository in config")]
+    GithubRepo,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -113,12 +125,8 @@ impl BotConfig {
         self.status_channel
     }
 
-    pub fn github_repo(&self) -> Option<&RepoName> {
-        if self.github_repo.is_none() {
-            tracing::warn!("no github repository in config");
-        }
-
-        self.github_repo.as_ref()
+    pub fn github_repo(&self) -> Result<&RepoName, BotConfigError> {
+        self.github_repo.as_ref().ok_or(BotConfigError::GithubRepo)
     }
 }
 
