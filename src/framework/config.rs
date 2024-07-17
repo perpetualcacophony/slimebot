@@ -37,7 +37,7 @@ pub struct BotConfig {
     activity: Option<String>,
     prefix: String,
     status_channel: Option<ChannelId>,
-    pub github_repo: Option<RepoName>,
+    github_repo: Option<RepoName>,
 }
 
 impl BotConfig {
@@ -112,9 +112,18 @@ impl BotConfig {
     pub fn status_channel(&self) -> Option<ChannelId> {
         self.status_channel
     }
+
+    pub fn github_repo(&self) -> Option<&RepoName> {
+        if self.github_repo.is_none() {
+            tracing::warn!("no github repository in config");
+        }
+
+        self.github_repo.as_ref()
+    }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(try_from = "String")]
 pub struct RepoName {
     user: String,
     repo: String,
@@ -142,18 +151,6 @@ impl RepoName {
         url.set_path(&self.to_string());
         url
     }
-
-    pub fn from_str_instrumented(s: &str) -> Option<Self> {
-        let parsed = Self::try_from_str(s);
-        if parsed.is_none() {
-            tracing::warn!(
-                value = s,
-                "{} is not a valid github repo",
-                format!("https://github.com/{s}"),
-            )
-        }
-        parsed
-    }
 }
 
 impl TryFrom<String> for RepoName {
@@ -161,19 +158,6 @@ impl TryFrom<String> for RepoName {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from_str(&value).ok_or(value)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RepoName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        Self::from_str_instrumented(&s).ok_or(serde::de::Error::invalid_value(
-            serde::de::Unexpected::Str(&s),
-            &"<user>/<repo>",
-        ))
     }
 }
 
