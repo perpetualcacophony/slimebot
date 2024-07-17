@@ -6,7 +6,7 @@ use tracing_unwrap::OptionExt;
 
 use crate::DiscordToken;
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, thisslime::TracingError)]
 pub enum ConfigError {
     #[error(transparent)]
     Bot(#[from] BotConfigError),
@@ -36,7 +36,8 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, thisslime::TracingError)]
+#[event(level = WARN)]
 pub enum BotConfigError {
     #[error("no github repository in config")]
     GithubRepo,

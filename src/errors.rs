@@ -1,7 +1,3 @@
-use std::fmt::Display;
-
-use chrono::format::Item;
-use mongodb::bson::document::Iter;
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
@@ -10,7 +6,7 @@ use poise::{
 use thiserror::Error as ThisError;
 use thisslime::TracingError;
 //use tokio::sync::mpsc;
-use tracing::{error, error_span, Instrument, Span};
+use tracing::{error, error_span, Instrument};
 use tracing_unwrap::ResultExt;
 
 use crate::{
@@ -345,15 +341,5 @@ impl<T: ErrorEmbedOptions> ErrorEmbed for T {
         }
 
         embed
-    }
-}
-
-trait SlimebotError: std::error::Error + TracingError + ErrorEmbed {
-    fn source(&self) -> Option<&(dyn SlimebotError + 'static)> {
-        None
-    }
-
-    fn root_cause(&self) -> Option<&(dyn SlimebotError + 'static)> {
-        SlimebotError::source(self).map(|source| SlimebotError::source(source).unwrap_or(source))
     }
 }
