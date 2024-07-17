@@ -126,8 +126,11 @@ impl BotConfig {
         self.status_channel
     }
 
-    pub fn github_repo(&self) -> Result<&RepoName, BotConfigError> {
-        self.github_repo.as_ref().ok_or(BotConfigError::GithubRepo)
+    pub fn github_repo(&self) -> Result<&RepoName, ConfigError> {
+        self.github_repo
+            .as_ref()
+            .ok_or(BotConfigError::GithubRepo)
+            .map_err(ConfigError::from)
     }
 }
 
