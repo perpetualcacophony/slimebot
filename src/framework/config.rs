@@ -37,6 +37,7 @@ pub struct BotConfig {
     activity: Option<String>,
     prefix: String,
     status_channel: Option<ChannelId>,
+    pub github_repo: Option<RepoName>,
 }
 
 impl BotConfig {
