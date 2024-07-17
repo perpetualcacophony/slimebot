@@ -113,6 +113,45 @@ impl BotConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(try_from = "String")]
+pub struct RepoName {
+    user: String,
+    repo: String,
+}
+
+impl std::fmt::Display for RepoName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.user, self.repo)
+    }
+}
+
+impl RepoName {
+    fn new(user: String, repo: String) -> Self {
+        Self { user, repo }
+    }
+
+    pub fn try_from_str(s: &str) -> Option<Self> {
+        let (user, repo) = s.split_once('/')?;
+        Some(Self::new(user.to_owned(), repo.to_owned()))
+    }
+
+    pub fn to_github_url(&self) -> reqwest::Url {
+        let github = reqwest::Url::parse("https://github.com").unwrap();
+        let mut url = github;
+        url.set_path(&self.to_string());
+        url
+    }
+}
+
+impl TryFrom<String> for RepoName {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from_str(&value).ok_or(value)
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct LogsConfig {
     flavor_texts: Vec<String>,
