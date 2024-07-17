@@ -37,6 +37,7 @@ pub struct BotConfig {
     activity: Option<String>,
     prefix: String,
     status_channel: Option<ChannelId>,
+    pub github_repo: Option<RepoName>,
 }
 
 impl BotConfig {
@@ -110,6 +111,69 @@ impl BotConfig {
 
     pub fn status_channel(&self) -> Option<ChannelId> {
         self.status_channel
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RepoName {
+    user: String,
+    repo: String,
+}
+
+impl std::fmt::Display for RepoName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.user, self.repo)
+    }
+}
+
+impl RepoName {
+    fn new(user: String, repo: String) -> Self {
+        Self { user, repo }
+    }
+
+    pub fn try_from_str(s: &str) -> Option<Self> {
+        let (user, repo) = s.split_once('/')?;
+        Some(Self::new(user.to_owned(), repo.to_owned()))
+    }
+
+    pub fn to_github_url(&self) -> reqwest::Url {
+        let github = reqwest::Url::parse("https://github.com").unwrap();
+        let mut url = github;
+        url.set_path(&self.to_string());
+        url
+    }
+
+    pub fn from_str_instrumented(s: &str) -> Option<Self> {
+        let parsed = Self::try_from_str(s);
+        if parsed.is_none() {
+            tracing::warn!(
+                value = s,
+                "{} is not a valid github repo",
+                format!("https://github.com/{s}"),
+            )
+        }
+        parsed
+    }
+}
+
+impl TryFrom<String> for RepoName {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from_str(&value).ok_or(value)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for RepoName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str_instrumented(&s).ok_or(serde::de::Error::invalid_value(
+            serde::de::Unexpected::Str(&s),
+            &"<user>/<repo>",
+        ))
     }
 }
 
