@@ -143,6 +143,18 @@ impl RepoName {
         url.set_path(&self.to_string());
         url
     }
+
+    pub fn from_str_instrumented(s: &str) -> Option<Self> {
+        let parsed = Self::try_from_str(s);
+        if parsed.is_none() {
+            tracing::warn!(
+                value = s,
+                "{} is not a valid github repo",
+                format!("https://github.com/{s}"),
+            )
+        }
+        parsed
+    }
 }
 
 impl TryFrom<String> for RepoName {
