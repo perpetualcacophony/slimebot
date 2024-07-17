@@ -37,7 +37,8 @@ list! {
     pub wordle,
     help,
     eightball,
-    januannie
+    januannie,
+    repository
 }
 
 trait LogCommands {
