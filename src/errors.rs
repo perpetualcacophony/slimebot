@@ -19,8 +19,6 @@ use crate::{
     PoiseData,
 };
 
-pub mod tracing_error;
-
 pub fn handle_framework_error(err: FrameworkError<'_, PoiseData, Error>) -> BoxFuture<()> {
     Box::pin(async {
         match err {
