@@ -8,7 +8,7 @@ use super::super::core::{guess::GuessSlice, AsEmoji, GuessesRecord};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {
     pub user: UserId,
-    guesses: GuessesRecord,
+    guesses: Vec<kwordle::Guess>,
     pub num_guesses: usize,
     finished: bool,
     solved: bool,

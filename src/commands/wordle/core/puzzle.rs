@@ -28,7 +28,7 @@ impl Puzzle {
     }
 
     pub fn guess(&self, word: &kwordle::Word<5>) -> kwordle::Guess<5> {
-        self.answer().guess_word(*word)
+        self.answer().guess(*word)
     }
 
     pub fn is_daily(&self) -> bool {

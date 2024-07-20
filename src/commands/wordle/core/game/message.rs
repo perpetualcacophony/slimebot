@@ -69,7 +69,7 @@ impl GameMessage {
             guesses = data.guesses.count(),
             max = data
                 .guesses
-                .limit
+                .max()
                 .map_or("∞".to_owned(), |lim| lim.to_string()),
             emojis = data.guesses.emoji_with_style(style)
         )

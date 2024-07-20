@@ -258,7 +258,9 @@ impl ToPartialGuess for Message {
 pub struct GuessesRecord(Vec<kwordle::Guess>);
 
 impl From<kwordle::Guesses> for GuessesRecord {
-    fn from
+    fn from(value: kwordle::Guesses) -> Self {
+        Self(value.into_vec())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -454,7 +456,7 @@ impl AsEmoji for CharSet {
 impl GuessSlice for Guesses {}
 impl GuessSlice for GuessesRecord {}
 
-impl<T: GuessSlice> AsEmoji for T {
+/*impl<T: GuessSlice> AsEmoji for T {
     fn as_emoji(&self) -> Cow<str> {
         self.iter()
             .map(|g| g.as_emoji())
@@ -476,7 +478,7 @@ impl<T: GuessSlice> AsEmoji for T {
             .collect::<Vec<_>>()
             .join("\n")
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {

@@ -378,7 +378,7 @@ impl AsRef<ShardMessenger> for GameContext<'_> {
     }
 }
 
-impl AsRef<WordsList> for GameContext<'_> {
+impl AsRef<kwordle::WordsList> for GameContext<'_> {
     fn as_ref(&self) -> &kwordle::WordsList<5> {
         self.words()
     }
