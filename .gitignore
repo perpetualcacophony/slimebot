@@ -19,4 +19,4 @@
 /macros/Cargo.lock
 /macros/target/
 
-Cargo.lock
+/Cargo.lock
