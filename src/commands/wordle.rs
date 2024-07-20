@@ -6,9 +6,7 @@ use crate::utils::poise::{CommandResult, Context, ContextExt};
 use crate::{errors::SendMessageError, Result};
 
 pub mod core;
-use core::{
-    self as wordle, core::AsEmoji, game::options::GameOptionsBuilder, game::options::GameStyle,
-};
+use core::{self as wordle, game::options::GameOptionsBuilder, game::options::GameStyle, AsEmoji};
 
 /// play wordle right from discord!
 #[instrument(skip_all)]

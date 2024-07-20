@@ -2,7 +2,8 @@ const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 
-pub mod core;
+mod as_emoji;
+pub use as_emoji::AsEmoji;
 
 use mongodb::error::Error as MongoDbError;
 

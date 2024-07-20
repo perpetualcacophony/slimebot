@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Not};
 use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
 
-use super::super::core::AsEmoji;
+use super::super::AsEmoji;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {

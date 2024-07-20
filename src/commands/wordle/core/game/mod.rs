@@ -19,7 +19,7 @@ use crate::{
 
 use self::{message::GameMessage, options::GameOptions};
 
-use super::{core::AsEmoji, puzzle::Puzzle, DailyWordles};
+use super::{puzzle::Puzzle, AsEmoji, DailyWordles};
 
 type SerenityResult<T> = serenity_prelude::Result<T>;
 
