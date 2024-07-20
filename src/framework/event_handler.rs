@@ -100,8 +100,8 @@ async fn event_handler(
     data: &PoiseData,
 ) -> Result<(), HandlerError> {
     let filter_watcher_msg = move |msg: &Message| {
-        !msg.is_own(&serenity_ctx.cache)
-            && !msg.is_private()
+        msg.author.id != framework_ctx.bot_id
+            && msg.guild_id.is_some()
             && data.config().watchers.channel_allowed(msg.channel_id)
     };
 
