@@ -19,5 +19,4 @@
 /macros/Cargo.lock
 /macros/target/
 
-/slimebot_error/Cargo.lock
-/slimebot_error/target/
+Cargo.lock
