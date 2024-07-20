@@ -88,8 +88,9 @@ dependencies = [
 
 [[package]]
 name = "attribute-derive"
-version = "0.9.1"
-source = "git+https://github.com/perpetualcacophony/attribute-derive#cb5e168b305da8640ba746f374483aa442913960"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f1ee502851995027b06f99f5ffbeffa1406b38d0b318a1ebfa469332c6cbafd"
 dependencies = [
  "attribute-derive-macro",
  "derive-where",
@@ -101,8 +102,9 @@ dependencies = [
 
 [[package]]
 name = "attribute-derive-macro"
-version = "0.9.1"
-source = "git+https://github.com/perpetualcacophony/attribute-derive#cb5e168b305da8640ba746f374483aa442913960"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3601467f634cfe36c4780ca9c75dea9a5b34529c1f2810676a337e7e0997f954"
 dependencies = [
  "collection_literals",
  "interpolator",
@@ -2823,8 +2825,9 @@ dependencies = [
 
 [[package]]
 name = "thisslime"
-version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f93aeac3a49997247357c272f3bd948ab47fe89a6451a3902623567a4e4f7b9"
 dependencies = [
  "thisslime-core",
  "thisslime-derive",
@@ -2833,8 +2836,9 @@ dependencies = [
 
 [[package]]
 name = "thisslime-core"
-version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72fd8b621d0bfe7712698fe2a958e855a16205b4aaa6ef746c10fe75daf23bbe"
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",
@@ -2847,8 +2851,9 @@ dependencies = [
 
 [[package]]
 name = "thisslime-derive"
-version = "0.1.0"
-source = "git+https://github.com/perpetualcacophony/thisslime#23728c6cd659ef963c2aa05cddc2a51ba115816f"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bd44b2fc03ad06a3b9a30d54d2c8d96282cea66a69300146873c297a7374560"
 dependencies = [
  "attribute-derive",
  "heck 0.5.0",
