@@ -11,8 +11,8 @@ pub use puzzle::Puzzle;
 
 type DbResult<T> = std::result::Result<T, MongoDbError>;
 
-mod words_list;
-pub use words_list::WordsList;
+//mod words_list;
+//pub use words_list::WordsList;
 
 mod daily;
 pub use daily::DailyWordles;

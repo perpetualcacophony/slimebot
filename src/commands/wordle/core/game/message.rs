@@ -8,10 +8,7 @@ use crate::utils::{poise::ContextExt, Context};
 
 use super::{options::GameStyle, GameContext, GameData};
 
-use super::super::{
-    core::{guess::GuessSlice, AsEmoji},
-    Puzzle,
-};
+use super::super::{core::AsEmoji, Puzzle};
 
 pub struct GameMessage {
     msg: Message,

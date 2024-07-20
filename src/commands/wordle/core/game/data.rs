@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{super::core::Guesses, Puzzle};
+use super::Puzzle;
 use poise::serenity_prelude::{ChannelId, MessageId};
 
 #[derive(Clone, Debug)]

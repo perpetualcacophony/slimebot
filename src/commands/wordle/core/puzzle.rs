@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 
-use super::{
-    core::{AsLetters, Guess, PartialGuess, Word},
-    WordsList,
-};
+use super::core::AsLetters;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 

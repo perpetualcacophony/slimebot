@@ -7,10 +7,7 @@ use crate::{errors::SendMessageError, Result};
 
 pub mod core;
 use core::{
-    self as wordle,
-    core::{guess::GuessSlice, AsEmoji},
-    game::options::GameOptionsBuilder,
-    game::options::GameStyle,
+    self as wordle, core::AsEmoji, game::options::GameOptionsBuilder, game::options::GameStyle,
 };
 
 /// play wordle right from discord!
@@ -20,7 +17,7 @@ use core::{
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("daily", "random", "display", "role", "letters", "unused")
+    subcommands("daily", "random", "display", "role", "unused")
 )]
 pub async fn wordle(ctx: Context<'_>) -> Result<()> {
     _wordle(ctx).await?;
@@ -264,7 +261,7 @@ async fn role(ctx: Context<'_>) -> Result<()> {
     Ok(())
 }
 
-#[instrument(skip_all)]
+/* #[instrument(skip_all)]
 #[poise::command(
     slash_command,
     prefix_command,
@@ -294,7 +291,7 @@ async fn letters(ctx: Context<'_>) -> Result<()> {
     result?;
 
     Ok(())
-}
+} */
 
 #[instrument(skip_all)]
 #[poise::command(

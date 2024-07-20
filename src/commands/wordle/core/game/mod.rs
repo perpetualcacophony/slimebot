@@ -19,13 +19,7 @@ use crate::{
 
 use self::{message::GameMessage, options::GameOptions};
 
-use super::{
-    core::{
-        guess::GuessSlice, AsEmoji, Guess, Guesses, PartialGuess, PartialGuessError, ToPartialGuess,
-    },
-    puzzle::Puzzle,
-    DailyWordles, WordsList,
-};
+use super::{core::AsEmoji, puzzle::Puzzle, DailyWordles};
 
 type SerenityResult<T> = serenity_prelude::Result<T>;
 
@@ -149,7 +143,7 @@ impl<'a> Game<'a> {
     }
 
     pub fn state(&self, finished: bool) -> GameRecord {
-        GameRecord::new(self.author_id(), self.guesses.to_record(), finished)
+        GameRecord::new(self.author_id(), self.guesses.clone(), finished)
     }
 
     pub fn data(&self) -> GameData {

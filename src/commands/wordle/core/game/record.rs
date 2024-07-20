@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Not};
 use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
 
-use super::super::core::{guess::GuessSlice, AsEmoji, GuessesRecord};
+use super::super::core::AsEmoji;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameRecord {
@@ -15,13 +15,13 @@ pub struct GameRecord {
 }
 
 impl GameRecord {
-    pub fn new(owner: UserId, guesses: impl GuessSlice, finished: bool) -> Self {
+    pub fn new(owner: UserId, guesses: kwordle::Guesses, finished: bool) -> Self {
         let count = guesses.count();
-        let solved = guesses.last_is_solved();
+        let solved = guesses.latest_is_correct();
 
         Self {
             user: owner,
-            guesses: guesses.to_record(),
+            guesses: guesses.to_vec(),
             num_guesses: count,
             finished,
             solved,

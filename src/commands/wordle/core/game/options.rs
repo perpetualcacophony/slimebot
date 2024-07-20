@@ -1,5 +1,3 @@
-use super::super::core::guess::GuessesLimit;
-
 #[derive(Debug, Copy, Clone)]
 pub struct GameOptions {
     pub style: GameStyle,

@@ -3,13 +3,13 @@ use std::borrow::Cow;
 use poise::serenity_prelude::UserId;
 use serde::{Deserialize, Serialize};
 
-mod word;
-pub use word::Word;
+//mod word;
+//pub use word::Word;
 
-pub mod guess;
-pub use guess::{Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError, ToPartialGuess};
+//pub mod guess;
+//pub use guess::{Guess, Guesses, GuessesRecord, PartialGuess, PartialGuessError, ToPartialGuess};
 
-use self::guess::LetterState;
+//use self::guess::LetterState;
 
 use super::game::options::GameStyle;
 
@@ -141,7 +141,7 @@ impl AsEmoji for char {
     }
 }
 
-impl AsEmoji for Vec<LetterState> {
+/* impl AsEmoji for Vec<LetterState> {
     fn as_emoji(&self) -> Cow<str> {
         self.iter()
             .map(|l| l.as_emoji())
@@ -149,7 +149,7 @@ impl AsEmoji for Vec<LetterState> {
             .join("")
             .into()
     }
-}
+} */
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GameResults {
@@ -170,11 +170,11 @@ impl AsLetters for &str {
     }
 }
 
-impl AsLetters for Word {
+/* impl AsLetters for Word {
     fn as_letters(&self) -> impl Iterator<Item = char> {
         self.letters.iter().copied()
     }
-}
+} */
 
 impl AsEmoji for kwordle::LetterState {
     fn as_emoji(&self) -> Cow<str> {
@@ -258,6 +258,30 @@ impl AsEmoji for kwordle::Guesses {
     }
 }
 
+impl AsEmoji for Vec<kwordle::Guess> {
+    fn as_emoji(&self) -> Cow<str> {
+        self.iter()
+            .map(|g| g.as_emoji())
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into()
+    }
+
+    fn emoji_with_letters(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn emoji_with_letters_spaced(&self) -> String {
+        self.iter()
+            .map(|g| g.emoji_with_letters_spaced())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 impl AsEmoji for kwordle::Letter {
     fn as_emoji(&self) -> Cow<str> {
         let alphabet_letters = kwordle::letter::ALPHABET;
@@ -272,9 +296,9 @@ impl AsEmoji for kwordle::Letter {
     }
 }
 
-impl AsEmoji for std::collections::BTreeSet<kwordle::Letter> {
+impl AsEmoji for kwordle::letter::LetterSet {
     fn as_emoji(&self) -> Cow<str> {
-        self.into_iter()
+        self.iter()
             .map(kwordle::Letter::as_emoji)
             .collect::<Vec<_>>()
             .join(", ")

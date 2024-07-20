@@ -1,6 +1,6 @@
 use mongodb::Database;
 
-use super::{game::GamesCache, DailyWordles, WordsList};
+use super::{game::GamesCache, DailyWordles};
 
 #[derive(Debug, Clone)]
 pub struct WordleData {

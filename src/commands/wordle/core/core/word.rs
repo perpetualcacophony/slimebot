@@ -7,7 +7,7 @@ use tracing::{debug, trace};
 use crate::commands::wordle::core::core;
 
 use core::{
-    guess::{Guess, LetterState, PartialGuess},
+    //guess::{Guess, LetterState, PartialGuess},
     AsLetters,
 };
 

@@ -10,7 +10,7 @@ use poise::serenity_prelude::{futures::StreamExt, UserId};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 
-use super::{core::Word, puzzle, DbResult, GameRecord, WordsList};
+use super::{puzzle, DbResult, GameRecord};
 
 #[derive(Debug, Clone)]
 pub struct DailyWordles {
@@ -52,11 +52,8 @@ impl DailyWordles {
             .filter(|daily| daily.is_expired().not()))
     }
 
-    pub async fn refresh(
-        &self,
-        words: impl AsRef<kwordle::WordsList<5>>,
-    ) -> DbResult<Option<DailyWordle>> {
-        let new_word = words.as_ref().answers.random();
+    pub async fn refresh(&self, words: &kwordle::WordsList) -> DbResult<Option<DailyWordle>> {
+        let new_word = words.answers.random();
 
         if let Some(latest) = self.latest_not_expired().await? {
             if latest.is_old() {
