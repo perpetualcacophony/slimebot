@@ -54,7 +54,7 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "serde_derive",
     "classic_words",
     "step",
-], optional = true }
+], optional = true, version = "0.5.0" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
