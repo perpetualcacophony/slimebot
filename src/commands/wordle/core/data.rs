@@ -12,7 +12,7 @@ pub struct WordleData {
 impl WordleData {
     pub fn new(db: &Database) -> Self {
         let words = kwordle::classic::words_list();
-        let wordles = DailyWordles::new(db);
+        let wordles = DailyWordles::new(db, &words);
         let game_data = GamesCache::new();
 
         Self {

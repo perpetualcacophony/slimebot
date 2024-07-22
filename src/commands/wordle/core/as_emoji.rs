@@ -87,7 +87,7 @@ impl AsEmoji for Vec<kwordle::LetterState> {
 impl AsEmoji for kwordle::Guess {
     fn as_emoji(&self) -> Cow<str> {
         self.into_iter()
-            .map(|letter| letter.state())
+            .map(|(_, state)| state)
             .collect::<Vec<kwordle::LetterState>>()
             .as_emoji()
             .into_owned()
@@ -95,27 +95,29 @@ impl AsEmoji for kwordle::Guess {
     }
 
     fn emoji_with_letters(&self) -> String {
-        let (letters, states) =
-            self.into_iter()
-                .fold((String::new(), String::new()), |(letters, states), l| {
-                    (
-                        letters + "‌" /* zero-width non-joiner */ + &l.letter().as_emoji(),
-                        states + &l.state().as_emoji(),
-                    )
-                });
+        let (letters, states) = self.into_iter().fold(
+            (String::new(), String::new()),
+            |(letters, states), (letter, state)| {
+                (
+                    letters + "‌" /* zero-width non-joiner */ + &letter.as_emoji(),
+                    states + &state.as_emoji(),
+                )
+            },
+        );
 
         letters + "\n" + &states
     }
 
     fn emoji_with_letters_spaced(&self) -> String {
-        let (letters, states) =
-            self.into_iter()
-                .fold((String::new(), String::new()), |(letters, states), l| {
-                    (
-                        letters + " " + &l.letter().as_emoji(),
-                        states + " " + &l.state().as_emoji(),
-                    )
-                });
+        let (letters, states) = self.into_iter().fold(
+            (String::new(), String::new()),
+            |(letters, states), (letter, state)| {
+                (
+                    letters + " " + &letter.as_emoji(),
+                    states + " " + &state.as_emoji(),
+                )
+            },
+        );
 
         letters.trim().to_owned() + "\n" + states.trim()
     }

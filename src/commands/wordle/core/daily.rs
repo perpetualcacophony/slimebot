@@ -6,7 +6,10 @@ use mongodb::{
     options::{FindOneOptions, FindOptions},
     Collection, Database,
 };
-use poise::serenity_prelude::{futures::StreamExt, UserId};
+use poise::serenity_prelude::{
+    futures::{Stream, StreamExt, TryStreamExt},
+    UserId,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument, trace};
 
@@ -14,20 +17,43 @@ use super::{puzzle, DbResult, GameRecord};
 
 #[derive(Debug, Clone)]
 pub struct DailyWordles {
-    collection: Collection<DailyWordle>,
+    collection: Collection<PartialDailyWordle>,
+    words_list: kwordle::WordsList,
 }
 
 impl DailyWordles {
-    pub fn new(db: &Database) -> Self {
+    async fn find_one(
+        &self,
+        filter: impl Into<Option<mongodb::bson::Document>>,
+        options: impl Into<Option<FindOneOptions>>,
+    ) -> DbResult<Option<DailyWordle>> {
+        Ok(self
+            .collection
+            .find_one(filter, options)
+            .await?
+            .and_then(|partial| DailyWordle::from_partial(partial, &self.words_list)))
+    }
+
+    async fn find(
+        &self,
+        filter: impl Into<Option<mongodb::bson::Document>>,
+        options: impl Into<Option<FindOptions>>,
+    ) -> DbResult<impl Stream<Item = DbResult<DailyWordle>> + '_> {
+        Ok(self.collection.find(filter, options).await?.map(|res| {
+            res.map(|partial| DailyWordle::from_partial(partial, &self.words_list).unwrap())
+        }))
+    }
+
+    pub fn new(db: &Database, words: &kwordle::WordsList) -> Self {
         Self {
             collection: db.collection("daily_wordles"),
+            words_list: words.clone(),
         }
     }
 
     #[instrument(skip_all)]
     pub async fn latest(&self) -> DbResult<Option<DailyWordle>> {
         let daily = self
-            .collection
             .find_one(
                 None,
                 FindOneOptions::builder()
@@ -74,7 +100,9 @@ impl DailyWordles {
         let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, word.clone());
         let wordle = DailyWordle::new(puzzle);
 
-        self.collection.insert_one(&wordle, None).await?;
+        self.collection
+            .insert_one(&wordle.clone().into_partial(), None)
+            .await?;
 
         Ok(wordle)
     }
@@ -84,7 +112,6 @@ impl DailyWordles {
         let game = mongodb::bson::ser::to_bson(&game).expect("implements serialize");
 
         if self
-            .collection
             .find_one(
                 doc! {
                     "puzzle.number": puzzle,
@@ -128,7 +155,6 @@ impl DailyWordles {
         let mut vec = Vec::with_capacity(2);
 
         let mut cursor = self
-            .collection
             .find(
                 None,
                 FindOptions::builder()
@@ -157,28 +183,46 @@ impl DailyWordles {
     }
 
     pub async fn wordle_exists(&self, number: u32) -> DbResult<bool> {
-        self.collection
-            .find_one(doc! { "puzzle.number": number }, None)
+        self.find_one(doc! { "puzzle.number": number }, None)
             .await
             .map(|daily| daily.is_some())
     }
 
     pub async fn find_game(&self, user: UserId, wordle: u32) -> DbResult<Option<GameRecord>> {
         Ok(self
-            .collection
             .find_one(doc! { "puzzle.number": wordle }, None)
             .await?
             .and_then(|daily| daily.user_game(user).cloned()))
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DailyWordle {
     pub puzzle: puzzle::DailyPuzzle,
     games: Vec<GameRecord>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PartialDailyWordle {
+    pub puzzle: puzzle::PartialDailyPuzzle,
+    games: Vec<GameRecord>,
+}
+
 impl DailyWordle {
+    fn from_partial(partial: PartialDailyWordle, list: &kwordle::WordsList) -> Option<Self> {
+        Some(Self {
+            puzzle: puzzle::DailyPuzzle::from_partial(partial.puzzle, list)?,
+            games: partial.games,
+        })
+    }
+
+    fn into_partial(self) -> PartialDailyWordle {
+        PartialDailyWordle {
+            puzzle: self.puzzle.into_partial(),
+            games: self.games,
+        }
+    }
+
     fn new(puzzle: puzzle::DailyPuzzle) -> Self {
         Self {
             puzzle,
