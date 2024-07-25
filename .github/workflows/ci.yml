@@ -2,11 +2,10 @@ name: CI
 
 on:
   push:
-    paths-ignore: [ "README.md" ]
-    branches: [ "main" ]
+    paths-ignore: [ README.md ]
+    branches: [ main ]
 
   pull_request:
-    types: [opened, synchronize, reopened]
     
 env:
   CARGO_TERM_COLOR: always
