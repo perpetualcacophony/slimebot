@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use chrono::Utc;
-use serde::{de::VariantAccess, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::framework::data::UtcDateTime;
 
@@ -69,23 +69,6 @@ impl Puzzle {
     }
 }
 
-struct PuzzleDeserializer<'list> {
-    list: &'list kwordle::WordsList,
-}
-
-impl<'de, 'list> serde::de::DeserializeSeed<'de> for PuzzleDeserializer<'list> {
-    type Value = Puzzle;
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let partial = PartialPuzzle::deserialize(deserializer)?;
-
-        Puzzle::from_partial(partial, &self.list).ok_or_else(|| serde::de::Error::custom("msg"))
-    }
-}
-
 #[derive(Debug, Serialize, Clone)]
 pub struct DailyPuzzle {
     pub number: u32,
@@ -137,25 +120,8 @@ impl From<DailyPuzzle> for Puzzle {
     }
 }
 
-pub struct DailyPuzzleDeserializer<'list> {
-    list: &'list kwordle::WordsList,
-}
-
-impl<'de, 'list> serde::de::DeserializeSeed<'de> for DailyPuzzleDeserializer<'list> {
-    type Value = DailyPuzzle;
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let partial = PartialDailyPuzzle::deserialize(deserializer)?;
-        DailyPuzzle::from_partial(partial, &self.list)
-            .ok_or_else(|| serde::de::Error::custom("msg"))
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-enum PartialPuzzle {
+pub enum PartialPuzzle {
     Random(String),
     Daily(PartialDailyPuzzle),
 }
