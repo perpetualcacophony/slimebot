@@ -146,7 +146,7 @@ impl RepoName {
     }
 
     pub fn to_github_url(&self) -> reqwest::Url {
-        let github = reqwest::Url::parse("https://github.com").unwrap();
+        let github = reqwest::Url::parse("https://github.com").expect("github is a valid url");
         let mut url = github;
         url.set_path(&self.to_string());
         url

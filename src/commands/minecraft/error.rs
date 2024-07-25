@@ -24,10 +24,6 @@ impl ErrorAlreadyClaimed {
         }
     }
 
-    pub(crate) fn from_serenity(user: &serenity::User, minecraft_username: String) -> Self {
-        Self::new(user.id, Some(user.name.clone()), minecraft_username)
-    }
-
     pub(crate) fn set_user_name(&mut self, new: String) {
         self.user_name = Some(new)
     }

@@ -41,7 +41,7 @@ impl Request {
 
 #[derive(serde::Deserialize)]
 pub struct ResponseOffline {
-    pub ip_address: Option<std::net::IpAddr>,
+    //pub ip_address: Option<std::net::IpAddr>,
     pub host: Option<url::Host>,
 }
 

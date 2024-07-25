@@ -12,7 +12,7 @@ pub async fn januannie(ctx: Context<'_>) -> crate::Result<()> {
 }
 
 const JAN_1_2025: NaiveDate =
-    NaiveDate::from_ymd_opt(2025, 01, 01).expect("2025-01-01 should be a valid date");
+    NaiveDate::from_ymd_opt(2025, 1, 1).expect("2025-01-01 should be a valid date");
 
 fn text(current: NaiveDate) -> String {
     let days_until = JAN_1_2025.signed_duration_since(current).num_days();
@@ -33,7 +33,7 @@ mod tests {
             super::text(
                 super::JAN_1_2025
                     .checked_sub_days(chrono::Days::new(1))
-                    .unwrap()
+                    .expect("should be in range")
             ),
             "1 day until Januannie!"
         )
@@ -45,7 +45,7 @@ mod tests {
             super::text(
                 super::JAN_1_2025
                     .checked_sub_days(chrono::Days::new(7))
-                    .unwrap(),
+                    .expect("should be in range"),
             ),
             "7 days until Januannie!"
         )

@@ -222,7 +222,7 @@ mod tests {
         pub const USER_ID_BAR: serenity::UserId = serenity::UserId::new(2);
         pub const MINECRAFT_USERNAME_BAR: &str = "bar";
 
-        pub const USER_ID_BAZ: serenity::UserId = serenity::UserId::new(3);
+        //pub const USER_ID_BAZ: serenity::UserId = serenity::UserId::new(3);
         pub const MINECRAFT_USERNAME_BAZ: &str = "baz";
     }
 

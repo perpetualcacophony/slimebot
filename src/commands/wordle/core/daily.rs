@@ -7,7 +7,7 @@ use mongodb::{
     Collection, Database,
 };
 use poise::serenity_prelude::{
-    futures::{Stream, StreamExt, TryStreamExt},
+    futures::{Stream, StreamExt},
     UserId,
 };
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,10 @@ impl DailyWordles {
         options: impl Into<Option<FindOptions>>,
     ) -> DbResult<impl Stream<Item = DbResult<DailyWordle>> + '_> {
         Ok(self.collection.find(filter, options).await?.map(|res| {
-            res.map(|partial| DailyWordle::from_partial(partial, &self.words_list).unwrap())
+            res.map(|partial| {
+                DailyWordle::from_partial(partial, &self.words_list)
+                    .expect("should be a valid daily")
+            })
         }))
     }
 
@@ -97,7 +100,7 @@ impl DailyWordles {
 
         debug!(latest_number);
 
-        let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, word.clone());
+        let puzzle = puzzle::DailyPuzzle::new(latest_number + 1, *word);
         let wordle = DailyWordle::new(puzzle);
 
         self.collection
