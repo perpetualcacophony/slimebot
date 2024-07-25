@@ -335,13 +335,3 @@ impl<T: ErrorEmbedOptions> ErrorEmbed for T {
         embed
     }
 }
-
-trait SlimebotError: std::error::Error + TracingError + ErrorEmbed {
-    fn source(&self) -> Option<&(dyn SlimebotError + 'static)> {
-        None
-    }
-
-    fn root_cause(&self) -> Option<&(dyn SlimebotError + 'static)> {
-        SlimebotError::source(self).map(|source| SlimebotError::source(source).unwrap_or(source))
-    }
-}
