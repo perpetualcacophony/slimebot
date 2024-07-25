@@ -269,3 +269,38 @@ impl DailyWordle {
         self.user_game(user).is_some_and(|game| game.in_progress())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DailyWordle;
+    use pretty_assertions::assert_str_eq;
+
+    const DAILY_WORDLE_JSON: &str = include_str!("./tests/daily_wordle.json");
+
+    #[test]
+    fn deserialize() {
+        let words = kwordle::classic::words_list();
+
+        DailyWordle::from_partial(
+            serde_json::from_str(DAILY_WORDLE_JSON).expect("should be valid json"),
+            &words,
+        )
+        .expect("should be valid DailyWordle");
+    }
+
+    #[test]
+    fn serialize_stable() {
+        let words = kwordle::classic::words_list();
+
+        let daily_wordle = DailyWordle::from_partial(
+            serde_json::from_str(DAILY_WORDLE_JSON).expect("should be valid json"),
+            &words,
+        )
+        .expect("should be valid DailyWordle");
+
+        let serialized =
+            serde_json::to_string_pretty(&daily_wordle).expect("should serialize properly");
+
+        assert_str_eq!(serialized, DAILY_WORDLE_JSON)
+    }
+}
