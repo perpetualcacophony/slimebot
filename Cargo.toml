@@ -3,7 +3,6 @@ name = "slimebot"
 edition = "2021"
 readme = "README.md"
 license = "AGPL-3.0"
-build = "build.rs"
 
 [profile.release]
 strip = true
@@ -61,8 +60,8 @@ pretty_assertions = "1.4.0"
 temp-mongo = "0.1.3"
 
 [build-dependencies]
-built = { version = "0.7.3", features = ["git2"] }
-git2 = { version = "0.18.3", features = ["vendored-libgit2"] }
+built = { version = "0.7.4", features = ["git2"] }
+git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [features]
 default = ["wordle"]
