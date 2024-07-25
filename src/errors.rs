@@ -1,7 +1,3 @@
-use std::fmt::Display;
-
-use chrono::format::Item;
-use mongodb::bson::document::Iter;
 use poise::{
     serenity_prelude::{self as serenity, Permissions},
     BoxFuture, Context, FrameworkError,
@@ -10,7 +6,7 @@ use poise::{
 use thiserror::Error as ThisError;
 use thisslime::TracingError;
 //use tokio::sync::mpsc;
-use tracing::{error, error_span, Instrument, Span};
+use tracing::{error, error_span, Instrument};
 use tracing_unwrap::ResultExt;
 
 use crate::{

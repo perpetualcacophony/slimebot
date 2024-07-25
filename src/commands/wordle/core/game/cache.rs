@@ -58,7 +58,7 @@ impl GamesCache {
 }
 
 #[derive(Default, Clone, Debug)]
-struct Iter {
+pub struct Iter {
     vec: Vec<Arc<GameData>>,
     next_index: usize,
 }
