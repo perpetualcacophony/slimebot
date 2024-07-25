@@ -4,67 +4,66 @@ use rand::{
 };
 use std::fmt;
 
-macro_rules! create_tone_macros {
-    ($($name:ident $tone:expr)+) => {
-        $(
-            macro_rules! $name {
-                ($$text:literal) => {
-                    $name!($$text 1.0)
-                };
-
-                ($$text:literal $$weight:literal) => {
-                    Answer {
-                        tone: $tone,
-                        text: $$text,
-                        weight: $$weight,
-                    }
-                };
-            }
-        )+
-    };
-}
-
-create_tone_macros! {
-    aff AnswerTone::Affirmative
-    non AnswerTone::NonCommittal
-    neg AnswerTone::Negative
-}
-
 macro_rules! create_answer_consts {
-    ( $($answer:expr )+ ) => {
+    (
+        affirmative {
+            $($text:literal $($weight:literal)?),+
+        }
+
+        non_committal {
+            $($text2:literal $($weight2:literal)?),+
+        }
+
+        negative {
+            $($text3:literal $($weight3:literal)?),+
+        }
+    ) => {
+        macro_rules! weight {
+            ($value:literal) => { $value };
+            () => { 1.0 }
+        }
+
         pub const ANSWERS: Answers = Answers(&[
-            $( $answer ),+
+            $(Answer { tone: AnswerTone::Affirmative, text: $text, weight: weight!($($weight)?)},)+
+            $(Answer { tone: AnswerTone::NonCommittal, text: $text2, weight: weight!($($weight2)?)} ,)+
+            $(Answer { tone: AnswerTone::Negative, text: $text3, weight: weight!($($weight3)?)} ,)+
         ]);
     }
 }
 
 create_answer_consts! {
-    aff!("It is certain")
-    aff!("It is decidedly so")
-    aff!("Without a doubt")
-    aff!("Yes definitely")
-    aff!("You may rely on it")
-    aff!("As I see it, yes")
-    aff!("Most likely")
-    aff!("Outlook good")
-    aff!("Yes")
-    aff!("Signs point to yes")
-    aff!("Yep")
-    aff!("Mhm")
+    affirmative {
+        "It is certain",
+        "It is decidedly so",
+        "Without a doubt",
+        "Yes definitely",
+        "You may rely on it",
+        "As I see it, yes",
+        "Most likely",
+        "Outlook good",
+        "Yes",
+        "Signs point to yes",
+        "Yep",
+        "Mhm"
+    }
 
-    non!("Reply hazy, try again")
-    non!("Ask again later")
-    non!("Better not tell you now")
-    non!("Cannot predict now")
-    non!("Concentrate and ask again")
-    non!("Ask again in six to eight business weeks")
+    non_committal {
+        "Reply hazy, try again",
+        "Ask again later",
+        "Better not tell you now",
+        "Cannot predict now",
+        "Concentrate and ask again",
+        "Ask again in six to eight business weeks"
+    }
 
-    neg!("Don't count on it")
-    neg!("My reply is no")
-    neg!("My sources say no")
-    neg!("Outlook not so good")
-    neg!("Very doubtful")
-    neg!("No. Banned" 0.1)
+    negative {
+        "Don't count on it",
+        "My reply is no",
+        "My sources say no",
+        "Outlook not so good",
+        "Very doubtful",
+        "No. Banned" 0.1
+    }
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -120,28 +119,6 @@ impl Answers {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
-
-    mod macros {
-        use super::super::{Answer, AnswerTone};
-        use super::assert_eq;
-
-        #[test]
-        fn affirmative() {
-            assert_eq!(aff!("boop"), Answer::new(AnswerTone::Affirmative, "boop"));
-        }
-
-        #[test]
-        fn non_committal() {
-            assert_eq!(non!("boop"), Answer::new(AnswerTone::NonCommittal, "boop"));
-        }
-
-        #[test]
-        fn negative() {
-            assert_eq!(neg!("boop"), Answer::new(AnswerTone::Negative, "boop"));
-        }
-    }
-
     /// These tests are here to make sure that the magic 8-ball's odds don't change
     /// Or at least, if they do change, it'll pop up in CI
     /// So that the odds don't change dramatically, which isn't breaking but would be. Weird
