@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use tracing::instrument;
 
 use crate::utils::{
@@ -13,65 +13,87 @@ use crate::utils::{
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
-pub async fn flip(ctx: Context<'_>, coins: Option<u8>, #[flag] verbose: bool) -> crate::Result<()> {
-    _flip(ctx, coins, verbose).await?;
+pub async fn flip(
+    ctx: Context<'_>,
+    coins: Option<usize>,
+    #[flag] verbose: bool,
+) -> crate::Result<()> {
+    let result: CommandResult = try {
+        let _typing = ctx.defer_or_broadcast().await?;
+
+        let results = flip_coins(coins.unwrap_or(1));
+
+        ctx.reply_ext(text(&results, verbose)).await?;
+    };
+
+    result?;
+
     Ok(())
 }
 
-async fn _flip(ctx: Context<'_>, coins: Option<u8>, verbose: bool) -> CommandResult {
-    let _typing = ctx.defer_or_broadcast().await?;
+fn flip_coins(coins: usize) -> Vec<bool> {
+    let mut rng = rand::thread_rng();
 
-    let coins = coins.map(|int| if int == 0 { 1 } else { int }).unwrap_or(1);
+    let mut new = Vec::with_capacity(coins);
 
-    let mut rng = rand::rngs::StdRng::from_rng(rand::thread_rng()).expect("valid rng");
+    for _ in 0..coins {
+        new.push(rng.gen())
+    }
 
-    // extremely simple processing for 1 flip
-    let text = if coins == 1 {
-        let heads: bool = rng.gen();
+    new
+}
 
-        if heads {
-            "heads".to_owned()
-        } else {
-            "tails".to_owned()
-        }
-    } else {
-        let mut heads = 0;
-        let mut tails = 0;
-        // small optimization - allocate `coins` capacity if verbose, or 0 if not
-        let mut results = Vec::with_capacity(verbose.then_some(coins).unwrap_or_default().into());
-
-        for _ in 0..coins {
-            if rng.gen() {
-                heads += 1;
-
-                if verbose {
-                    results.push("heads")
-                }
-            } else {
-                tails += 1;
-
-                if verbose {
-                    results.push("tails")
-                }
-            }
-        }
-
-        let results_text = format!("{heads} heads & {tails} tails");
-
-        let verbose_text = if verbose {
-            format!("({})", results.join(", "))
-        } else {
-            "".to_owned()
-        };
-
-        if verbose {
-            format!("**{results_text}** {verbose_text}")
-        } else {
-            results_text
-        }
+fn text(results: &[bool], verbose: bool) -> std::borrow::Cow<str> {
+    if results.len() == 1 {
+        return if results[0] { "heads" } else { "tails" }.into();
     };
 
-    ctx.reply_ext(text).await?;
+    let heads = results.iter().filter(|heads| **heads).count();
+    let tails = results.len() - heads;
 
-    Ok(())
+    let results_text = format!("{heads} heads & {tails} tails");
+
+    if verbose {
+        let vec: Vec<_> = results
+            .iter()
+            .map(|heads| if *heads { "heads" } else { "tails" })
+            .collect();
+
+        format!("**{results_text}** ({verbose})", verbose = vec.join(", ")).into()
+    } else {
+        results_text.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_str_eq;
+
+    use super::text;
+
+    #[test]
+    fn one_coin() {
+        assert_str_eq!(text(&[true], false), "heads")
+    }
+
+    #[test]
+    fn one_coin_verbose() {
+        assert_str_eq!(text(&[false], false), "tails")
+    }
+
+    #[test]
+    fn five_coins() {
+        assert_str_eq!(
+            text(&[true, false, true, false, false], false),
+            "2 heads & 3 tails"
+        )
+    }
+
+    #[test]
+    fn five_coins_verbose() {
+        assert_str_eq!(
+            text(&[false, false, true, true, false], true),
+            "**2 heads & 3 tails** (tails, tails, heads, heads, tails)"
+        )
+    }
 }
