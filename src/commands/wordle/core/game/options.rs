@@ -1,9 +1,7 @@
-use super::super::core::guess::GuessesLimit;
-
 #[derive(Debug, Copy, Clone)]
 pub struct GameOptions {
     pub style: GameStyle,
-    pub guesses_limit: GuessesLimit,
+    pub guesses_limit: Option<usize>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -11,7 +9,7 @@ impl Default for GameOptions {
     fn default() -> Self {
         Self {
             style: GameStyle::default(),
-            guesses_limit: GuessesLimit::default(),
+            guesses_limit: None,
         }
     }
 }
@@ -19,7 +17,7 @@ impl Default for GameOptions {
 #[derive(Debug, Copy, Clone, Default)]
 pub struct GameOptionsBuilder {
     style: Option<GameStyle>,
-    guesses_limit: Option<GuessesLimit>,
+    guesses_limit: Option<usize>,
 }
 
 impl GameOptionsBuilder {
@@ -28,7 +26,7 @@ impl GameOptionsBuilder {
         self
     }
 
-    pub fn guesses_limit(mut self, limit: impl Into<Option<GuessesLimit>>) -> Self {
+    pub fn guesses_limit(mut self, limit: impl Into<Option<usize>>) -> Self {
         self.guesses_limit = limit.into();
         self
     }
@@ -36,7 +34,7 @@ impl GameOptionsBuilder {
     pub fn build(self) -> GameOptions {
         GameOptions {
             style: self.style.unwrap_or_default(),
-            guesses_limit: self.guesses_limit.unwrap_or_default(),
+            guesses_limit: self.guesses_limit,
         }
     }
 }

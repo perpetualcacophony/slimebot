@@ -1,4 +1,3 @@
-use super::core::Word;
 use rand::seq::IteratorRandom;
 use std::{collections::HashSet, fs};
 

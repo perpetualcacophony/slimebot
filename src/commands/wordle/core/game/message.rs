@@ -8,10 +8,7 @@ use crate::utils::{poise::ContextExt, Context};
 
 use super::{options::GameStyle, GameContext, GameData};
 
-use super::super::{
-    core::{guess::GuessSlice, AsEmoji},
-    Puzzle,
-};
+use super::super::{AsEmoji, Puzzle};
 
 pub struct GameMessage {
     msg: Message,
@@ -69,7 +66,7 @@ impl GameMessage {
             guesses = data.guesses.count(),
             max = data
                 .guesses
-                .limit
+                .max()
                 .map_or("∞".to_owned(), |lim| lim.to_string()),
             emojis = data.guesses.emoji_with_style(style)
         )

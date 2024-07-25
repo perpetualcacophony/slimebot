@@ -1,18 +1,18 @@
 use mongodb::Database;
 
-use super::{game::GamesCache, DailyWordles, WordsList};
+use super::{game::GamesCache, DailyWordles};
 
 #[derive(Debug, Clone)]
 pub struct WordleData {
-    words: WordsList,
+    words: kwordle::WordsList<5>,
     wordles: DailyWordles,
     game_data: GamesCache,
 }
 
 impl WordleData {
     pub fn new(db: &Database) -> Self {
-        let words = WordsList::load();
-        let wordles = DailyWordles::new(db);
+        let words = kwordle::classic::words_list();
+        let wordles = DailyWordles::new(db, &words);
         let game_data = GamesCache::new();
 
         Self {
@@ -22,7 +22,7 @@ impl WordleData {
         }
     }
 
-    pub const fn words(&self) -> &WordsList {
+    pub const fn words(&self) -> &kwordle::WordsList<5> {
         &self.words
     }
 

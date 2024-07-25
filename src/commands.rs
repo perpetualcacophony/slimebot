@@ -13,10 +13,14 @@ macro_rules! list {
         )+
 
         pub fn list() -> Vec<crate::utils::poise::Command> {
-
-            vec![
+            let mut vec = vec![
                 $($module()),+
-            ]
+            ];
+
+            #[cfg(feature = "wordle")]
+            vec.push(wordle());
+
+            vec
         }
     };
 }
@@ -34,11 +38,16 @@ list! {
     roll: {d20},
     flip,
     version,
-    pub wordle,
     help,
     eightball,
     januannie
 }
+
+#[cfg(feature = "wordle")]
+pub mod wordle;
+
+#[cfg(feature = "wordle")]
+use wordle::wordle;
 
 trait LogCommands {
     async fn log_command(&self);

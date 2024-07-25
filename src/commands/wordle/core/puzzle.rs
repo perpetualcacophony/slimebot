@@ -1,34 +1,30 @@
 use std::borrow::Cow;
 
-use super::{
-    core::{AsLetters, Guess, PartialGuess, Word},
-    WordsList,
-};
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use serde::{de::VariantAccess, Deserialize, Serialize};
 
 use crate::framework::data::UtcDateTime;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub enum Puzzle {
-    Random(Word),
+    Random(#[serde(serialize_with = "kwordle::Word::serialize_as_str")] kwordle::Word<5>),
     Daily(DailyPuzzle),
 }
 
 impl Puzzle {
-    pub fn random(words: &WordsList) -> Self {
-        let answer = words.random_answer();
+    pub fn random(words: &kwordle::WordsList<5>) -> Self {
+        let answer = words.answers.random();
 
         Self::Random(answer)
     }
 
     #[allow(dead_code)] // this is used in a macro
-    pub fn guess_str(&self, word: &impl AsLetters) -> Guess {
-        self.answer().guess_str(word)
+    pub fn guess_str(&self, list: &kwordle::WordsList<5>, s: &str) -> kwordle::Guess<5> {
+        self.answer().guess_str(list, s).unwrap()
     }
 
-    pub fn guess(&self, partial: PartialGuess) -> Guess {
-        self.answer().guess(partial)
+    pub fn guess(&self, word: &kwordle::Word<5>) -> kwordle::Guess<5> {
+        self.answer().guess(*word)
     }
 
     pub fn is_daily(&self) -> bool {
@@ -40,7 +36,7 @@ impl Puzzle {
         matches!(self, Self::Random(..))
     }
 
-    pub fn answer(&self) -> &Word {
+    pub fn answer(&self) -> &kwordle::Word<5> {
         match self {
             Self::Random(answer) => answer,
             Self::Daily(daily) => &daily.answer,
@@ -60,27 +56,106 @@ impl Puzzle {
             Self::Daily(DailyPuzzle { number, .. }) => format!("daily wordle {number}").into(),
         }
     }
+
+    pub fn from_partial(partial: PartialPuzzle, list: &kwordle::WordsList<5>) -> Option<Self> {
+        match partial {
+            PartialPuzzle::Random(string) => {
+                Some(Puzzle::Random(kwordle::Word::from_str(list, &string).ok()?))
+            }
+            PartialPuzzle::Daily(partial) => {
+                DailyPuzzle::from_partial(partial, list).map(Puzzle::Daily)
+            }
+        }
+    }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+struct PuzzleDeserializer<'list> {
+    list: &'list kwordle::WordsList,
+}
+
+impl<'de, 'list> serde::de::DeserializeSeed<'de> for PuzzleDeserializer<'list> {
+    type Value = Puzzle;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let partial = PartialPuzzle::deserialize(deserializer)?;
+
+        Puzzle::from_partial(partial, &self.list).ok_or_else(|| serde::de::Error::custom("msg"))
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct DailyPuzzle {
     pub number: u32,
-    answer: Word,
+
+    #[serde(serialize_with = "kwordle::Word::serialize_as_str")]
+    answer: kwordle::Word<5>,
+
     pub started: UtcDateTime,
 }
 
 impl DailyPuzzle {
-    pub fn new(number: u32, answer: Word) -> Self {
+    pub fn new(number: u32, answer: kwordle::Word<5>) -> Self {
         Self {
             number,
             answer,
             started: Utc::now(),
         }
     }
+
+    pub fn from_partial(partial: PartialDailyPuzzle, list: &kwordle::WordsList) -> Option<Self> {
+        Some(Self {
+            number: partial.number,
+            answer: kwordle::Word::from_str(list, &partial.answer).ok()?,
+            started: partial.started,
+        })
+    }
+
+    pub fn into_partial(self) -> PartialDailyPuzzle {
+        PartialDailyPuzzle {
+            number: self.number,
+            answer: self.answer.to_string(),
+            started: self.started,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartialDailyPuzzle {
+    pub number: u32,
+
+    answer: String,
+
+    pub started: UtcDateTime,
 }
 
 impl From<DailyPuzzle> for Puzzle {
     fn from(value: DailyPuzzle) -> Self {
         Self::Daily(value)
     }
+}
+
+pub struct DailyPuzzleDeserializer<'list> {
+    list: &'list kwordle::WordsList,
+}
+
+impl<'de, 'list> serde::de::DeserializeSeed<'de> for DailyPuzzleDeserializer<'list> {
+    type Value = DailyPuzzle;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let partial = PartialDailyPuzzle::deserialize(deserializer)?;
+        DailyPuzzle::from_partial(partial, &self.list)
+            .ok_or_else(|| serde::de::Error::custom("msg"))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum PartialPuzzle {
+    Random(String),
+    Daily(PartialDailyPuzzle),
 }
