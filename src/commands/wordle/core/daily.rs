@@ -303,4 +303,23 @@ mod tests {
 
         assert_str_eq!(serialized, DAILY_WORDLE_JSON)
     }
+
+    #[test]
+    #[should_panic]
+    fn serialize_fail() {
+        let words = kwordle::classic::words_list();
+
+        let mut daily_wordle = DailyWordle::from_partial(
+            serde_json::from_str(DAILY_WORDLE_JSON).expect("should be valid json"),
+            &words,
+        )
+        .expect("should be valid DailyWordle");
+
+        daily_wordle.puzzle.number += 5;
+
+        let serialized =
+            serde_json::to_string_pretty(&daily_wordle).expect("should serialize properly");
+
+        assert_str_eq!(serialized, DAILY_WORDLE_JSON)
+    }
 }
