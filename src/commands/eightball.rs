@@ -5,6 +5,7 @@ use crate::utils::{poise::CommandResult, Context};
 mod core;
 use core::ANSWERS;
 
+/// posts a response from the magic 8-ball
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

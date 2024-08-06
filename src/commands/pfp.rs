@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-/// display a user's profile picture
+/// displays a user's profile picture
 #[instrument(skip_all)]
 #[poise::command(
     prefix_command,

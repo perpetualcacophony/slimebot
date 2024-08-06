@@ -10,6 +10,7 @@ use crate::{
     Result,
 };
 
+/// displays the bot's uptime
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
 pub async fn uptime(ctx: Context<'_>) -> Result<()> {

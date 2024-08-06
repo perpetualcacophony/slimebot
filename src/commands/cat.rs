@@ -9,6 +9,7 @@ use crate::{
     },
 };
 
+/// posts random cat media from cataas.com
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

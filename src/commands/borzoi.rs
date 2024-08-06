@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+/// posts a random picture of a borzoi, sourced from dog.ceo
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

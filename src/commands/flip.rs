@@ -6,6 +6,7 @@ use crate::utils::{
     Context,
 };
 
+/// flips a specified number of coins
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

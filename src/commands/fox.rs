@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+/// posts a random picture of a fox, sourced from randomfox.ca
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

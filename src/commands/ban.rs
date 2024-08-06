@@ -6,7 +6,11 @@ pub mod core;
 use core::joke_ban;
 
 #[instrument(skip(ctx, user))]
-#[poise::command(prefix_command, required_bot_permissions = "SEND_MESSAGES")]
+#[poise::command(
+    prefix_command,
+    required_bot_permissions = "SEND_MESSAGES",
+    hide_in_help
+)]
 pub async fn ban(ctx: Context<'_>, user: User, reason: Option<String>) -> Result<()> {
     _ban(ctx, user, reason).await?;
     Ok(())

@@ -4,6 +4,7 @@ use crate::utils::poise::CommandResult;
 use crate::Context;
 use crate::{built_info, utils::poise::ContextExt, Result};
 
+/// displays the bot's current version
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

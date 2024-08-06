@@ -5,7 +5,7 @@ use crate::{
     utils::{poise::CommandResult, Context},
 };
 
-// displays command help text
+/// displays command help text
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

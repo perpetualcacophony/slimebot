@@ -9,6 +9,7 @@ use crate::Result;
 mod core;
 use core::DiceRoll;
 
+/// rolls a number of dice, using DnD syntax
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

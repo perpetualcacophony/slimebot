@@ -8,7 +8,7 @@ use crate::{
 };
 use tracing::instrument;
 
-/// bot will respond on successful execution
+/// prompts the bot for a response
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
@@ -34,6 +34,7 @@ async fn _ping(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
+/// alternate version of ping command
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,

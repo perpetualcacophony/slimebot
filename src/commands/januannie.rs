@@ -1,6 +1,7 @@
 use crate::utils::{poise::ContextExt, Context};
 use chrono::NaiveDate;
 
+/// counts down to january 2025
 #[poise::command(slash_command, prefix_command)]
 pub async fn januannie(ctx: Context<'_>) -> crate::Result<()> {
     let result: crate::utils::poise::CommandResult = try {

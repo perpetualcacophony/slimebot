@@ -4,6 +4,7 @@ use crate::utils::{poise::CommandResult, Context};
 use poise::serenity_prelude::{self as serenity};
 use tracing::{debug, instrument};
 
+/// displays some information about a minecraft server
 #[instrument(skip_all)]
 #[poise::command(
     slash_command,
