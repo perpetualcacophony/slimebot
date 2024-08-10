@@ -1,6 +1,7 @@
 use poise::serenity_prelude as serenity;
 
 mod mongodb;
+pub use mongodb::MongoDb;
 
 pub trait NortverseData {
     type Error;

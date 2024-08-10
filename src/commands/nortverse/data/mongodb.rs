@@ -1,10 +1,26 @@
 use poise::serenity_prelude as serenity;
 
-use super::NortverseDataAsync;
-
 pub struct MongoDb {
     latest: mongodb::Collection<SlugRecord>,
     subscribers: mongodb::Collection<SubscriberRecord>,
+}
+
+impl MongoDb {
+    const LATEST_COLLECTION_NAME: &str = "nortverse_latest";
+    const SUBSCRIBERS_COLLECTION_NAME: &str = "nortverse_subscribers";
+
+    pub fn from_database(db: &mongodb::Database) -> Self {
+        Self {
+            latest: db.collection(Self::LATEST_COLLECTION_NAME),
+            subscribers: db.collection(Self::SUBSCRIBERS_COLLECTION_NAME),
+        }
+    }
+}
+
+impl<'a> From<&'a mongodb::Database> for MongoDb {
+    fn from(value: &'a mongodb::Database) -> Self {
+        Self::from_database(value)
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -19,7 +35,7 @@ struct SubscriberRecord {
     added: mongodb::bson::DateTime,
 }
 
-impl NortverseDataAsync for MongoDb {
+impl super::NortverseDataAsync for MongoDb {
     type Error = mongodb::error::Error;
 
     async fn latest_slug(&self) -> Result<Option<String>, Self::Error> {
