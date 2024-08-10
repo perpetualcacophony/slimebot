@@ -4,6 +4,8 @@ use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 use tracing_unwrap::OptionExt;
 
+mod github;
+
 use crate::DiscordToken;
 
 #[derive(Deserialize, Debug, Clone)]

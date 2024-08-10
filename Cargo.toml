@@ -54,6 +54,8 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "classic_words",
     "step",
 ], optional = true, version = "0.5.5" }
+octocrab = { version = "0.39.0", optional = true }
+sha2 = { version = "0.10.8", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -64,5 +66,6 @@ built = { version = "0.7.4", features = ["git2"] }
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [features]
-default = ["wordle"]
+default = ["wordle", "github_bot"]
 wordle = ["dep:kwordle"]
+github_bot = ["dep:octocrab", "dep:sha2"]
