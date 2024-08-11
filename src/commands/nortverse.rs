@@ -1,4 +1,9 @@
-use crate::{utils::poise::CommandResult, Context};
+use crate::{
+    utils::poise::{CommandResult, ContextExt},
+    Context,
+};
+use poise::serenity_prelude as serenity;
+use serenity::futures::stream;
 
 mod data;
 use data::NortverseDataAsync;
@@ -19,15 +24,47 @@ type Result<T, E = Error> = std::result::Result<T, E>;
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn nortverse(ctx: Context<'_>) -> crate::Result<()> {
-    let result: CommandResult = try {};
+    use stream::{StreamExt, TryStreamExt};
+
+    let result: CommandResult = try {
+        ctx.defer_or_broadcast().await?;
+
+        let comic = ctx.data().nortverse().refresh_latest().await?.0;
+
+        let builder = poise::CreateReply::default().reply(true).content(format!(
+            "## {title}\nPosted {date}",
+            title = comic.title(),
+            date = comic.date()
+        ));
+
+        let attachments = stream::iter(comic.images())
+            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter();
+
+        let response = attachments.fold(builder, |builder, attachment| {
+            builder.attachment(attachment)
+        });
+
+        ctx.send_ext(response).await?;
+    };
 
     result?;
     Ok(())
 }
 
 #[derive(Debug)]
-struct Nortverse<Data = data::MongoDb> {
+pub struct Nortverse<Data = data::MongoDb> {
     data: std::sync::Arc<tokio::sync::RwLock<Data>>,
+}
+
+impl Nortverse {
+    pub fn from_database(db: &mongodb::Database) -> Self {
+        Self {
+            data: std::sync::Arc::new(tokio::sync::RwLock::new(data::MongoDb::from_database(db))),
+        }
+    }
 }
 
 impl<T> Clone for Nortverse<T> {

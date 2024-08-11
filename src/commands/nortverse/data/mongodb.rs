@@ -2,6 +2,7 @@ use poise::serenity_prelude as serenity;
 
 use super::Error;
 
+#[derive(Debug, Clone)]
 pub struct MongoDb {
     latest: mongodb::Collection<SlugRecord>,
     subscribers: mongodb::Collection<SubscriberRecord>,
