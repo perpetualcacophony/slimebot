@@ -103,3 +103,129 @@ impl super::NortverseDataAsync for MongoDb {
             .map(|_| ())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use poise::serenity_prelude::UserId;
+    use temp_mongo::TempMongo;
+
+    use crate::commands::nortverse::data::NortverseDataAsync;
+
+    use super::MongoDb;
+
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    async fn temp_mongo() -> TempMongo {
+        TempMongo::new()
+            .await
+            .expect("creating temp mongo should not fail")
+    }
+
+    fn get_db(mongo: &TempMongo) -> mongodb::Database {
+        mongo.client().database("nortverse_data_test")
+    }
+
+    #[tokio::test]
+    async fn set_latest() -> Result<(), mongodb::error::Error> {
+        let mongo = temp_mongo().await;
+        let mut data = MongoDb::from_database(&get_db(&mongo));
+
+        data.set_latest("amber".to_owned()).await?;
+
+        let data_slug = data.latest_slug().await?;
+        let data_slug = data_slug.as_ref().map(AsRef::as_ref);
+
+        assert_eq!(data_slug, Some("amber"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_latest() -> Result<(), mongodb::error::Error> {
+        let mongo = temp_mongo().await;
+        let mut data = MongoDb::from_database(&get_db(&mongo));
+
+        {
+            data.set_latest("amber".to_owned()).await?;
+
+            let data_slug = data.latest_slug().await?;
+            let data_slug = data_slug.as_ref().map(AsRef::as_ref);
+
+            assert_eq!(data_slug, Some("amber"));
+        }
+
+        {
+            data.set_latest("crimped".to_owned()).await?;
+
+            let data_slug = data.latest_slug().await?;
+            let data_slug = data_slug.as_ref().map(AsRef::as_ref);
+
+            assert_eq!(data_slug, Some("crimped"));
+            assert_ne!(data_slug, Some("amber"));
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn add_subscriber() -> Result<(), mongodb::error::Error> {
+        let mongo = temp_mongo().await;
+        let mut data = MongoDb::from_database(&get_db(&mongo));
+
+        data.add_subscriber(UserId::new(123)).await?;
+
+        assert!(data.contains_subscriber(&UserId::new(123)).await?);
+        assert!(!data.contains_subscriber(&UserId::new(456)).await?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn remove_subscriber() -> Result<(), mongodb::error::Error> {
+        let mongo = temp_mongo().await;
+        let mut data = MongoDb::from_database(&get_db(&mongo));
+
+        data.add_subscriber(UserId::new(123)).await?;
+        assert!(data.contains_subscriber(&UserId::new(123)).await?);
+
+        data.remove_subscriber(UserId::new(123)).await?;
+        assert!(!data.contains_subscriber(&UserId::new(123)).await?);
+        assert!(!data.contains_subscriber(&UserId::new(456)).await?);
+
+        data.add_subscriber(UserId::new(456)).await?;
+        assert!(data.contains_subscriber(&UserId::new(456)).await?);
+
+        data.remove_subscriber(UserId::new(456)).await?;
+        assert!(!data.contains_subscriber(&UserId::new(456)).await?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn subscribers() -> Result<(), mongodb::error::Error> {
+        let mongo = temp_mongo().await;
+        let mut data = MongoDb::from_database(&get_db(&mongo));
+
+        data.add_subscriber(UserId::new(123)).await?;
+        data.add_subscriber(UserId::new(789)).await?;
+
+        let subscribers = Vec::from_iter(data.subscribers().await?);
+
+        assert_eq!(subscribers.len(), 2);
+        assert!(subscribers.iter().any(|id| id == &UserId::new(123)));
+        assert!(subscribers.iter().any(|id| id == &UserId::new(789)));
+        assert!(!subscribers.iter().any(|id| id == &UserId::new(456)));
+
+        drop(subscribers);
+
+        data.remove_subscriber(UserId::new(123)).await?;
+
+        let subscribers = Vec::from_iter(data.subscribers().await?);
+
+        assert_eq!(subscribers.len(), 1);
+        assert!(!subscribers.iter().any(|id| id == &UserId::new(123)));
+        assert!(subscribers.iter().any(|id| id == &UserId::new(789)));
+
+        Ok(())
+    }
+}
