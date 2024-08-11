@@ -1,5 +1,7 @@
 use poise::serenity_prelude as serenity;
 
+use super::{Error, Result};
+
 pub struct MongoDb {
     latest: mongodb::Collection<SlugRecord>,
     subscribers: mongodb::Collection<SubscriberRecord>,
@@ -51,7 +53,8 @@ impl super::NortverseDataAsync for MongoDb {
                     })
                     .build(),
             )
-            .await?
+            .await
+            .map_err(Error::data)?
             .map(|record| record.slug))
     }
 
@@ -63,7 +66,11 @@ impl super::NortverseDataAsync for MongoDb {
             added: DateTime::now(),
         };
 
-        self.latest.insert_one(record, None).await.map(|_| ())
+        self.latest
+            .insert_one(record, None)
+            .await
+            .map(|_| ())
+            .map_err(Error::data)
     }
 
     async fn subscribers(&self) -> Result<impl IntoIterator<Item = serenity::UserId>, Self::Error> {
@@ -71,10 +78,12 @@ impl super::NortverseDataAsync for MongoDb {
 
         self.subscribers
             .find(None, None)
-            .await?
+            .await
+            .map_err(Error::data)?
             .map_ok(|record| record.id)
             .try_collect::<Vec<_>>()
             .await
+            .map_err(Error::data)
     }
 
     async fn add_subscriber(&mut self, id: serenity::UserId) -> Result<(), Self::Error> {
@@ -85,7 +94,11 @@ impl super::NortverseDataAsync for MongoDb {
             added: DateTime::now(),
         };
 
-        self.subscribers.insert_one(record, None).await.map(|_| ())
+        self.subscribers
+            .insert_one(record, None)
+            .await
+            .map(|_| ())
+            .map_err(Error::data)
     }
 
     async fn remove_subscriber(&mut self, id: serenity::UserId) -> Result<(), Self::Error> {
@@ -100,5 +113,6 @@ impl super::NortverseDataAsync for MongoDb {
             )
             .await
             .map(|_| ())
+            .map_err(Error::data)
     }
 }

@@ -1,10 +1,12 @@
 use poise::serenity_prelude as serenity;
 
+use super::{Error, Result};
+
 mod mongodb;
 pub use mongodb::MongoDb;
 
 pub trait NortverseData {
-    type Error;
+    type Error: std::error::Error;
 
     fn latest_slug(&self) -> Result<Option<impl AsRef<str>>, Self::Error>;
     fn set_latest(&mut self, slug: String) -> Result<(), Self::Error>;
@@ -19,7 +21,7 @@ pub trait NortverseData {
 }
 
 pub trait NortverseDataAsync {
-    type Error;
+    type Error: std::error::Error;
 
     async fn latest_slug(&self) -> Result<Option<impl AsRef<str>>, Self::Error>;
     async fn set_latest(&mut self, slug: String) -> Result<(), Self::Error>;
