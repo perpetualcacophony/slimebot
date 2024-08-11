@@ -22,7 +22,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
     prefix_command,
     discard_spare_arguments,
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
-    subcommands("latest", "subscribe", "unsubscribe")
+    subcommands("latest", "subscribe", "unsubscribe", "random")
 )]
 pub async fn nortverse(ctx: Context<'_>) -> crate::Result<()> {
     latest_inner(ctx).await
@@ -38,6 +38,48 @@ impl Nortverse {
         Self {
             data: std::sync::Arc::new(tokio::sync::RwLock::new(data::MongoDb::from_database(db))),
         }
+    }
+
+    pub async fn subscribe_action(&self, cache_http: &impl serenity::CacheHttp) -> CommandResult {
+        try {
+            let (comic, updated) = self.refresh_latest().await?;
+
+            if updated {
+                let message = {
+                    use stream::{StreamExt, TryStreamExt};
+
+                    let attachments = stream::iter(comic.images())
+                        .then(|url| {
+                            serenity::CreateAttachment::url(cache_http.http(), url.as_str())
+                        })
+                        .try_collect::<Vec<_>>()
+                        .await?;
+
+                    serenity::CreateMessage::new()
+                        .content(format!(
+                            "new comic!\n## {title}\n(`..nortverse unsubscribe` to unsubscribe)",
+                            title = comic.title(),
+                        ))
+                        .add_files(attachments)
+                };
+
+                for subscriber in self.subscribers().await? {
+                    subscriber.dm(cache_http, message.clone()).await?;
+                }
+            }
+        }
+    }
+
+    pub fn subscribe_task(self, cache_http: impl serenity::CacheHttp + 'static) {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(1));
+
+            loop {
+                interval.tick().await;
+
+                self.subscribe_action(&cache_http).await;
+            }
+        });
     }
 }
 
@@ -60,6 +102,7 @@ impl<Data> Nortverse<Data> {
 
     const HOST: &str = "nortverse.com";
     const COMICS_PATH: &str = "comic";
+    const RANDOM_PATH: &str = "random";
 
     fn comic_url(slug: &str) -> reqwest::Url {
         reqwest::Url::parse(&format!(
@@ -68,6 +111,26 @@ impl<Data> Nortverse<Data> {
             path = Self::COMICS_PATH
         ))
         .unwrap()
+    }
+
+    async fn random_comic() -> Result<ComicPage> {
+        let seed: u64 = rand::random();
+
+        let response = reqwest::get(format!(
+            "https://{host}/{path}?r={seed}",
+            host = Self::HOST,
+            path = Self::RANDOM_PATH
+        ))
+        .await?;
+
+        let slug = response
+            .url()
+            .path_segments()
+            .expect("should have path")
+            .nth(1)
+            .expect("should have 2nd item");
+
+        Ok(ComicPage::from_slug(slug).await?)
     }
 }
 
@@ -116,6 +179,19 @@ where
             Err(Error::not_subscribed(id))
         }
     }
+
+    async fn subscribers(&self) -> Result<impl Iterator<Item = serenity::UserId>> {
+        let data = self.data().await;
+
+        let vec: Vec<serenity::UserId> = data
+            .subscribers()
+            .await
+            .map_err(Error::data)?
+            .into_iter()
+            .collect();
+
+        Ok(vec.into_iter())
+    }
 }
 
 #[tracing::instrument(skip_all)]
@@ -149,7 +225,11 @@ async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
             .await?
             .into_iter();
 
-        let response = attachments.fold(builder, |builder, attachment| {
+        let response = attachments.fold(builder, |builder, mut attachment| {
+            if ctx.guild_id().is_some() {
+                attachment.filename = format!("SPOILER_{original}", original = attachment.filename);
+            }
+
             builder.attachment(attachment)
         });
 
@@ -175,6 +255,9 @@ pub async fn subscribe(ctx: Context<'_>) -> crate::Result<()> {
             .nortverse()
             .add_subscriber(ctx.author().id)
             .await?;
+
+        ctx.reply_ephemeral("you'll be notified whenever a new comic is posted!")
+            .await?;
     };
 
     result?;
@@ -196,6 +279,51 @@ pub async fn unsubscribe(ctx: Context<'_>) -> crate::Result<()> {
             .nortverse()
             .remove_subscriber(ctx.author().id)
             .await?;
+
+        ctx.reply_ephemeral("you will no longer be notified for new comics.")
+            .await?;
+    };
+
+    result?;
+    Ok(())
+}
+
+#[tracing::instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn random(ctx: Context<'_>) -> crate::Result<()> {
+    use stream::{StreamExt, TryStreamExt};
+
+    let result: CommandResult = try {
+        ctx.defer_or_broadcast().await?;
+
+        let comic = Nortverse::<()>::random_comic().await?;
+
+        let builder = poise::CreateReply::default().reply(true).content(format!(
+            "## {title}\nPosted {date}",
+            title = comic.title(),
+            date = comic.date()
+        ));
+
+        let attachments = stream::iter(comic.images())
+            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter();
+
+        let response = attachments.fold(builder, |builder, mut attachment| {
+            if ctx.guild_id().is_some() {
+                attachment.filename = format!("SPOILER_{original}", original = attachment.filename);
+            }
+
+            builder.attachment(attachment)
+        });
+
+        ctx.send_ext(response).await?;
     };
 
     result?;

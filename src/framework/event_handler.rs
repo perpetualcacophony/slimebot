@@ -131,6 +131,10 @@ async fn event_handler(
                 bug_reports(serenity_ctx.http(), reaction.clone(), channel).await?;
             }
         }
+        FullEvent::Ready { .. } => data
+            .nortverse()
+            .clone()
+            .subscribe_task(serenity_ctx.clone()),
         _ => (),
     }
 
