@@ -21,37 +21,11 @@ type Result<T, E = Error> = std::result::Result<T, E>;
     slash_command,
     prefix_command,
     discard_spare_arguments,
-    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL",
+    subcommands("latest", "subscribe", "unsubscribe")
 )]
 pub async fn nortverse(ctx: Context<'_>) -> crate::Result<()> {
-    use stream::{StreamExt, TryStreamExt};
-
-    let result: CommandResult = try {
-        ctx.defer_or_broadcast().await?;
-
-        let comic = ctx.data().nortverse().refresh_latest().await?.0;
-
-        let builder = poise::CreateReply::default().reply(true).content(format!(
-            "## {title}\nPosted {date}",
-            title = comic.title(),
-            date = comic.date()
-        ));
-
-        let attachments = stream::iter(comic.images())
-            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
-            .try_collect::<Vec<_>>()
-            .await?
-            .into_iter();
-
-        let response = attachments.fold(builder, |builder, attachment| {
-            builder.attachment(attachment)
-        });
-
-        ctx.send_ext(response).await?;
-    };
-
-    result?;
-    Ok(())
+    latest_inner(ctx).await
 }
 
 #[derive(Debug)]
@@ -122,4 +96,108 @@ where
 
         Ok((latest, updated))
     }
+
+    async fn add_subscriber(&self, id: serenity::UserId) -> Result<()> {
+        let mut data = self.data_mut().await;
+
+        if data.contains_subscriber(&id).await.map_err(Error::data)? {
+            Err(Error::already_subscribed(id))
+        } else {
+            data.add_subscriber(id).await.map_err(Error::data)
+        }
+    }
+
+    async fn remove_subscriber(&self, id: serenity::UserId) -> Result<()> {
+        let mut data = self.data_mut().await;
+
+        if data.contains_subscriber(&id).await.map_err(Error::data)? {
+            data.remove_subscriber(id).await.map_err(Error::data)
+        } else {
+            Err(Error::not_subscribed(id))
+        }
+    }
+}
+
+#[tracing::instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn latest(ctx: Context<'_>) -> crate::Result<()> {
+    latest_inner(ctx).await
+}
+
+async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
+    use stream::{StreamExt, TryStreamExt};
+
+    let result: CommandResult = try {
+        ctx.defer_or_broadcast().await?;
+
+        let comic = ctx.data().nortverse().refresh_latest().await?.0;
+
+        let builder = poise::CreateReply::default().reply(true).content(format!(
+            "## {title}\nPosted {date}",
+            title = comic.title(),
+            date = comic.date()
+        ));
+
+        let attachments = stream::iter(comic.images())
+            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter();
+
+        let response = attachments.fold(builder, |builder, attachment| {
+            builder.attachment(attachment)
+        });
+
+        ctx.send_ext(response).await?;
+    };
+
+    result?;
+    Ok(())
+}
+
+#[tracing::instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn subscribe(ctx: Context<'_>) -> crate::Result<()> {
+    let result: CommandResult = try {
+        ctx.defer_or_broadcast().await?;
+
+        ctx.data()
+            .nortverse()
+            .add_subscriber(ctx.author().id)
+            .await?;
+    };
+
+    result?;
+    Ok(())
+}
+
+#[tracing::instrument(skip_all)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    discard_spare_arguments,
+    required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
+)]
+pub async fn unsubscribe(ctx: Context<'_>) -> crate::Result<()> {
+    let result: CommandResult = try {
+        ctx.defer_or_broadcast().await?;
+
+        ctx.data()
+            .nortverse()
+            .remove_subscriber(ctx.author().id)
+            .await?;
+    };
+
+    result?;
+    Ok(())
 }
