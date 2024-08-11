@@ -90,7 +90,7 @@ impl ComicPage {
             "https://{host}",
             host = super::Nortverse::<()>::HOST
         ))
-        .unwrap();
+        .expect("url should be well-formed");
 
         let text = reqwest::get(homepage)
             .await?

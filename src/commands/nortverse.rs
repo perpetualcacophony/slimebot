@@ -77,6 +77,7 @@ impl Nortverse {
             loop {
                 interval.tick().await;
 
+                // todo: handle this error somewhere
                 self.subscribe_action(&cache_http).await;
             }
         });
@@ -110,7 +111,7 @@ impl<Data> Nortverse<Data> {
             host = Self::HOST,
             path = Self::COMICS_PATH
         ))
-        .unwrap()
+        .expect("url should be well-formed")
     }
 
     async fn random_comic() -> Result<ComicPage> {

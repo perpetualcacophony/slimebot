@@ -1,7 +1,5 @@
 use poise::serenity_prelude as serenity;
 
-use super::Error;
-
 #[derive(Debug, Clone)]
 pub struct MongoDb {
     latest: mongodb::Collection<SlugRecord>,
@@ -97,7 +95,7 @@ impl super::NortverseDataAsync for MongoDb {
         self.subscribers
             .delete_one(
                 doc! {
-                    "id": to_bson(&id).unwrap()
+                    "id": to_bson(&id).expect("discord id should be serializable")
                 },
                 None,
             )

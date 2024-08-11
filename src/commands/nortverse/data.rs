@@ -1,7 +1,5 @@
 use poise::serenity_prelude as serenity;
 
-use super::Error;
-
 mod mongodb;
 pub use mongodb::MongoDb;
 
