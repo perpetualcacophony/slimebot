@@ -1,5 +1,5 @@
 mod id;
-pub use id::AsDiscordId;
+pub use id::{AsDiscordId, UserIdExt};
 
 pub mod buttons;
 

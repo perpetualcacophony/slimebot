@@ -1,3 +1,7 @@
+use poise::serenity_prelude as serenity;
+
+use crate::errors::SendMessageError;
+
 pub trait AsDiscordId<Id: DiscordId> {
     type Id: DiscordId = Id;
 
@@ -62,4 +66,32 @@ auto_ids! {
     (User.id)
     (Guild.id)
     (Channel::id(), GuildChannel.id, PrivateChannel.id)
+}
+
+pub trait UserIdExt {
+    async fn dm_ext(
+        self,
+        cache_http: impl serenity::CacheHttp + Copy,
+        builder: serenity::CreateMessage,
+    ) -> Result<serenity::Message, SendMessageError>;
+}
+
+impl UserIdExt for serenity::UserId {
+    async fn dm_ext(
+        self,
+        cache_http: impl serenity::CacheHttp + Copy,
+        builder: serenity::CreateMessage,
+    ) -> Result<serenity::Message, SendMessageError> {
+        backoff::future::retry_notify(
+            backoff::ExponentialBackoff::default(),
+            || async {
+                self.dm(cache_http, builder.clone())
+                    .await
+                    .map_err(SendMessageError::from)
+                    .map_err(SendMessageError::backoff)
+            },
+            |err, _| tracing::warn!("{err}, retrying..."),
+        )
+        .await
+    }
 }

@@ -134,7 +134,7 @@ async fn event_handler(
         FullEvent::Ready { .. } => data
             .nortverse()
             .clone()
-            .subscribe_task(serenity_ctx.clone()),
+            .subscribe_task(serenity_ctx.cache.clone(), serenity_ctx.http.clone()),
         _ => (),
     }
 

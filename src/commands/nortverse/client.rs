@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use poise::serenity_prelude as serenity;
+use tracing_unwrap::ResultExt;
 
 use crate::utils::poise::CommandResult;
 
@@ -21,7 +24,11 @@ impl Nortverse {
         Self::new(data::MongoDb::from_database(db))
     }
 
-    pub async fn subscribe_action(&self, cache_http: &impl serenity::CacheHttp) -> CommandResult {
+    pub async fn subscribe_action(
+        &self,
+        cache: Arc<serenity::Cache>,
+        http: Arc<serenity::Http>,
+    ) -> CommandResult {
         try {
             let (comic, updated) = self.refresh_latest().await?;
 
@@ -32,18 +39,29 @@ impl Nortverse {
                         .in_guild(false)
                         .include_date(false)
                         .subscribed(true)
+                        .build_message(&http)
+                        .await?
                 };
 
                 for subscriber in self.subscribers().await? {
-                    subscriber
-                        .dm(cache_http, message.build_message(cache_http.http()).await?)
-                        .await?;
+                    let message = message.clone();
+                    let cache = cache.clone();
+                    let http = http.clone();
+
+                    use crate::utils::serenity::UserIdExt;
+
+                    tokio::spawn(async move {
+                        subscriber
+                            .dm_ext((&cache, http.as_ref()), message.clone())
+                            .await
+                            .expect_or_log("failed to send message, skipping...");
+                    });
                 }
             }
         }
     }
 
-    pub fn subscribe_task(self, cache_http: impl serenity::CacheHttp + 'static) {
+    pub fn subscribe_task(self, cache: Arc<serenity::Cache>, http: Arc<serenity::Http>) {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(1));
 
@@ -51,7 +69,9 @@ impl Nortverse {
                 interval.tick().await;
 
                 // todo: handle this error somewhere
-                self.subscribe_action(&cache_http).await;
+                self.subscribe_action(cache.clone(), http.clone())
+                    .await
+                    .expect_or_log("failed to run subscribe task");
             }
         });
     }
