@@ -31,13 +31,12 @@ pub async fn nortverse(ctx: Context<'_>) -> crate::Result<()> {
 #[derive(Debug)]
 pub struct Nortverse<Data = data::MongoDb> {
     data: std::sync::Arc<tokio::sync::RwLock<Data>>,
+    client: reqwest::Client,
 }
 
 impl Nortverse {
     pub fn from_database(db: &mongodb::Database) -> Self {
-        Self {
-            data: std::sync::Arc::new(tokio::sync::RwLock::new(data::MongoDb::from_database(db))),
-        }
+        Self::new(data::MongoDb::from_database(db))
     }
 
     pub async fn subscribe_action(&self, cache_http: &impl serenity::CacheHttp) -> CommandResult {
@@ -88,11 +87,19 @@ impl<T> Clone for Nortverse<T> {
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
+            client: self.client.clone(),
         }
     }
 }
 
 impl<Data> Nortverse<Data> {
+    fn new(data: Data) -> Self {
+        Self {
+            data: std::sync::Arc::new(tokio::sync::RwLock::new(data)),
+            client: reqwest::Client::new(),
+        }
+    }
+
     async fn data(&self) -> tokio::sync::RwLockReadGuard<Data> {
         self.data.read().await
     }
@@ -101,37 +108,16 @@ impl<Data> Nortverse<Data> {
         self.data.write().await
     }
 
-    const HOST: &str = "nortverse.com";
-    const COMICS_PATH: &str = "comic";
-    const RANDOM_PATH: &str = "random";
-
-    fn comic_url(slug: &str) -> reqwest::Url {
-        reqwest::Url::parse(&format!(
-            "https://{host}/{path}/{slug}",
-            host = Self::HOST,
-            path = Self::COMICS_PATH
-        ))
-        .expect("url should be well-formed")
+    fn client(&self) -> &reqwest::Client {
+        &self.client
     }
 
-    async fn random_comic() -> Result<ComicPage> {
-        let seed: u64 = rand::random();
+    async fn random_comic(&self) -> Result<ComicPage> {
+        Ok(ComicPage::random(self.client()).await?)
+    }
 
-        let response = reqwest::get(format!(
-            "https://{host}/{path}?r={seed}",
-            host = Self::HOST,
-            path = Self::RANDOM_PATH
-        ))
-        .await?;
-
-        let slug = response
-            .url()
-            .path_segments()
-            .expect("should have path")
-            .nth(1)
-            .expect("should have 2nd item");
-
-        Ok(ComicPage::from_slug(slug).await?)
+    async fn latest_comic(&self) -> Result<ComicPage> {
+        Ok(ComicPage::from_homepage(self.client()).await?)
     }
 }
 
@@ -140,7 +126,7 @@ where
     Data: NortverseDataAsync,
 {
     async fn refresh_latest(&self) -> Result<(ComicPage, bool)> {
-        let latest = ComicPage::from_homepage().await?;
+        let latest = self.latest_comic().await?;
 
         let data_slug = {
             let data = self.data().await;
@@ -302,7 +288,9 @@ pub async fn random(ctx: Context<'_>) -> crate::Result<()> {
     let result: CommandResult = try {
         ctx.defer_or_broadcast().await?;
 
-        let comic = Nortverse::<()>::random_comic().await?;
+        let nortverse = ctx.data().nortverse();
+
+        let comic = nortverse.random_comic().await?;
 
         let builder = poise::CreateReply::default().reply(true).content(format!(
             "## {title}\nPosted {date}",
