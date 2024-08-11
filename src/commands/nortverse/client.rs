@@ -1,5 +1,4 @@
 use poise::serenity_prelude as serenity;
-use serenity::futures::stream;
 
 use crate::utils::poise::CommandResult;
 
@@ -28,25 +27,17 @@ impl Nortverse {
 
             if updated {
                 let message = {
-                    use stream::{StreamExt, TryStreamExt};
-
-                    let attachments = stream::iter(comic.images())
-                        .then(|url| {
-                            serenity::CreateAttachment::url(cache_http.http(), url.as_str())
-                        })
-                        .try_collect::<Vec<_>>()
-                        .await?;
-
-                    serenity::CreateMessage::new()
-                        .content(format!(
-                            "new comic!\n## {title}\n(`..nortverse unsubscribe` to unsubscribe)",
-                            title = comic.title(),
-                        ))
-                        .add_files(attachments)
+                    comic
+                        .builder()
+                        .in_guild(false)
+                        .include_date(false)
+                        .subscribed(true)
                 };
 
                 for subscriber in self.subscribers().await? {
-                    subscriber.dm(cache_http, message.clone()).await?;
+                    subscriber
+                        .dm(cache_http, message.build_message(cache_http.http()).await?)
+                        .await?;
                 }
             }
         }

@@ -2,8 +2,6 @@ use crate::{
     utils::poise::{CommandResult, ContextExt},
     Context,
 };
-use poise::serenity_prelude as serenity;
-use serenity::futures::stream;
 
 mod data;
 
@@ -14,6 +12,8 @@ mod comic;
 
 mod client;
 pub use client::Nortverse;
+
+mod response;
 
 #[tracing::instrument(skip_all)]
 #[poise::command(
@@ -39,32 +39,20 @@ pub async fn latest(ctx: Context<'_>) -> crate::Result<()> {
 }
 
 async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
-    use stream::{StreamExt, TryStreamExt};
-
     let result: CommandResult = try {
         ctx.defer_or_broadcast().await?;
 
-        let comic = ctx.data().nortverse().refresh_latest().await?.0;
-
-        let builder = poise::CreateReply::default().reply(true).content(format!(
-            "## {title}\nPosted {date}",
-            title = comic.title(),
-            date = comic.date()
-        ));
-
-        let attachments = stream::iter(comic.images())
-            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
-            .try_collect::<Vec<_>>()
+        let response = ctx
+            .data()
+            .nortverse()
+            .refresh_latest()
             .await?
-            .into_iter();
-
-        let response = attachments.fold(builder, |builder, mut attachment| {
-            if ctx.guild_id().is_some() {
-                attachment.filename = format!("SPOILER_{original}", original = attachment.filename);
-            }
-
-            builder.attachment(attachment)
-        });
+            .0
+            .builder()
+            .in_guild(ctx.guild_id().is_some())
+            .build_reply(ctx.http())
+            .await?
+            .reply(true);
 
         ctx.send_ext(response).await?;
     };
@@ -129,34 +117,19 @@ pub async fn unsubscribe(ctx: Context<'_>) -> crate::Result<()> {
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn random(ctx: Context<'_>) -> crate::Result<()> {
-    use stream::{StreamExt, TryStreamExt};
-
     let result: CommandResult = try {
         ctx.defer_or_broadcast().await?;
 
         let nortverse = ctx.data().nortverse();
 
-        let comic = nortverse.random_comic().await?;
-
-        let builder = poise::CreateReply::default().reply(true).content(format!(
-            "## {title}\nPosted {date}",
-            title = comic.title(),
-            date = comic.date()
-        ));
-
-        let attachments = stream::iter(comic.images())
-            .then(|url| serenity::CreateAttachment::url(ctx.http(), url.as_str()))
-            .try_collect::<Vec<_>>()
+        let response = nortverse
+            .random_comic()
             .await?
-            .into_iter();
-
-        let response = attachments.fold(builder, |builder, mut attachment| {
-            if ctx.guild_id().is_some() {
-                attachment.filename = format!("SPOILER_{original}", original = attachment.filename);
-            }
-
-            builder.attachment(attachment)
-        });
+            .builder()
+            .in_guild(ctx.guild_id().is_some())
+            .build_reply(ctx.http())
+            .await?
+            .reply(true);
 
         ctx.send_ext(response).await?;
     };

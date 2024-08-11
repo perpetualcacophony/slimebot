@@ -1,3 +1,5 @@
+use poise::serenity_prelude as serenity;
+
 #[derive(Debug, Clone)]
 pub struct ComicPage {
     title: String,
@@ -29,6 +31,26 @@ impl ComicPage {
 
     pub fn images(&self) -> impl Iterator<Item = &reqwest::Url> {
         self.images.iter()
+    }
+
+    pub async fn attachments(
+        &self,
+        http: &serenity::Http,
+    ) -> serenity::Result<impl Iterator<Item = serenity::CreateAttachment>> {
+        use serenity::{
+            futures::stream::{self, StreamExt, TryStreamExt},
+            CreateAttachment,
+        };
+
+        Ok(stream::iter(self.images())
+            .then(|url| CreateAttachment::url(http, url.as_str()))
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter())
+    }
+
+    pub fn builder(&self) -> super::response::ResponseBuilder<'_> {
+        super::response::ResponseBuilder::new(self)
     }
 }
 
