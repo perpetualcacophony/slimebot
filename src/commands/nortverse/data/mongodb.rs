@@ -38,7 +38,7 @@ struct SubscriberRecord {
 impl super::NortverseDataAsync for MongoDb {
     type Error = mongodb::error::Error;
 
-    async fn latest_slug(&self) -> Result<Option<String>, Self::Error> {
+    async fn latest_slug(&self) -> Result<Option<impl AsRef<str>>, Self::Error> {
         use mongodb::{bson::doc, options::FindOneOptions};
 
         Ok(self
