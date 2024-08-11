@@ -91,6 +91,9 @@ pub enum CommandError {
 
     #[error("error from minecraft api: {0}")]
     Minecraft(#[from] crate::commands::minecraft::Error),
+
+    #[error("error from nortverse api: {0}")]
+    Nortverse(#[from] crate::commands::nortverse::Error),
 }
 
 #[derive(Debug, ThisError, TracingError)]

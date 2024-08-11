@@ -6,7 +6,10 @@ use data::NortverseDataAsync;
 mod error;
 pub use error::NortverseError as Error;
 
-type Result<T, Data> = std::result::Result<T, Error<Data>>;
+mod comic;
+use comic::ComicPage;
+
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[tracing::instrument(skip_all)]
 #[poise::command(
@@ -16,6 +19,9 @@ type Result<T, Data> = std::result::Result<T, Error<Data>>;
     required_bot_permissions = "SEND_MESSAGES | VIEW_CHANNEL"
 )]
 pub async fn nortverse(ctx: Context<'_>) -> crate::Result<()> {
+    let result: CommandResult = try {};
+
+    result?;
     Ok(())
 }
 
@@ -40,16 +46,11 @@ impl<Data> Nortverse<Data> {
     async fn data_mut(&self) -> tokio::sync::RwLockWriteGuard<Data> {
         self.data.write().await
     }
-}
 
-impl<Data> Nortverse<Data>
-where
-    Data: NortverseDataAsync,
-{
     const HOST: &str = "nortverse.com";
     const COMICS_PATH: &str = "comic";
 
-    async fn comic_url(slug: &str) -> reqwest::Url {
+    fn comic_url(slug: &str) -> reqwest::Url {
         reqwest::Url::parse(&format!(
             "https://{host}/{path}/{slug}",
             host = Self::HOST,
@@ -57,27 +58,31 @@ where
         ))
         .unwrap()
     }
+}
 
-    async fn latest(&self) -> Result<reqwest::Url, Data::Error> {
-        let text = reqwest::get(format!("https://{host}", host = Self::HOST))
-            .await?
-            .text()
-            .await?;
+impl<Data> Nortverse<Data>
+where
+    Data: NortverseDataAsync,
+{
+    async fn refresh_latest(&self) -> Result<(ComicPage, bool)> {
+        let latest = ComicPage::from_homepage().await?;
 
-        let html = scraper::Html::parse_document(&text);
-        let selector =
-            scraper::Selector::parse(".entry-title>a").expect("should be a valid selector");
+        let data_slug = {
+            let data = self.data().await;
+            let data_slug = data.latest_slug().await.map_err(Error::data)?;
+            data_slug.map(|as_ref| as_ref.as_ref().to_owned())
+        };
 
-        Ok(reqwest::Url::parse(
-            html.select(&selector)
-                .map(|element| {
-                    element
-                        .attr("href")
-                        .expect("a element should have href attr")
-                })
-                .next()
-                .expect("homepage should have a title with a link"),
-        )
-        .expect("href should be valid url"))
+        let updated = Some(latest.slug()) == data_slug.as_deref();
+
+        if updated {
+            self.data_mut()
+                .await
+                .set_latest(latest.slug().to_owned())
+                .await
+                .map_err(Error::data)?;
+        }
+
+        Ok((latest, updated))
     }
 }
