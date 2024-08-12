@@ -7,6 +7,9 @@ pub enum NortverseError {
     Data(String),
 
     #[error(transparent)]
+    ParseComic(#[from] super::comic::ParseError),
+
+    #[error(transparent)]
     AlreadySubscribed(#[from] AlreadySubscribedError),
 
     #[error(transparent)]
