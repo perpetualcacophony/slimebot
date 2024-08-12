@@ -61,9 +61,9 @@ impl<T: NortverseData> NortverseDataAsync for T {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Std {
-    latest: String,
+    latest: Option<String>,
     subscribers: std::collections::HashSet<serenity::UserId>,
 }
 
@@ -71,11 +71,11 @@ impl NortverseData for Std {
     type Error = std::convert::Infallible;
 
     fn latest_slug(&self) -> Result<Option<impl AsRef<str>>, Self::Error> {
-        Ok(Some(&self.latest))
+        Ok(self.latest.as_ref())
     }
 
     fn set_latest(&mut self, slug: String) -> Result<(), Self::Error> {
-        self.latest = slug;
+        self.latest = Some(slug);
         Ok(())
     }
 
