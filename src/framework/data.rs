@@ -20,6 +20,9 @@ pub struct PoiseData {
 
     //error_tx: ErrorSender,
     minecraft: crate::commands::minecraft::Data,
+
+    #[cfg(feature = "nortverse")]
+    nortverse: crate::commands::nortverse::Nortverse,
 }
 
 impl PoiseData {
@@ -46,6 +49,9 @@ impl PoiseData {
 
         let minecraft = crate::commands::minecraft::Data::new_mongodb(&db);
 
+        #[cfg(feature = "nortverse")]
+        let nortverse = crate::commands::nortverse::Nortverse::from_database(&db);
+
         Self {
             config,
             db,
@@ -54,8 +60,10 @@ impl PoiseData {
             #[cfg(feature = "wordle")]
             wordle,
 
-            //error_tx,
             minecraft,
+
+            #[cfg(feature = "nortverse")]
+            nortverse,
         }
     }
 
@@ -79,5 +87,10 @@ impl PoiseData {
 
     pub(crate) const fn minecraft(&self) -> &crate::commands::minecraft::Data {
         &self.minecraft
+    }
+
+    #[cfg(feature = "nortverse")]
+    pub(crate) const fn nortverse(&self) -> &crate::commands::nortverse::Nortverse {
+        &self.nortverse
     }
 }

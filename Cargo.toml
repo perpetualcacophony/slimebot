@@ -28,7 +28,7 @@ poise = "0.6.1"
 rand = "0.8.5"
 regex = "1.10.3"
 reqwest = { version = "0.11.18", default-features = true, features = ["json"] }
-scraper = { version = "0.17.1", default-features = false }
+scraper = { version = "0.20", default-features = false }
 serde = { version = "1.0.*", default-features = false }
 serde_json = { version = "1.0.*", default-features = false }
 thiserror = "1.0.57"
@@ -64,5 +64,6 @@ built = { version = "0.7.4", features = ["git2"] }
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [features]
-default = ["wordle"]
+default = ["wordle", "nortverse"]
 wordle = ["dep:kwordle"]
+nortverse = []

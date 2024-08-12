@@ -20,6 +20,9 @@ macro_rules! list {
             #[cfg(feature = "wordle")]
             vec.push(wordle());
 
+            #[cfg(feature = "nortverse")]
+            vec.push(nortverse::nortverse());
+
             vec
         }
     };
@@ -48,6 +51,9 @@ pub mod wordle;
 
 #[cfg(feature = "wordle")]
 use wordle::wordle;
+
+#[cfg(feature = "nortverse")]
+pub mod nortverse;
 
 trait LogCommands {
     async fn log_command(&self);

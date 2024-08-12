@@ -131,6 +131,13 @@ async fn event_handler(
                 bug_reports(serenity_ctx.http(), reaction.clone(), channel).await?;
             }
         }
+
+        #[cfg(feature = "nortverse")]
+        FullEvent::Ready { .. } => data
+            .nortverse()
+            .clone()
+            .subscribe_task(serenity_ctx.cache.clone(), serenity_ctx.http.clone()),
+
         _ => (),
     }
 
