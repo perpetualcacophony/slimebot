@@ -88,7 +88,7 @@ impl Display for ResponseBuilder<'_> {
 
         write!(
             f,
-            "## [{title}]({url})",
+            "## [{title}](<{url}>)",
             title = self.comic.title(),
             url = self.comic.url()
         )?;

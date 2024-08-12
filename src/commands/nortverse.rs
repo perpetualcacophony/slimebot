@@ -77,7 +77,7 @@ pub async fn subscribe(ctx: Context<'_>) -> crate::Result<()> {
             .add_subscriber(ctx.author().id)
             .await?;
 
-        ctx.reply_ephemeral("you'll be notified whenever a new comic is posted!")
+        ctx.reply_ephemeral("you'll be notified whenever a new comic is posted!\n`..nortverse unsubscribe` to unsubscribe")
             .await?;
     };
 
