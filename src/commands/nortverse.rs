@@ -45,9 +45,8 @@ async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
         let response = ctx
             .data()
             .nortverse()
-            .refresh_latest()
+            .latest_comic()
             .await?
-            .0
             .builder()
             .in_guild(ctx.guild_id().is_some())
             .build_reply(ctx.http())

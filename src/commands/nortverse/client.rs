@@ -24,15 +24,20 @@ impl Nortverse {
         Self::new(data::MongoDb::from_database(db))
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn subscribe_action(
         &self,
         cache: Arc<serenity::Cache>,
         http: Arc<serenity::Http>,
     ) -> CommandResult {
+        tracing::info!("checking for new comic");
+
         try {
-            let (comic, updated) = self.refresh_latest().await?;
+            let (comic, updated, old_slug) = self.refresh_latest().await?;
 
             if updated {
+                tracing::info!(comic.slug = comic.slug(), old.slug = ?old_slug, "new comic found");
+
                 let message = {
                     comic
                         .builder()
@@ -48,6 +53,8 @@ impl Nortverse {
                     let cache = cache.clone();
                     let http = http.clone();
 
+                    tracing::trace!(user.id = %subscriber, "messaging subscriber");
+
                     use crate::utils::serenity::UserIdExt;
 
                     tokio::spawn(async move {
@@ -57,18 +64,20 @@ impl Nortverse {
                             .expect_or_log("failed to send message, skipping...");
                     });
                 }
+            } else {
+                tracing::trace!("no new comic found")
             }
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn subscribe_task(self, cache: Arc<serenity::Cache>, http: Arc<serenity::Http>) {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(1));
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_mins(60));
 
             loop {
                 interval.tick().await;
 
-                // todo: handle this error somewhere
                 self.subscribe_action(cache.clone(), http.clone())
                     .await
                     .expect_or_log("failed to run subscribe task");
@@ -119,7 +128,8 @@ impl<Data> Nortverse<Data>
 where
     Data: NortverseDataAsync,
 {
-    pub async fn refresh_latest(&self) -> Result<(ComicPage, bool)> {
+    #[tracing::instrument(skip_all)]
+    pub async fn refresh_latest(&self) -> Result<(ComicPage, bool, Option<String>)> {
         let latest = self.latest_comic().await?;
 
         let data_slug = {
@@ -128,7 +138,7 @@ where
             data_slug.map(|as_ref| as_ref.as_ref().to_owned())
         };
 
-        let updated = Some(latest.slug()) == data_slug.as_deref();
+        let updated = Some(latest.slug()) != data_slug.as_deref();
 
         if updated {
             self.data_mut()
@@ -136,18 +146,27 @@ where
                 .set_latest(latest.slug().to_owned())
                 .await
                 .map_err(Error::data)?;
+
+            tracing::info!(slug = %latest.slug(), "updated latest comic")
         }
 
-        Ok((latest, updated))
+        Ok((latest, updated, data_slug))
     }
 
+    #[tracing::instrument(skip_all, fields(id))]
     pub async fn add_subscriber(&self, id: serenity::UserId) -> Result<()> {
         let mut data = self.data_mut().await;
 
         if data.contains_subscriber(&id).await.map_err(Error::data)? {
+            tracing::warn!(user.id = %id, "user already subscribed");
+
             Err(Error::already_subscribed(id))
         } else {
-            data.add_subscriber(id).await.map_err(Error::data)
+            data.add_subscriber(id).await.map_err(Error::data)?;
+
+            tracing::info!(user.id = %id, "added subscriber");
+
+            Ok(())
         }
     }
 
@@ -155,8 +174,14 @@ where
         let mut data = self.data_mut().await;
 
         if data.contains_subscriber(&id).await.map_err(Error::data)? {
-            data.remove_subscriber(id).await.map_err(Error::data)
+            data.remove_subscriber(id).await.map_err(Error::data)?;
+
+            tracing::info!(user.id = %id, "removed subscriber");
+
+            Ok(())
         } else {
+            tracing::warn!(user.id = %id, "user not subscribed");
+
             Err(Error::not_subscribed(id))
         }
     }
