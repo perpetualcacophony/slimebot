@@ -86,8 +86,12 @@ impl Display for ResponseBuilder<'_> {
             f.write_str("New comic! (`..nortverse unsubscribe`) to unsubscribe")?;
         }
 
-        let title = format!("## {}", self.comic.title());
-        f.write_str(&title)?;
+        write!(
+            f,
+            "## [{title}]({url})",
+            title = self.comic.title(),
+            url = self.comic.url()
+        )?;
 
         if self.include_date {
             let date = format!("Posted {}", self.comic.date());
@@ -96,6 +100,7 @@ impl Display for ResponseBuilder<'_> {
         }
 
         if self.in_guild {
+            f.write_char('\n')?;
             f.write_str("`spoilered for potential NSFW`")?;
         }
 

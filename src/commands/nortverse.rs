@@ -40,7 +40,7 @@ pub async fn latest(ctx: Context<'_>) -> crate::Result<()> {
 
 async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
     let result: CommandResult = try {
-        ctx.defer_or_broadcast().await?;
+        let _broadcast = ctx.defer_or_broadcast().await?;
 
         let response = ctx
             .data()
@@ -70,7 +70,7 @@ async fn latest_inner(ctx: Context<'_>) -> crate::Result<()> {
 )]
 pub async fn subscribe(ctx: Context<'_>) -> crate::Result<()> {
     let result: CommandResult = try {
-        ctx.defer_or_broadcast().await?;
+        let _broadcast = ctx.defer_or_broadcast().await?;
 
         ctx.data()
             .nortverse()
@@ -94,7 +94,7 @@ pub async fn subscribe(ctx: Context<'_>) -> crate::Result<()> {
 )]
 pub async fn unsubscribe(ctx: Context<'_>) -> crate::Result<()> {
     let result: CommandResult = try {
-        ctx.defer_or_broadcast().await?;
+        let _broadcast = ctx.defer_or_broadcast().await?;
 
         ctx.data()
             .nortverse()
@@ -118,7 +118,7 @@ pub async fn unsubscribe(ctx: Context<'_>) -> crate::Result<()> {
 )]
 pub async fn random(ctx: Context<'_>) -> crate::Result<()> {
     let result: CommandResult = try {
-        ctx.defer_or_broadcast().await?;
+        let _broadcast = ctx.defer_or_broadcast().await?;
 
         let nortverse = ctx.data().nortverse();
 
