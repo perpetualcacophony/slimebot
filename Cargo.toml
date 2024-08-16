@@ -54,6 +54,7 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "classic_words",
     "step",
 ], optional = true, version = "0.5.5" }
+dynasty2 = { path = "../personal/dynasty2", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -67,4 +68,4 @@ git2 = { version = "0.19", features = ["vendored-libgit2"] }
 default = ["wordle", "nortverse", "dynasty"]
 wordle = ["dep:kwordle"]
 nortverse = []
-dynasty = []
+dynasty = ["dep:dynasty2"]

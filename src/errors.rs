@@ -95,6 +95,11 @@ pub enum CommandError {
     #[cfg(feature = "nortverse")]
     #[error("error from nortverse api: {0}")]
     Nortverse(#[from] crate::commands::nortverse::Error),
+
+    #[cfg(feature = "dynasty")]
+    #[error("error from dynasty scans api: {0}")]
+    #[event(level = ERROR)]
+    Dynasty(#[from] dynasty2::Error),
 }
 
 #[derive(Debug, ThisError, TracingError)]
