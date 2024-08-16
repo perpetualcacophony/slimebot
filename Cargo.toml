@@ -71,6 +71,7 @@ default = []
 wordle = ["dep:kwordle"]
 nortverse = []
 full = ["wordle", "nortverse"]
+dynasty = []
 
 docker = ["full", "vault"]
 docker-secrets = []
