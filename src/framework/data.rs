@@ -32,6 +32,9 @@ pub struct PoiseData {
 
     #[cfg(feature = "nortverse")]
     nortverse: crate::commands::nortverse::Nortverse,
+
+    #[cfg(feature = "dynasty")]
+    dynasty: dynasty2::Dynasty,
 }
 
 impl PoiseData {
@@ -92,7 +95,10 @@ impl PoiseData {
         #[cfg(feature = "nortverse")]
         let nortverse = crate::commands::nortverse::Nortverse::from_database(&db);
 
-        Ok(Self {
+        #[cfg(feature = "dynasty")]
+        let dynasty = dynasty2::Dynasty::new();
+
+        Self {
             config,
             db,
             started,
@@ -106,7 +112,10 @@ impl PoiseData {
 
             #[cfg(feature = "nortverse")]
             nortverse,
-        })
+
+            #[cfg(feature = "dynasty")]
+            dynasty,
+        }
     }
 
     pub(crate) const fn config(&self) -> &super::config::Config {
@@ -134,5 +143,10 @@ impl PoiseData {
     #[cfg(feature = "nortverse")]
     pub(crate) const fn nortverse(&self) -> &crate::commands::nortverse::Nortverse {
         &self.nortverse
+    }
+
+    #[cfg(feature = "dynasty")]
+    pub(crate) const fn dynasty(&self) -> &dynasty2::Dynasty {
+        &self.dynasty
     }
 }
