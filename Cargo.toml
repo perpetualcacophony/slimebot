@@ -54,6 +54,7 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "classic_words",
     "step",
 ], optional = true, version = "0.5.5" }
+dotenvy = "0.15.7"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

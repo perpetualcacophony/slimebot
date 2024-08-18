@@ -17,4 +17,5 @@ RUN cargo +nightly build --release --target x86_64-unknown-linux-musl
 FROM alpine AS runtime
 COPY --link --from=builder /app/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
 EXPOSE 443
+USER slimebot:slimebot
 ENTRYPOINT ["slimebot"]
