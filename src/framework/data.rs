@@ -38,7 +38,7 @@ impl PoiseData {
         };
 
         let config: super::config::Config = ::config::Config::builder()
-            .add_source(::config::File::with_name(&config_file))
+            .add_source(::config::File::new(&config_file, config::FileFormat::Toml))
             .build()
             .expect_or_log("config file could not be loaded")
             .try_deserialize()
