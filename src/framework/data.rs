@@ -4,7 +4,7 @@ use crate::commands::wordle::core::WordleData;
 use mongodb::Database;
 
 use chrono::Utc;
-use tracing::trace;
+use tracing::{info, trace, warn};
 use tracing_unwrap::ResultExt;
 
 pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
@@ -27,9 +27,18 @@ pub struct PoiseData {
 
 impl PoiseData {
     pub(crate) fn new() -> Self {
+        dotenvy::dotenv().ok();
+
+        let config_file = if let Ok(path) = std::env::var("SLIMEBOT_TOML") {
+            info!(path, "looking for config file with SLIMEBOT_TOML...");
+            path
+        } else {
+            warn!("SLIMEBOT_TOML env unset, using default path /usr/share/slimebot/slimebot.toml");
+            "/usr/share/slimebot/slimebot.toml".to_owned()
+        };
+
         let config: super::config::Config = ::config::Config::builder()
-            .add_source(::config::File::with_name("slimebot.toml"))
-            .add_source(::config::Environment::with_prefix("SLIMEBOT"))
+            .add_source(::config::File::with_name(&config_file))
             .build()
             .expect_or_log("config file could not be loaded")
             .try_deserialize()
