@@ -2,6 +2,9 @@
 FROM ghcr.io/perpetualcacophony/muslrust-chef:nightly AS chef
 WORKDIR /build
 
+# add rustup musl target
+RUN rustup target add x86_64-unknown-linux-musl
+
 
 
 FROM chef AS planner
