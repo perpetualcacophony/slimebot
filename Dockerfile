@@ -2,9 +2,6 @@
 FROM ghcr.io/perpetualcacophony/muslrust-chef:nightly AS chef
 WORKDIR /build
 
-# add rustup musl target
-RUN rustup target add x86_64-unknown-linux-musl
-
 
 
 FROM chef AS planner
@@ -54,7 +51,7 @@ RUN adduser --system slimebot --ingroup slimebot
 EXPOSE 443
 
 # copy binary from builder
-COPY --link --from=builder --chown=slimebot:slimebot /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
+COPY --from=builder --chown=slimebot:slimebot /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
 
 USER slimebot:slimebot
 
