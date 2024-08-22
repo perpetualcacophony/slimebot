@@ -14,7 +14,7 @@ COPY Cargo.toml .
 COPY src/main.rs src/
 
 # create the cargo chef recipe file
-RUN cargo +nightly chef prepare --recipe-path recipe.json
+RUN cargo chef prepare --recipe-path recipe.json
 
 
 
