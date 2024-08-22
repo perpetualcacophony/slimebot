@@ -48,8 +48,8 @@ RUN cargo +nightly build \
 FROM alpine AS runtime
 
 # add slimebot user & group
-RUN addgroup --system slimebot && \
-    adduser --system slimebot --ingroup slimebot
+RUN addgroup --system slimebot
+RUN adduser --system slimebot --ingroup slimebot
 
 EXPOSE 443
 
