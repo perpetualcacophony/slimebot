@@ -44,17 +44,14 @@ RUN cargo +nightly build \
 # using alpine for small final image
 FROM alpine AS runtime
 
-# add slimebot user & group
-RUN addgroup --system slimebot
-RUN adduser --system slimebot --ingroup slimebot
-
-RUN mkdir /etc/slimebot
-RUN chown -R slimebot:slimebot /etc/slimebot
-
 EXPOSE 443
 
 # copy binary from builder
-COPY --from=builder --chown=slimebot:slimebot /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
+COPY --from=builder --link /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
+
+# add slimebot user & group (8040)
+RUN addgroup --system slimebot --gid 8040
+RUN adduser --system slimebot --ingroup slimebot
 
 USER slimebot:slimebot
 
