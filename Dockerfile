@@ -48,6 +48,9 @@ FROM alpine AS runtime
 RUN addgroup --system slimebot
 RUN adduser --system slimebot --ingroup slimebot
 
+RUN mkdir /etc/slimebot
+RUN chown -R slimebot:slimebot /etc/slimebot
+
 EXPOSE 443
 
 # copy binary from builder
