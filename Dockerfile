@@ -45,13 +45,13 @@ RUN cargo +nightly build \
 FROM alpine AS runtime
 
 # add slimebot user & group
-RUN addgroup --system slimebot && \
-    adduser --system slimebot --ingroup slimebot
+RUN addgroup --system slimebot
+RUN adduser --system slimebot --ingroup slimebot
 
 EXPOSE 443
 
 # copy binary from builder
-COPY --link --from=builder --chown=slimebot:slimebot /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
+COPY --from=builder --chown=slimebot:slimebot /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
 
 USER slimebot:slimebot
 
