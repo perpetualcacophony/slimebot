@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
@@ -190,8 +192,14 @@ pub struct DbConfig {
 }
 
 impl DbConfig {
-    pub fn url(&self) -> &str {
-        &self.url
+    pub fn url(&self) -> Cow<str> {
+        #[cfg(feature = "docker")]
+        if let Ok(db_url) = std::env::var("SLIMEBOT_DB_URL") {
+            info!(db_url, "using db url override from environment");
+            return db_url.into();
+        }
+
+        (&self.url).into()
     }
 
     pub fn username(&self) -> &str {

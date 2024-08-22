@@ -1,0 +1,7 @@
+*
+!/src
+!/static
+!/.cargo
+!/Cargo.toml
+!/rust-toolchain.toml
+!/build.rs

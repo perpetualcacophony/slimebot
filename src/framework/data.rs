@@ -33,8 +33,14 @@ impl PoiseData {
             info!(path, "looking for config file with SLIMEBOT_TOML...");
             path
         } else {
-            warn!("SLIMEBOT_TOML env unset, using default path /usr/share/slimebot/slimebot.toml");
-            "/usr/share/slimebot/slimebot.toml".to_owned()
+            #[cfg(not(feature = "docker"))]
+            let path = "./slimebot.toml".to_owned();
+
+            #[cfg(feature = "docker")]
+            let path = "/slimebot.toml".to_owned();
+
+            warn!(path, "SLIMEBOT_TOML env unset, using default path");
+            path
         };
 
         let config: super::config::Config = ::config::Config::builder()
