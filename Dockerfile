@@ -24,7 +24,7 @@ FROM chef AS builder
 COPY --link --from=planner /build/recipe.json .
 
 # cargo chef cook to cache dependencies from recipe file
-RUN cargo +nightly chef cook \
+RUN cargo chef cook \
     --release \
     --target x86_64-unknown-linux-musl \
     --recipe-path recipe.json \
@@ -37,7 +37,7 @@ COPY . .
 RUN touch build.rs
 
 # build binary
-RUN cargo +nightly build \
+RUN cargo build \
     --release \
     --target x86_64-unknown-linux-musl \
     --features docker
