@@ -14,7 +14,7 @@ COPY Cargo.toml .
 COPY src/main.rs src/
 
 # create the cargo chef recipe file
-RUN cargo chef prepare --recipe-path recipe.json
+RUN cargo +nightly chef prepare --recipe-path recipe.json
 
 
 
@@ -24,7 +24,7 @@ FROM chef AS builder
 COPY --link --from=planner /build/recipe.json .
 
 # cargo chef cook to cache dependencies from recipe file
-RUN cargo chef cook \
+RUN cargo +nightly chef cook \
     --release \
     --target x86_64-unknown-linux-musl \
     --recipe-path recipe.json \
@@ -37,7 +37,7 @@ COPY . .
 RUN touch build.rs
 
 # build binary
-RUN cargo build \
+RUN cargo +nightly build \
     --release \
     --target x86_64-unknown-linux-musl \
     --features docker
