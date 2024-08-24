@@ -105,6 +105,9 @@ pub enum Error {
 
     #[error(transparent)]
     Handler(#[from] HandlerError),
+
+    #[error(transparent)]
+    Data(#[from] crate::framework::DataError),
 }
 
 #[derive(Debug, thiserror::Error, TracingError)]

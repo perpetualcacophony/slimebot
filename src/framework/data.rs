@@ -7,6 +7,13 @@ use chrono::Utc;
 use tracing::{info, trace, warn};
 use tracing_unwrap::ResultExt;
 
+use super::Secrets;
+
+pub mod error;
+pub use error::Error as DataError;
+
+pub type Result<T, E = DataError> = std::result::Result<T, E>;
+
 pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
@@ -14,6 +21,8 @@ pub struct PoiseData {
     pub(crate) config: super::config::Config,
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
+
+    pub(crate) secrets: Secrets,
 
     #[cfg(feature = "wordle")]
     pub(crate) wordle: WordleData,
@@ -26,7 +35,7 @@ pub struct PoiseData {
 }
 
 impl PoiseData {
-    pub(crate) fn new() -> Self {
+    pub(crate) async fn new() -> Result<Self> {
         dotenvy::dotenv().ok();
 
         let config_file = if let Ok(path) = std::env::var("SLIMEBOT_TOML") {
@@ -52,7 +61,9 @@ impl PoiseData {
 
         trace!("config loaded");
 
-        let db = super::db::database(&config.db);
+        let secrets = Secrets::secret_files(&config.secrets_dir()).await?;
+
+        let db = super::db::database(&config.db, &secrets);
 
         let started = Utc::now();
 
@@ -67,10 +78,12 @@ impl PoiseData {
         #[cfg(feature = "nortverse")]
         let nortverse = crate::commands::nortverse::Nortverse::from_database(&db);
 
-        Self {
+        Ok(Self {
             config,
             db,
             started,
+
+            secrets,
 
             #[cfg(feature = "wordle")]
             wordle,
@@ -79,7 +92,7 @@ impl PoiseData {
 
             #[cfg(feature = "nortverse")]
             nortverse,
-        }
+        })
     }
 
     pub(crate) const fn config(&self) -> &super::config::Config {

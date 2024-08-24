@@ -1,15 +1,17 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
-use tracing_unwrap::OptionExt;
-
-use crate::DiscordToken;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
+    pub secrets_dir: Option<PathBuf>,
+
     pub bot: BotConfig,
     pub logs: LogsConfig,
     pub db: DbConfig,
@@ -17,6 +19,8 @@ pub struct Config {
     pub watchers: WatchersConfig,
     #[serde(default)]
     pub bug_reports: BugReportsConfig,
+
+    #[cfg(feature = "wordle")]
     #[serde(default)]
     pub wordle: WordleConfig,
 }
@@ -30,11 +34,45 @@ impl Config {
             None
         }
     }
+
+    #[tracing::instrument(skip_all)]
+    pub fn secrets_dir(&self) -> Cow<Path> {
+        tracing::trace!("looking for secrets directory...");
+
+        if let Ok(env) = std::env::var("SLIMEBOT_SECRETS_DIR") {
+            tracing::trace!(
+                var = "SLIMEBOT_SECRETS_DIR",
+                value = env,
+                "using value from environemtn"
+            );
+
+            if cfg!(feature = "docker") && env.as_str() != "/run/secrets" {
+                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            }
+
+            PathBuf::from(env).into()
+        } else if let Some(ref config) = self.secrets_dir {
+            tracing::trace!(value = ?config, "using value from config");
+
+            if cfg!(feature = "docker") && config != Path::new("/run/secrets") {
+                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            }
+
+            config.into()
+        } else if cfg!(feature = "docker") {
+            tracing::trace!(value = "/run/secrets", "using docker default value");
+
+            Path::new("/run/secrets").into()
+        } else {
+            tracing::error!("no secrets directory specified in config or environment");
+
+            panic!()
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BotConfig {
-    token: Option<DiscordToken>,
     testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
@@ -43,12 +81,6 @@ pub struct BotConfig {
 }
 
 impl BotConfig {
-    pub fn token(&self) -> &str {
-        self.token
-            .as_ref()
-            .expect_or_log("no token in config or environment!")
-    }
-
     pub fn testing_server(&self) -> Option<&GuildId> {
         if self.testing_server.is_none() {
             warn!("no testing server set in config, slash commands will not be registered");
@@ -187,8 +219,6 @@ impl LogsConfig {
 #[derive(Deserialize, Debug, Clone)]
 pub struct DbConfig {
     url: String,
-    username: String,
-    password: String,
 }
 
 impl DbConfig {
@@ -200,14 +230,6 @@ impl DbConfig {
         }
 
         (&self.url).into()
-    }
-
-    pub fn username(&self) -> &str {
-        &self.username
-    }
-
-    pub fn password(&self) -> &str {
-        &self.password
     }
 }
 

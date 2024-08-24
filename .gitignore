@@ -20,3 +20,5 @@
 /macros/target/
 
 /Cargo.lock
+
+/config

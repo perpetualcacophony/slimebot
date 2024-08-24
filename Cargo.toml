@@ -68,4 +68,5 @@ git2 = { version = "0.19", features = ["vendored-libgit2"] }
 default = []
 wordle = ["dep:kwordle"]
 nortverse = []
-docker = ["wordle", "nortverse"]
+full = ["wordle", "nortverse"]
+docker = []
