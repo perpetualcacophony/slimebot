@@ -1,27 +1,26 @@
 macro_rules! list {
-    ($($pub:vis $module:ident$(: {$($cmd:ident),+})?),+) => {
+    ($($pub:vis $module:ident{$($cmd:ident),*$($feature:literal)?})+) => {
         $(
+            $(
+                #[cfg(feature = $feature)]
+            )?
             $pub mod $module;
-            use $module::$module;
+        )+
+
+        #[allow(clippy::vec_init_then_push)]
+        pub fn list() -> Vec<crate::utils::poise::Command> {
+            let mut vec = Vec::with_capacity(${count($module)});
 
             $(
                 $(
-                    #[allow(unused_imports)]
-                    use $module::$cmd;
-                )+
-            )?
-        )+
+                    #[cfg(feature = $feature)]
+                )?
+                vec.push($module::$module());
 
-        pub fn list() -> Vec<crate::utils::poise::Command> {
-            let mut vec = vec![
-                $($module()),+
-            ];
-
-            #[cfg(feature = "wordle")]
-            vec.push(wordle());
-
-            #[cfg(feature = "nortverse")]
-            vec.push(nortverse::nortverse());
+                $(
+                    vec.push($module::$cmd());
+                )*
+            )+
 
             vec
         }
@@ -29,31 +28,24 @@ macro_rules! list {
 }
 
 list! {
-    ping: {pong},
-    pfp,
-    ban,
-    banban,
-    uptime,
-    borzoi,
-    cat,
-    fox,
-    pub minecraft,
-    roll: {d20},
-    flip,
-    version,
-    help,
-    eightball,
-    januannie
+    ping{pong}
+    pfp{}
+    ban{}
+    banban{}
+    uptime{}
+    borzoi{}
+    cat{}
+    fox{}
+    pub minecraft{}
+    roll{d20}
+    flip{}
+    version{}
+    help{}
+    eightball{}
+    januannie{}
+    wordle{"wordle"}
+    nortverse{"nortverse"}
 }
-
-#[cfg(feature = "wordle")]
-pub mod wordle;
-
-#[cfg(feature = "wordle")]
-use wordle::wordle;
-
-#[cfg(feature = "nortverse")]
-pub mod nortverse;
 
 trait LogCommands {
     async fn log_command(&self);
