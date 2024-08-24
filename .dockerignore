@@ -5,3 +5,4 @@
 !/Cargo.toml
 !/rust-toolchain.toml
 !/build.rs
+!/Dockerfile.entrypoint.sh
