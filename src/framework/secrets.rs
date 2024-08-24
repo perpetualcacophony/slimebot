@@ -1,5 +1,6 @@
 use std::{fmt::Display, path::Path};
 
+#[derive(Debug, Clone)]
 pub struct Secrets {
     bot_token: String,
     db_username: String,
@@ -9,11 +10,10 @@ pub struct Secrets {
 impl Secrets {
     pub async fn from_store(store: impl SecretStore) -> Result<Self, MissingSecretError> {
         let (bot_token, db_username, db_password) = tokio::try_join!(
-            store.get2(SecretKey::BotToken),
-            store.get2(SecretKey::DbUsername),
-            store.get2(SecretKey::DbPassword)
-        )
-        .map_err(|key: SecretKey| MissingSecretError { secret: key })?;
+            store.get(SecretKey::BotToken),
+            store.get(SecretKey::DbUsername),
+            store.get(SecretKey::DbPassword)
+        )?;
 
         Ok(Self {
             bot_token,
@@ -58,15 +58,22 @@ impl Display for SecretKey {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("missing secret `{secret}`")]
 pub struct MissingSecretError {
     secret: SecretKey,
 }
 
 pub trait SecretStore {
-    async fn get(&self, secret: SecretKey) -> Option<String>;
+    async fn try_get(&self, secret: SecretKey) -> Option<String>;
 
-    async fn get2(&self, secret: SecretKey) -> Result<String, SecretKey> {
-        self.get(secret).await.ok_or(secret)
+    async fn get(&self, secret: SecretKey) -> Result<String, MissingSecretError> {
+        if let Some(value) = self.try_get(secret).await {
+            tracing::trace!("loaded secret `{secret}`");
+            Ok(value)
+        } else {
+            Err(MissingSecretError { secret })
+        }
     }
 }
 
@@ -75,7 +82,7 @@ pub struct SecretFiles<'path> {
 }
 
 impl SecretStore for SecretFiles<'_> {
-    async fn get(&self, secret: SecretKey) -> Option<String> {
+    async fn try_get(&self, secret: SecretKey) -> Option<String> {
         tokio::fs::read_to_string(self.directory.join(secret.to_string()))
             .await
             .ok()

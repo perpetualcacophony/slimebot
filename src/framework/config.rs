@@ -7,9 +7,6 @@ use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
-use tracing_unwrap::OptionExt;
-
-use crate::DiscordToken;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
@@ -22,6 +19,8 @@ pub struct Config {
     pub watchers: WatchersConfig,
     #[serde(default)]
     pub bug_reports: BugReportsConfig,
+
+    #[cfg(feature = "wordle")]
     #[serde(default)]
     pub wordle: WordleConfig,
 }
@@ -74,7 +73,6 @@ impl Config {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BotConfig {
-    token: Option<DiscordToken>,
     testing_server: Option<GuildId>,
     activity: Option<String>,
     prefix: String,
@@ -83,12 +81,6 @@ pub struct BotConfig {
 }
 
 impl BotConfig {
-    pub fn token(&self) -> &str {
-        self.token
-            .as_ref()
-            .expect_or_log("no token in config or environment!")
-    }
-
     pub fn testing_server(&self) -> Option<&GuildId> {
         if self.testing_server.is_none() {
             warn!("no testing server set in config, slash commands will not be registered");
@@ -227,8 +219,6 @@ impl LogsConfig {
 #[derive(Deserialize, Debug, Clone)]
 pub struct DbConfig {
     url: String,
-    username: String,
-    password: String,
 }
 
 impl DbConfig {
@@ -240,14 +230,6 @@ impl DbConfig {
         }
 
         (&self.url).into()
-    }
-
-    pub fn username(&self) -> &str {
-        &self.username
-    }
-
-    pub fn password(&self) -> &str {
-        &self.password
     }
 }
 

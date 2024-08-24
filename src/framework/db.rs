@@ -3,12 +3,12 @@ use mongodb::{
     Database,
 };
 
-use super::config::DbConfig;
+use super::{config::DbConfig, Secrets};
 
-pub fn database(config: &DbConfig) -> Database {
+pub fn database(config: &DbConfig, secrets: &Secrets) -> Database {
     let credential = Credential::builder()
-        .username(config.username().to_string())
-        .password(config.password().to_string())
+        .username(secrets.db_username().to_owned())
+        .password(secrets.db_password().to_owned())
         .build();
 
     let options = ClientOptions::builder()
