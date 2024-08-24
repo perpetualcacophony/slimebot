@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
@@ -10,6 +13,8 @@ use crate::DiscordToken;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
+    pub secrets_dir: Option<PathBuf>,
+
     pub bot: BotConfig,
     pub logs: LogsConfig,
     pub db: DbConfig,
@@ -28,6 +33,41 @@ impl Config {
         } else {
             warn!("bug reports not configured");
             None
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn secrets_dir(&self) -> Cow<Path> {
+        tracing::trace!("looking for secrets directory...");
+
+        if let Ok(env) = std::env::var("SLIMEBOT_SECRETS_DIR") {
+            tracing::trace!(
+                var = "SLIMEBOT_SECRETS_DIR",
+                value = env,
+                "using value from environemtn"
+            );
+
+            if cfg!(feature = "docker") && env.as_str() != "/run/secrets" {
+                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            }
+
+            PathBuf::from(env).into()
+        } else if let Some(ref config) = self.secrets_dir {
+            tracing::trace!(value = ?config, "using value from config");
+
+            if cfg!(feature = "docker") && config != Path::new("/run/secrets") {
+                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            }
+
+            config.into()
+        } else if cfg!(feature = "docker") {
+            tracing::trace!(value = "/run/secrets", "using docker default value");
+
+            Path::new("/run/secrets").into()
+        } else {
+            tracing::error!("no secrets directory specified in config or environment");
+
+            panic!()
         }
     }
 }
