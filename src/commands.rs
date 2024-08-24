@@ -1,10 +1,10 @@
 macro_rules! list {
-    ($($pub:vis $module:ident{$($cmd:ident),*$($feature:literal)?})+) => {
+    ($($module:ident{$($cmd:ident),*$($feature:literal)?})+) => {
         $(
             $(
                 #[cfg(feature = $feature)]
             )?
-            $pub mod $module;
+            pub mod $module;
         )+
 
         #[allow(clippy::vec_init_then_push)]
@@ -36,7 +36,7 @@ list! {
     borzoi{}
     cat{}
     fox{}
-    pub minecraft{}
+    minecraft{}
     roll{d20}
     flip{}
     version{}
