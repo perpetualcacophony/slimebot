@@ -2,4 +2,4 @@
 
 addgroup --system slimebot --gid $GID
 adduser --system slimebot --ingroup slimebot
-id
+su -s /bin/sh slimebot -c slimebot

@@ -51,12 +51,6 @@ COPY --from=builder --link /build/target/x86_64-unknown-linux-musl/release/slime
 
 ENV GID=8040
 
-# add slimebot user & group (8040)
-RUN addgroup --system slimebot --gid 8040
-RUN adduser --system slimebot --ingroup slimebot
-
-USER slimebot:slimebot
-
 COPY Dockerfile.entrypoint.sh .
 
-ENTRYPOINT Dockerfile.entrypoint.sh
+ENTRYPOINT /Dockerfile.entrypoint.sh
