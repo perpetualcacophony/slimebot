@@ -47,10 +47,12 @@ FROM alpine AS runtime
 EXPOSE 443
 
 # copy binary from builder
-COPY --from=builder --link /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/slimebot
+COPY --from=builder --link /build/target/x86_64-unknown-linux-musl/release/slimebot /usr/local/bin/
+
+RUN mkdir /etc/slimebot
+RUN mkdir /etc/slimebot/secrets
+
+COPY Dockerfile.entrypoint.sh /usr/local/bin/
 
 ENV GID=8040
-
-COPY Dockerfile.entrypoint.sh .
-
-ENTRYPOINT /Dockerfile.entrypoint.sh
+ENTRYPOINT Dockerfile.entrypoint.sh
