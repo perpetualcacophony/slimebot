@@ -4,7 +4,7 @@ use crate::commands::wordle::core::WordleData;
 use mongodb::Database;
 
 use chrono::Utc;
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 use tracing_unwrap::ResultExt;
 
 use super::Secrets;
@@ -59,7 +59,7 @@ impl PoiseData {
             .try_deserialize()
             .expect_or_log("configuration could not be parsed");
 
-        trace!("config loaded");
+        info!("config loaded");
 
         let secrets = Secrets::secret_files(&config.secrets_dir()).await?;
 

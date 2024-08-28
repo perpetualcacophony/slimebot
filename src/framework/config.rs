@@ -43,26 +43,29 @@ impl Config {
             tracing::trace!(
                 var = "SLIMEBOT_SECRETS_DIR",
                 value = env,
-                "using value from environemtn"
+                "using value from environment"
             );
 
-            if cfg!(feature = "docker") && env.as_str() != "/run/secrets" {
-                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            if cfg!(feature = "docker") && env.as_str() != "/etc/slimebot/secrets" {
+                tracing::warn!("running in docker, but not using the expected secrets directory. are you sure whatever you're doing is worth it?");
             }
 
             PathBuf::from(env).into()
         } else if let Some(ref config) = self.secrets_dir {
             tracing::trace!(value = ?config, "using value from config");
 
-            if cfg!(feature = "docker") && config != Path::new("/run/secrets") {
-                tracing::warn!("running in docker, but not using docker default secrets directory. are you sure whatever you're doing is worth it?");
+            if cfg!(feature = "docker") && config != Path::new("/etc/slimebot/secrets") {
+                tracing::warn!("running in docker, but not using the expected secrets directory. are you sure whatever you're doing is worth it?");
             }
 
             config.into()
         } else if cfg!(feature = "docker") {
-            tracing::trace!(value = "/run/secrets", "using docker default value");
+            tracing::trace!(
+                value = "/etc/slimebot/secrets",
+                "using docker default value"
+            );
 
-            Path::new("/run/secrets").into()
+            Path::new("/etc/slimebot/secrets").into()
         } else {
             tracing::error!("no secrets directory specified in config or environment");
 
@@ -225,7 +228,7 @@ impl DbConfig {
     pub fn url(&self) -> Cow<str> {
         #[cfg(feature = "docker")]
         if let Ok(db_url) = std::env::var("SLIMEBOT_DB_URL") {
-            info!(db_url, "using db url override from environment");
+            tracing::trace!(db_url, "using db url override from environment");
             return db_url.into();
         }
 
