@@ -1,5 +1,8 @@
 use std::{fmt::Display, path::Path};
 
+#[cfg(feature = "vault")]
+mod vault;
+
 #[derive(Debug, Clone)]
 pub struct Secrets {
     bot_token: String,
