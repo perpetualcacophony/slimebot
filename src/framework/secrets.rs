@@ -86,5 +86,11 @@ impl SecretStore for SecretFiles<'_> {
         tokio::fs::read_to_string(self.directory.join(secret.to_string()))
             .await
             .ok()
+            .map(|s| {
+                s.lines()
+                    .next()
+                    .expect("secret file should not be empty")
+                    .to_owned()
+            })
     }
 }
