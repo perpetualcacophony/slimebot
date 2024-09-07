@@ -1,8 +1,8 @@
-use crate::framework::secrets::MissingSecretError;
+use crate::framework::secrets;
 
 #[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
-    #[error(transparent)]
+    #[error("error loading secrets: {0}")]
     #[event(level = ERROR)]
-    MissingSecret(#[from] MissingSecretError),
+    Secrets(#[from] secrets::Error),
 }

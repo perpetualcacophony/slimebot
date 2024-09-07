@@ -55,6 +55,8 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "step",
 ], optional = true, version = "0.5.5" }
 dotenvy = "0.15.7"
+vaultrs = { version = "0.7.2", optional = true }
+nvee = { git = "https://github.com/perpetualcacophony/nvee" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -69,4 +71,8 @@ default = []
 wordle = ["dep:kwordle"]
 nortverse = []
 full = ["wordle", "nortverse"]
-docker = []
+
+docker = ["full", "vault"]
+docker-secrets = []
+
+vault = ["dep:vaultrs"]

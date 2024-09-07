@@ -37,9 +37,7 @@ RUN touch build.rs
 RUN cargo +nightly build \
     --release \
     --target x86_64-unknown-linux-musl \
-    --features "docker full"
-
-    
+    --features "docker"
 
 # using alpine for small final image
 FROM alpine AS runtime
