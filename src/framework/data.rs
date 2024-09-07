@@ -37,7 +37,14 @@ pub struct PoiseData {
 impl PoiseData {
     pub(crate) async fn new() -> Result<Self> {
         dotenvy::dotenv().ok();
-        nvee::from_path("slimebot.nvee").ok();
+
+        let nvee_path = if cfg!(feature = "docker") {
+            "/.nvee"
+        } else {
+            "slimebot.nvee"
+        };
+
+        nvee::from_path(nvee_path).ok();
 
         let config_file = if let Ok(path) = std::env::var("SLIMEBOT_TOML") {
             info!(path, "looking for config file with SLIMEBOT_TOML...");
