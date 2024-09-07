@@ -37,6 +37,7 @@ pub struct PoiseData {
 impl PoiseData {
     pub(crate) async fn new() -> Result<Self> {
         dotenvy::dotenv().ok();
+        nvee::from_path("slimebot.nvee").ok();
 
         let config_file = if let Ok(path) = std::env::var("SLIMEBOT_TOML") {
             info!(path, "looking for config file with SLIMEBOT_TOML...");
@@ -61,7 +62,13 @@ impl PoiseData {
 
         info!("config loaded");
 
-        let secrets = Secrets::secret_files(&config.secrets_dir()).await?;
+        #[cfg(feature = "vault")]
+        let secrets = Secrets::from_vault().await?;
+
+        #[cfg(not(feature = "vault"))]
+        let secrets = Secrets::secret_files(&config.secrets_dir())
+            .await
+            .map_err(crate::framework::secrets::Error::from)?;
 
         let db = super::db::database(&config.db, &secrets);
 

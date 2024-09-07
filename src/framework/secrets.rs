@@ -3,7 +3,7 @@ use std::{fmt::Display, path::Path};
 #[cfg(feature = "vault")]
 mod vault;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Secrets {
     bot_token: String,
     db_username: String,
@@ -27,6 +27,11 @@ impl Secrets {
 
     pub async fn secret_files(dir: &Path) -> Result<Self, MissingSecretError> {
         Self::from_store(SecretFiles { directory: dir }).await
+    }
+
+    #[cfg(feature = "vault")]
+    pub async fn from_vault() -> Result<Self, Error> {
+        vault::secrets().await
     }
 }
 
@@ -59,6 +64,15 @@ impl Display for SecretKey {
             Self::DbUsername => "db_username",
         })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    MissingSecret(#[from] MissingSecretError),
+
+    #[error("error when fetching secrets: {0}")]
+    BackendError(Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Debug, thiserror::Error)]

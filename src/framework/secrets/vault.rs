@@ -1,46 +1,39 @@
 use url::Url;
-use vaultrs::{
-    client::{VaultClient, VaultClientSettingsBuilder},
-    kv1,
-};
+use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
 
-use super::SecretStore;
+pub async fn secrets() -> Result<super::Secrets, super::Error> {
+    let env = Environment::get().map_err(|err| super::Error::BackendError(Box::new(err)))?;
 
-pub struct VaultSecrets {
-    vault: VaultClient,
-    env: Environment,
+    let vault = VaultClient::new(
+        VaultClientSettingsBuilder::default()
+            .address(&env.url)
+            .token(&env.token)
+            .build()
+            .expect("building vault settings should not fail"),
+    )
+    .expect("building vault client should not fail");
+
+    vaultrs::kv1::get(&vault, env.kv1_mount(), "slimebot")
+        .await
+        .map_err(|err| super::Error::BackendError(Box::new(err)))
 }
 
-impl VaultSecrets {
-    pub fn new() -> Self {
-        let env = Environment::get().unwrap();
-
-        let vault =
-            VaultClient::new(VaultClientSettingsBuilder::default().build().unwrap()).unwrap();
-
-        Self { vault, env }
-    }
-}
-
-impl SecretStore for VaultSecrets {
-    async fn try_get(&self, secret: super::SecretKey) -> Option<String> {
-        kv1::get(&self.vault, self.env.kv1_mount(), &secret.to_string())
-            .await
-            .ok()
-    }
-}
-
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Environment {
     // SLIMEBOT_VAULT_URL
     url: Url,
 
     // SLIMEBOT_VAULT_KV1_MOUNT
     kv1_mount: String,
+
+    // SLIMEBOT_VAULT_TOKEN
+    token: String,
 }
 
 impl Environment {
     const SLIMEBOT_VAULT_URL: &str = "SLIMEBOT_VAULT_URL";
     const SLIMEBOT_VAULT_KV1_MOUNT: &str = "SLIMEBOT_VAULT_KV1_MOUNT";
+    const SLIMEBOT_VAULT_TOKEN: &str = "SLIMEBOT_VAULT_TOKEN";
 
     pub fn get() -> Result<Self, EnvVarError> {
         use std::env;
@@ -60,6 +53,10 @@ impl Environment {
                 var: Self::SLIMEBOT_VAULT_KV1_MOUNT,
                 meta: EnvVarErrorMeta::NotFound,
             })?,
+            token: env::var(Self::SLIMEBOT_VAULT_TOKEN).map_err(|_| EnvVarError {
+                var: Self::SLIMEBOT_VAULT_TOKEN,
+                meta: EnvVarErrorMeta::NotFound,
+            })?,
         })
     }
 
@@ -68,14 +65,16 @@ impl Environment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("error loading env var '{var}' ({meta:?})")]
 pub struct EnvVarError {
     var: &'static str,
     meta: EnvVarErrorMeta,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum EnvVarErrorMeta {
     NotFound,
-    Invalid(Box<dyn std::error::Error>),
+    Invalid(Box<dyn std::error::Error + Send + Sync>),
 }
