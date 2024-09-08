@@ -71,7 +71,7 @@ pub enum Error {
     #[error(transparent)]
     MissingSecret(#[from] MissingSecretError),
 
-    #[error("error when fetching secrets: {0}")]
+    #[error("error when fetching secrets: {0:?}")]
     BackendError(Box<dyn std::error::Error + Send + Sync>),
 }
 
