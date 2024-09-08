@@ -1,4 +1,3 @@
-use dynasty2::Chapter;
 use poise::{
     serenity_prelude::futures::{stream, StreamExt, TryStreamExt},
     CreateReply,
@@ -25,23 +24,21 @@ pub async fn dynasty(ctx: Context<'_>) -> crate::Result<()> {
         let dynasty = ctx.data().dynasty();
 
         let series = dynasty
-            .series("the_guy_she_was_interested_in_wasnt_a_guy_at_all")
+            .series(&"the_guy_she_was_interested_in_wasnt_a_guy_at_all")?
             .await?;
 
         let chapter = series
             .chapters()
-            .meta()
             .last()
             .expect("should have at least one chapter");
-        let chapter = Chapter::from_meta(dynasty, chapter).await?;
+        let chapter = dynasty.chapter(&chapter.slug())?.await?;
 
-        let attachments =
-            stream::iter(chapter.pages())
-                .then(|page| async move {
-                    serenity::CreateAttachment::url(ctx.http(), &page.url()).await
-                })
-                .try_collect::<Vec<_>>()
-                .await?;
+        let attachments = stream::iter(chapter.pages())
+            .then(|page| async move {
+                serenity::CreateAttachment::url(ctx.http(), page.image_url().as_str()).await
+            })
+            .try_collect::<Vec<_>>()
+            .await?;
 
         let builder = CreateReply::default().content("tgswii");
 
