@@ -77,7 +77,7 @@ impl PoiseData {
             .await
             .map_err(crate::framework::secrets::Error::from)?;
 
-        let db = super::db::database(&config.db, &secrets);
+        let db = super::db::database(&secrets);
 
         let started = Utc::now();
 

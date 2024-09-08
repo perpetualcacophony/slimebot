@@ -14,7 +14,6 @@ pub struct Config {
 
     pub bot: BotConfig,
     pub logs: LogsConfig,
-    pub db: DbConfig,
     #[serde(default)]
     pub watchers: WatchersConfig,
     #[serde(default)]
@@ -216,23 +215,6 @@ impl LogsConfig {
         }
 
         flavor_text
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct DbConfig {
-    url: String,
-}
-
-impl DbConfig {
-    pub fn url(&self) -> Cow<str> {
-        #[cfg(feature = "docker")]
-        if let Ok(db_url) = std::env::var("SLIMEBOT_DB_URL") {
-            tracing::trace!(db_url, "using db url override from environment");
-            return db_url.into();
-        }
-
-        (&self.url).into()
     }
 }
 
