@@ -45,6 +45,7 @@ list! {
     januannie{}
     wordle{"wordle"}
     nortverse{"nortverse"}
+    dynasty{"dynasty"}
 }
 
 trait LogCommands {
