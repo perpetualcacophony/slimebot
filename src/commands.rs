@@ -22,6 +22,9 @@ macro_rules! list {
                 )*
             )+
 
+            #[cfg(feature = "dynasty")]
+            vec.push(dynasty::dynasty());
+
             vec
         }
     };

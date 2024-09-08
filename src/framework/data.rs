@@ -98,7 +98,7 @@ impl PoiseData {
         #[cfg(feature = "dynasty")]
         let dynasty = dynasty2::Dynasty::new();
 
-        Ok(Self {
+        Self {
             config,
             db,
             started,
@@ -115,7 +115,7 @@ impl PoiseData {
 
             #[cfg(feature = "dynasty")]
             dynasty,
-        })
+        }
     }
 
     pub(crate) const fn config(&self) -> &super::config::Config {
