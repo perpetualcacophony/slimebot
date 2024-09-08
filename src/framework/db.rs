@@ -3,19 +3,21 @@ use mongodb::{
     Database,
 };
 
-use super::{config::DbConfig, Secrets};
+use super::Secrets;
 
-pub fn database(config: &DbConfig, secrets: &Secrets) -> Database {
+pub fn database(secrets: &Secrets) -> Database {
     let credential = Credential::builder()
         .username(secrets.db_username().to_owned())
         .password(secrets.db_password().to_owned())
         .build();
 
+    let db_url = std::env::var("SLIMEBOT_DB_URL").expect("failed to load db url from environment");
+
     let options = ClientOptions::builder()
         .app_name("slimebot".to_string())
         .credential(credential)
         .hosts(vec![
-            ServerAddress::parse(config.url()).expect("db address should be valid")
+            ServerAddress::parse(db_url).expect("db address should be valid")
         ])
         .build();
 
