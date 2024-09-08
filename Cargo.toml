@@ -54,7 +54,7 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "classic_words",
     "step",
 ], optional = true, version = "0.5.5" }
-dynasty2 = { path = "../personal/dynasty2", optional = true }
+dynasty2 = { git = "https://github.com/perpetualcacophony/dynasty2", optional = true }
 dotenvy = "0.15.7"
 vaultrs = { version = "0.7.2", optional = true }
 nvee = { git = "https://github.com/perpetualcacophony/nvee" }
