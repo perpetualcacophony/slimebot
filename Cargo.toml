@@ -78,3 +78,5 @@ docker = ["full", "vault"]
 docker-secrets = []
 
 vault = ["dep:vaultrs"]
+
+db_auth = []

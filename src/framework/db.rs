@@ -6,10 +6,14 @@ use mongodb::{
 use super::Secrets;
 
 pub fn database(secrets: &Secrets) -> Database {
+    #[cfg(feature = "db_auth")]
     let credential = Credential::builder()
         .username(secrets.db_username().to_owned())
         .password(secrets.db_password().to_owned())
         .build();
+
+    #[cfg(not(feature = "db_auth"))]
+    let credential = None;
 
     let db_url = std::env::var("SLIMEBOT_DB_URL").expect("failed to load db url from environment");
 

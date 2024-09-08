@@ -6,11 +6,16 @@ mod vault;
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Secrets {
     bot_token: String,
+
+    #[cfg(feature = "db_auth")]
     db_username: String,
+
+    #[cfg(feature = "db_auth")]
     db_password: String,
 }
 
 impl Secrets {
+    #[cfg(feature = "db_auth")]
     pub async fn from_store(store: impl SecretStore) -> Result<Self, MissingSecretError> {
         let (bot_token, db_username, db_password) = tokio::try_join!(
             store.get(SecretKey::BotToken),
@@ -25,6 +30,7 @@ impl Secrets {
         })
     }
 
+    #[cfg(feature = "db_auth")]
     pub async fn secret_files(dir: &Path) -> Result<Self, MissingSecretError> {
         Self::from_store(SecretFiles { directory: dir }).await
     }
@@ -33,6 +39,15 @@ impl Secrets {
     pub async fn from_vault() -> Result<Self, Error> {
         vault::secrets().await
     }
+
+    #[cfg(not(feature = "db_auth"))]
+    pub fn dev() -> Result<Self, Error> {
+        Ok(Self {
+            bot_token: std::env::var("SLIMEBOT_TOKEN").map_err(|_| MissingSecretError {
+                secret: SecretKey::BotToken,
+            })?,
+        })
+    }
 }
 
 impl Secrets {
@@ -40,10 +55,12 @@ impl Secrets {
         &self.bot_token
     }
 
+    #[cfg(feature = "db_auth")]
     pub fn db_username(&self) -> &str {
         &self.db_username
     }
 
+    #[cfg(feature = "db_auth")]
     pub fn db_password(&self) -> &str {
         &self.db_password
     }
@@ -52,7 +69,11 @@ impl Secrets {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SecretKey {
     BotToken,
+
+    #[cfg(feature = "db_auth")]
     DbUsername,
+
+    #[cfg(feature = "db_auth")]
     DbPassword,
 }
 
@@ -60,7 +81,11 @@ impl Display for SecretKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::BotToken => "bot_token",
+
+            #[cfg(feature = "db_auth")]
             Self::DbPassword => "db_password",
+
+            #[cfg(feature = "db_auth")]
             Self::DbUsername => "db_username",
         })
     }

@@ -75,10 +75,13 @@ impl PoiseData {
         #[cfg(feature = "vault")]
         let secrets = Secrets::from_vault().await?;
 
-        #[cfg(not(feature = "vault"))]
+        #[cfg(all(not(feature = "vault"), feature = "db_auth"))]
         let secrets = Secrets::secret_files(&config.secrets_dir())
             .await
             .map_err(crate::framework::secrets::Error::from)?;
+
+        #[cfg(not(feature = "db_auth"))]
+        let secrets = Secrets::dev()?;
 
         let db = super::db::database(&secrets);
 
