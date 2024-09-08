@@ -22,9 +22,6 @@ macro_rules! list {
                 )*
             )+
 
-            #[cfg(feature = "dynasty")]
-            vec.push(dynasty::dynasty());
-
             vec
         }
     };
@@ -48,6 +45,7 @@ list! {
     januannie{}
     wordle{"wordle"}
     nortverse{"nortverse"}
+    dynasty{"dynasty"}
 }
 
 trait LogCommands {
