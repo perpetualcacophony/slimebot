@@ -39,7 +39,7 @@ impl PoiseData {
         dotenvy::dotenv().ok();
 
         let nvee_path = if cfg!(feature = "docker") {
-            "/.nvee"
+            "/slimebot.nvee"
         } else {
             "slimebot.nvee"
         };
