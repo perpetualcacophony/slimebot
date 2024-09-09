@@ -4,8 +4,6 @@ use crate::commands::wordle::core::WordleData;
 use mongodb::Database;
 
 use chrono::Utc;
-use tracing::{info, warn};
-use tracing_unwrap::ResultExt;
 
 use super::config::Configuration;
 

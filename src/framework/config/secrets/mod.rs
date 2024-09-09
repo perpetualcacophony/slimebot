@@ -7,15 +7,15 @@ mod vault;
 pub struct Secrets {
     bot_token: String,
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     db_username: String,
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     db_password: String,
 }
 
 impl Secrets {
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     pub async fn from_store(store: impl SecretStore) -> Result<Self, MissingSecretError> {
         let (bot_token, db_username, db_password) = tokio::try_join!(
             store.get(SecretKey::BotToken),
@@ -30,7 +30,7 @@ impl Secrets {
         })
     }
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     pub async fn secret_files(dir: &Path) -> Result<Self, MissingSecretError> {
         Self::from_store(SecretFiles { directory: dir }).await
     }
@@ -40,7 +40,7 @@ impl Secrets {
         vault::secrets().await
     }
 
-    #[cfg(not(feature = "db_auth"))]
+    #[cfg(not(feature = "vault"))]
     pub fn dev() -> Result<Self, Error> {
         Ok(Self {
             bot_token: std::env::var("SLIMEBOT_TOKEN").map_err(|_| MissingSecretError {
@@ -50,7 +50,11 @@ impl Secrets {
     }
 
     pub async fn load() -> Result<Self, Error> {
-        todo!()
+        #[cfg(feature = "vault")]
+        return Self::from_vault().await;
+
+        #[cfg(not(feature = "vault"))]
+        return Self::dev();
     }
 }
 
@@ -59,12 +63,12 @@ impl Secrets {
         &self.bot_token
     }
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     pub fn db_username(&self) -> &str {
         &self.db_username
     }
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     pub fn db_password(&self) -> &str {
         &self.db_password
     }
@@ -74,10 +78,10 @@ impl Secrets {
 pub enum SecretKey {
     BotToken,
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     DbUsername,
 
-    #[cfg(feature = "db_auth")]
+    #[cfg(feature = "vault")]
     DbPassword,
 }
 
@@ -86,10 +90,10 @@ impl Display for SecretKey {
         f.write_str(match self {
             Self::BotToken => "bot_token",
 
-            #[cfg(feature = "db_auth")]
+            #[cfg(feature = "vault")]
             Self::DbPassword => "db_password",
 
-            #[cfg(feature = "db_auth")]
+            #[cfg(feature = "vault")]
             Self::DbUsername => "db_username",
         })
     }

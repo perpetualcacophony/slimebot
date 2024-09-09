@@ -1,5 +1,5 @@
 pub mod config;
-pub use config::{Config, Environment, Secrets};
+pub use config::Config;
 
 pub mod data;
 pub use data::DataError;

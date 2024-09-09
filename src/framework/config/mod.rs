@@ -36,7 +36,14 @@ impl Configuration {
     }
 
     pub fn mongodb(&self) -> mongodb::options::ClientOptions {
-        let credential = mongodb::options::Credential::builder().build();
+        #[cfg(feature = "vault")]
+        let credential = mongodb::options::Credential::builder()
+            .username(self.secrets.db_username().to_owned())
+            .password(self.secrets.db_password().to_owned())
+            .build();
+
+        #[cfg(not(feature = "vault"))]
+        let credential = None;
 
         mongodb::options::ClientOptions::builder()
             .app_name("slimebot".to_owned())
