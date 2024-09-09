@@ -1,12 +1,9 @@
 pub mod config;
+pub use config::{Config, Environment, Secrets};
 
 pub mod data;
 pub use data::DataError;
 
-pub mod db;
 pub mod event_handler;
 pub mod logging;
 pub mod poise;
-
-pub mod secrets;
-pub use secrets::Secrets;

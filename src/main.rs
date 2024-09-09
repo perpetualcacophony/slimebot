@@ -55,7 +55,7 @@ async fn main() {
         info!("{build}");
 
         let data = PoiseData::new().await?;
-        let config = data.config.clone();
+        let config = data.config().clone();
 
         if let Some(flavor_text) = config.logs.flavor_text() {
             info!("{flavor_text}")

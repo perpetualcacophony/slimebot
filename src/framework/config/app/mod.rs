@@ -3,13 +3,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::Environment;
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId, RoleId};
 use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Config {
+pub struct AppConfig {
     pub secrets_dir: Option<PathBuf>,
 
     pub bot: BotConfig,
@@ -24,7 +25,19 @@ pub struct Config {
     pub wordle: WordleConfig,
 }
 
-impl Config {
+impl AppConfig {
+    pub(super) fn load(env: &Environment) -> Result<Self, Error> {
+        ::config::Config::builder()
+            .add_source(::config::File::new(
+                env.config_file(),
+                config::FileFormat::Toml,
+            ))
+            .build()
+            .map_err(Error::Read)?
+            .try_deserialize()
+            .map_err(Error::Parse)
+    }
+
     pub fn bug_reports_channel(&self) -> Option<&ChannelId> {
         if let Some(channel) = self.bug_reports.channel() {
             Some(channel)
@@ -71,6 +84,15 @@ impl Config {
             panic!()
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("file read error: {0}")]
+    Read(config::ConfigError),
+
+    #[error("parsing error: {0}")]
+    Parse(config::ConfigError),
 }
 
 #[derive(Deserialize, Debug, Clone)]

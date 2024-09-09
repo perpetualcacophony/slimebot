@@ -48,6 +48,10 @@ impl Secrets {
             })?,
         })
     }
+
+    pub async fn load() -> Result<Self, Error> {
+        todo!()
+    }
 }
 
 impl Secrets {
