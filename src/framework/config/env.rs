@@ -10,7 +10,22 @@ pub struct EnvConfig {
 
 impl EnvConfig {
     pub(super) fn load() -> Result<Self, Error> {
-        todo!()
+        Partial {
+            db_url: std::env::var("SLIMEBOT_DB_URL")
+                .map_err(|_| Error {
+                    key: "SLIMEBOT_DB_URL",
+                    message: "not set",
+                })?
+                .parse()
+                .map_err(|_| Error {
+                    key: "SLIMEBOT_DB_URL",
+                    message: "not a valid db url",
+                })?,
+            config_file: std::env::var("SLIMEBOT_CONFIG_FILE")
+                .ok()
+                .map(PathBuf::from),
+        }
+        .try_into()
     }
 
     fn from_partial(partial: Partial) -> Result<Self, Error> {
