@@ -91,6 +91,10 @@ impl PoiseData {
         self.config.as_ref()
     }
 
+    pub(crate) fn token(&self) -> &str {
+        self.config.token()
+    }
+
     #[allow(dead_code)]
     pub(crate) const fn db(&self) -> &Database {
         &self.db

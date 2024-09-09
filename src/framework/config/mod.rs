@@ -44,6 +44,10 @@ impl Configuration {
             .hosts(vec![self.env.db_url().clone()])
             .build()
     }
+
+    pub fn token(&self) -> &str {
+        self.secrets.bot_token()
+    }
 }
 
 mod as_ref {

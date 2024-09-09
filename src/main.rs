@@ -61,7 +61,7 @@ async fn main() {
             info!("{flavor_text}")
         }
 
-        let client = serenity::Client::builder(data.secrets.bot_token(), GatewayIntents::all());
+        let client = serenity::Client::builder(data.token(), GatewayIntents::all());
 
         let framework = framework::poise::build(data);
 
