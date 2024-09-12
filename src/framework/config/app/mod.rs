@@ -29,6 +29,10 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    pub async fn setup<'a>() -> Result<super::ConfigSetup<'a>, super::Error> {
+        super::ConfigSetup::load().await
+    }
+
     pub(super) fn load(env: &Environment) -> Result<Self, Error> {
         ::config::Config::builder()
             .add_source(::config::File::new(

@@ -5,7 +5,7 @@ use mongodb::Database;
 
 use chrono::Utc;
 
-use super::config::Configuration;
+use super::{config::ConfigSetup, Config};
 
 pub mod error;
 pub use error::Error as DataError;
@@ -16,7 +16,7 @@ pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
 pub struct PoiseData {
-    config: Configuration,
+    config: Config,
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
 
@@ -34,7 +34,7 @@ pub struct PoiseData {
 }
 
 impl PoiseData {
-    pub(crate) async fn new() -> Result<Self> {
+    pub(crate) async fn new(config: ConfigSetup<'_>) -> Result<Self> {
         dotenvy::dotenv().ok();
 
         let nvee_path = if cfg!(feature = "docker") {
@@ -44,8 +44,6 @@ impl PoiseData {
         };
 
         nvee::from_path(nvee_path).ok();
-
-        let config = Configuration::load().await?;
 
         let db = mongodb::Client::with_options(config.mongodb())
             .expect("building client should not fail")
@@ -68,7 +66,7 @@ impl PoiseData {
         let dynasty = dynasty2::Dynasty::new();
 
         Ok(Self {
-            config,
+            config: config.finish(),
             db,
             started,
 
@@ -85,12 +83,8 @@ impl PoiseData {
         })
     }
 
-    pub(crate) fn config(&self) -> &super::Config {
-        self.config.as_ref()
-    }
-
-    pub(crate) fn token(&self) -> &str {
-        self.config.token()
+    pub(crate) fn config(&self) -> &Config {
+        &self.config
     }
 
     #[allow(dead_code)]

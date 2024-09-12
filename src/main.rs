@@ -54,16 +54,15 @@ async fn main() {
 
         info!("{build}");
 
-        let data = PoiseData::new().await?;
-        let config = data.config().clone();
+        let config = framework::Config::setup().await.unwrap();
+
+        let client = serenity::Client::builder(config.token(), GatewayIntents::all());
 
         if let Some(flavor_text) = config.logs.flavor_text() {
             info!("{flavor_text}")
         }
 
-        let client = serenity::Client::builder(data.token(), GatewayIntents::all());
-
-        let framework = framework::poise::build(data);
+        let framework = framework::poise::build(config);
 
         let mut client = client
             .framework(framework)

@@ -1,8 +1,10 @@
 mod app;
+use std::ops::Deref;
+
 pub use app::AppConfig as Config;
 
 mod env;
-pub use env::EnvConfig as Environment;
+pub use env::Environment;
 
 mod secrets;
 pub use secrets::Secrets;
@@ -20,13 +22,13 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct Configuration {
+pub struct ConfigSetup<'a> {
     app: Config,
-    env: Environment,
+    env: Environment<'a>,
     secrets: Secrets,
 }
 
-impl Configuration {
+impl ConfigSetup<'_> {
     pub async fn load() -> Result<Self, Error> {
         let env = Environment::load()?;
         let app = Config::load(&env)?;
@@ -48,33 +50,23 @@ impl Configuration {
         mongodb::options::ClientOptions::builder()
             .app_name("slimebot".to_owned())
             .credential(credential)
-            .hosts(vec![self.env.db_url().clone()])
+            .hosts(vec![self.env.db.url().clone()])
             .build()
     }
 
     pub fn token(&self) -> &str {
         self.secrets.bot_token()
     }
+
+    pub fn finish(self) -> Config {
+        self.app
+    }
 }
 
-mod as_ref {
-    use super::*;
+impl Deref for ConfigSetup<'_> {
+    type Target = Config;
 
-    impl AsRef<Config> for Configuration {
-        fn as_ref(&self) -> &Config {
-            &self.app
-        }
-    }
-
-    impl AsRef<Environment> for Configuration {
-        fn as_ref(&self) -> &Environment {
-            &self.env
-        }
-    }
-
-    impl AsRef<Secrets> for Configuration {
-        fn as_ref(&self) -> &Secrets {
-            &self.secrets
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.app
     }
 }
