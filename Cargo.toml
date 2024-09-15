@@ -60,6 +60,8 @@ vaultrs = { version = "0.7.2", optional = true }
 nvee = { git = "https://github.com/perpetualcacophony/nvee" }
 toml = "0.8.19"
 clap = { version = "4.5.17", features = ["derive", "cargo"], optional = true }
+colored = "2.1.0"
+toml_edit = "0.22.20"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

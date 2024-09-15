@@ -23,7 +23,7 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct ConfigSetup {
-    app: Config,
+    pub app: Config,
     pub env: Environment,
     secrets: Secrets,
 }

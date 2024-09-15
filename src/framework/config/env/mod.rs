@@ -40,6 +40,13 @@ impl Environment {
     }
 }
 
+impl std::fmt::Display for Environment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let doc = toml_edit::ser::to_document(self).expect("serializing should not fail");
+        write!(f, "{doc}")
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(transparent)]
 pub struct Path {

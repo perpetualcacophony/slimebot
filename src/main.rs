@@ -14,6 +14,7 @@ mod discord;
 mod errors;
 
 mod utils;
+use colored::Colorize;
 use thisslime::TracingError;
 use utils::Context;
 use utils::Result;
@@ -101,15 +102,9 @@ async fn main() {
             start(&cli).await?;
         } else if cli.command.is_config() {
             let config = framework::Config::setup(&cli).await?;
-            println!(
-                "{}",
-                toml::to_string_pretty(&*config).expect("serializing should not fail")
-            );
+            println!("{}\n{}", "configuration:".underline().green(), config.app);
 
-            println!(
-                "{}",
-                toml::to_string_pretty(&config.env).expect("serializing should not fail")
-            );
+            print!("{}\n{}", "environment:".underline().green(), config.env);
         }
 
         #[cfg(not(feature = "cli"))]

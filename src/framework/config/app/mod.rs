@@ -28,6 +28,13 @@ pub struct AppConfig {
     pub wordle: WordleConfig,
 }
 
+impl std::fmt::Display for AppConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let doc = toml_edit::ser::to_document(self).expect("serializing should not fail");
+        write!(f, "{doc}")
+    }
+}
+
 impl AppConfig {
     pub async fn setup<'a>(
         #[cfg(feature = "cli")] cli: &crate::Cli,
