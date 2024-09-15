@@ -6,13 +6,13 @@ use std::{
 use super::Environment;
 use poise::serenity_prelude::{ChannelId, RoleId};
 use rand::seq::IteratorRandom;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
 mod bot;
 pub use bot::BotConfig;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AppConfig {
     pub secrets_dir: Option<PathBuf>,
 
@@ -111,7 +111,7 @@ pub enum Error {
     Parse(config::ConfigError),
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogsConfig {
     flavor_texts: Vec<String>,
 }
@@ -132,7 +132,7 @@ impl LogsConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct WatchersConfig {
     #[serde(default)]
     allow_by_default: bool,
@@ -162,13 +162,13 @@ impl WatchersConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct WatchersChannelConfig {
     id: ChannelId,
     allow: bool,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct BugReportsConfig {
     channel: Option<ChannelId>,
 }
@@ -179,7 +179,7 @@ impl BugReportsConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct WordleConfig {
     //pub guesses_file: String,

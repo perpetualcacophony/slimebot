@@ -9,7 +9,7 @@ pub enum Error {
     Toml(#[from] toml::de::Error),
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct Environment {
     config_file: String,
     pub db: Db,
@@ -40,7 +40,7 @@ impl Environment {
     }
 }
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(transparent)]
 pub struct Path {
     inner: std::path::PathBuf,
@@ -99,7 +99,7 @@ mod vault;
 #[cfg(feature = "vault")]
 pub use vault::VaultEnvironment as Vault;
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Secrets {
     Dev {

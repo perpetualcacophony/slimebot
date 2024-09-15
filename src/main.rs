@@ -71,7 +71,7 @@ async fn main() {
 
             let config = framework::Config::setup(
                 #[cfg(feature = "cli")]
-                &cli,
+                cli,
             )
             .await?;
 
@@ -99,6 +99,17 @@ async fn main() {
         #[cfg(feature = "cli")]
         if cli.command.is_start() {
             start(&cli).await?;
+        } else if cli.command.is_config() {
+            let config = framework::Config::setup(&cli).await?;
+            println!(
+                "{}",
+                toml::to_string_pretty(&*config).expect("serializing should not fail")
+            );
+
+            println!(
+                "{}",
+                toml::to_string_pretty(&config.env).expect("serializing should not fail")
+            );
         }
 
         #[cfg(not(feature = "cli"))]
@@ -107,7 +118,5 @@ async fn main() {
 
     if let Err(err) = result {
         err.trace()
-    } else {
-        tracing::error!("process should not terminate!")
     }
 }

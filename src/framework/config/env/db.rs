@@ -1,6 +1,6 @@
 use mongodb::options::ServerAddress;
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(from = "Partial")]
 pub struct DbEnvironment {
     url: ServerAddress,

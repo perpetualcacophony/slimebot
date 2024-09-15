@@ -19,4 +19,8 @@ impl Command {
     pub fn is_start(&self) -> bool {
         matches!(self, Self::Start)
     }
+
+    pub fn is_config(&self) -> bool {
+        matches!(self, Self::Config)
+    }
 }
