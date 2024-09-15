@@ -3,7 +3,7 @@ use url::Url;
 const URL_DEFAULT: fn() -> Url =
     || Url::parse("http://vault:8200").expect("hard-coded url should be valid");
 
-const KV1_MOUNT_DEFAULT: fn() -> &'static str = || "slimebot";
+const KV1_MOUNT_DEFAULT: fn() -> String = || "slimebot".to_owned();
 
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct VaultEnvironment {
@@ -20,6 +20,6 @@ impl VaultEnvironment {
     }
 
     pub fn kv1_mount(&self) -> &str {
-        self.kv1_mount
+        &self.kv1_mount
     }
 }
