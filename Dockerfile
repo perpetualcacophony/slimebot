@@ -25,7 +25,7 @@ RUN cargo +nightly chef cook \
     --release \
     --target x86_64-unknown-linux-musl \
     --recipe-path recipe.json \
-    --features "docker db_auth"
+    --features "docker"
 
 # copy the rest of the source code to builder
 COPY . .
@@ -37,7 +37,7 @@ RUN touch build.rs
 RUN cargo +nightly build \
     --release \
     --target x86_64-unknown-linux-musl \
-    --features "docker db_auth"
+    --features "docker"
 
 # using alpine for small final image
 FROM alpine AS runtime
