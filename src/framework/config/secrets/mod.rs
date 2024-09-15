@@ -12,7 +12,7 @@ impl Secrets {
         &self.bot_token
     }
 
-    pub async fn load(env: &super::Environment<'_>) -> Result<Self, Error> {
+    pub async fn load(env: &super::Environment) -> Result<Self, Error> {
         match &env.secrets {
             super::env::Secrets::Dev { token } => Ok(Self {
                 bot_token: (*token).to_owned(),

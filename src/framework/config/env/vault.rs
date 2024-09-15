@@ -6,20 +6,20 @@ const URL_DEFAULT: fn() -> Url =
 const KV1_MOUNT_DEFAULT: fn() -> &'static str = || "slimebot";
 
 #[derive(serde::Deserialize, Debug, Clone)]
-pub struct VaultEnvironment<'a> {
+pub struct VaultEnvironment {
     #[serde(default = "URL_DEFAULT")]
     url: Url,
 
     #[serde(default = "KV1_MOUNT_DEFAULT")]
-    kv1_mount: &'a str,
+    kv1_mount: String,
 }
 
-impl<'a> VaultEnvironment<'a> {
+impl VaultEnvironment {
     pub fn url(&self) -> &Url {
         &self.url
     }
 
-    pub fn kv1_mount(&self) -> &'a str {
+    pub fn kv1_mount(&self) -> &str {
         self.kv1_mount
     }
 }

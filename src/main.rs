@@ -36,6 +36,8 @@ mod commands;
 #[tokio::main]
 async fn main() {
     let result: Result<()> = try {
+        dotenvy::dotenv().ok();
+
         framework::logging::init_tracing();
 
         let build = if built_info::DEBUG {
@@ -54,7 +56,7 @@ async fn main() {
 
         info!("{build}");
 
-        let config = framework::Config::setup().await.unwrap();
+        let config = framework::Config::setup().await?;
 
         let client = serenity::Client::builder(config.token(), GatewayIntents::all());
 

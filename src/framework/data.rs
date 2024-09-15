@@ -34,7 +34,7 @@ pub struct PoiseData {
 }
 
 impl PoiseData {
-    pub(crate) async fn new(config: ConfigSetup<'_>) -> Result<Self> {
+    pub(crate) async fn new(config: ConfigSetup) -> Result<Self> {
         dotenvy::dotenv().ok();
 
         let nvee_path = if cfg!(feature = "docker") {

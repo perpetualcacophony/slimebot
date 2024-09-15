@@ -9,7 +9,7 @@ use crate::{
 
 use super::{config::ConfigSetup, data::PoiseData, event_handler};
 
-pub fn build(config: ConfigSetup<'static>) -> poise::Framework<PoiseData, Error> {
+pub fn build(config: ConfigSetup) -> poise::Framework<PoiseData, Error> {
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::list(),

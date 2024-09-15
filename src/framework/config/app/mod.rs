@@ -29,7 +29,7 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub async fn setup<'a>() -> Result<super::ConfigSetup<'a>, super::Error> {
+    pub async fn setup<'a>() -> Result<super::ConfigSetup, super::Error> {
         super::ConfigSetup::load().await
     }
 

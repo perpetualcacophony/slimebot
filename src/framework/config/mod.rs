@@ -22,13 +22,13 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigSetup<'a> {
+pub struct ConfigSetup {
     app: Config,
-    env: Environment<'a>,
+    env: Environment,
     secrets: Secrets,
 }
 
-impl ConfigSetup<'_> {
+impl ConfigSetup {
     pub async fn load() -> Result<Self, Error> {
         let env = Environment::load()?;
         let app = Config::load(&env)?;
@@ -60,7 +60,7 @@ impl ConfigSetup<'_> {
     }
 }
 
-impl Deref for ConfigSetup<'_> {
+impl Deref for ConfigSetup {
     type Target = Config;
 
     fn deref(&self) -> &Self::Target {
