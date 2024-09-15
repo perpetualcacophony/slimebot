@@ -45,6 +45,7 @@ async fn main() {
     let result: Result<()> = try {
         dotenvy::dotenv().ok();
 
+        #[cfg(not(feature = "cli"))]
         framework::logging::init_tracing();
 
         #[cfg(feature = "cli")]
@@ -52,6 +53,11 @@ async fn main() {
 
         #[cfg(feature = "cli")]
         let cli = Cli::parse();
+
+        #[cfg(feature = "cli")]
+        if cli.logs_enabled() {
+            framework::logging::init_tracing();
+        }
 
         async fn start(#[cfg(feature = "cli")] cli: &Cli) -> Result<()> {
             let build = if built_info::DEBUG {
@@ -100,11 +106,16 @@ async fn main() {
         #[cfg(feature = "cli")]
         if cli.command.is_start() {
             start(&cli).await?;
-        } else if cli.command.is_config() {
+        } else if let Some(command) = cli.command.config() {
             let config = framework::Config::setup(&cli).await?;
-            println!("{}\n{}", "configuration:".underline().green(), config.app);
 
-            print!("{}\n{}", "environment:".underline().green(), config.env);
+            if command.config() {
+                println!("{}\n{}", "configuration:".underline().green(), config.app);
+            }
+
+            if command.env() {
+                print!("{}\n{}", "environment:".underline().green(), config.env);
+            }
         }
 
         #[cfg(not(feature = "cli"))]
