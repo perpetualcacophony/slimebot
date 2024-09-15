@@ -52,7 +52,7 @@ async fn main() {
         #[cfg(feature = "cli")]
         let cli = Cli::parse();
 
-        async fn start() -> Result<()> {
+        async fn start(#[cfg(feature = "cli")] cli: &Cli) -> Result<()> {
             let build = if built_info::DEBUG {
                 let branch = built_info::GIT_HEAD_REF
                     .map(|s| s.trim_start_matches("/refs/heads/"))
@@ -69,7 +69,11 @@ async fn main() {
 
             info!("{build}");
 
-            let config = framework::Config::setup().await?;
+            let config = framework::Config::setup(
+                #[cfg(feature = "cli")]
+                &cli,
+            )
+            .await?;
 
             let client = serenity::Client::builder(config.token(), GatewayIntents::all());
 
@@ -94,7 +98,7 @@ async fn main() {
 
         #[cfg(feature = "cli")]
         if cli.command.is_start() {
-            start().await?;
+            start(&cli).await?;
         }
 
         #[cfg(not(feature = "cli"))]

@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 pub use app::AppConfig as Config;
 
-mod env;
+pub mod env;
 pub use env::Environment;
 
 mod secrets;
@@ -30,8 +30,13 @@ pub struct ConfigSetup {
 
 impl ConfigSetup {
     #[tracing::instrument(skip_all, name = "config")]
-    pub async fn load() -> Result<Self, Error> {
-        let env = Environment::load()?;
+    pub async fn load(#[cfg(feature = "cli")] cli: &crate::Cli) -> Result<Self, Error> {
+        #[cfg(not(feature = "cli"))]
+        let env = Environment::load(None)?;
+
+        #[cfg(feature = "cli")]
+        let env = Environment::load(cli.env_path.as_ref())?;
+
         let app = Config::load(&env)?;
         let secrets = Secrets::load(&env).await?;
 

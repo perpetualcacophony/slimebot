@@ -29,8 +29,14 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub async fn setup<'a>() -> Result<super::ConfigSetup, super::Error> {
-        super::ConfigSetup::load().await
+    pub async fn setup<'a>(
+        #[cfg(feature = "cli")] cli: &crate::Cli,
+    ) -> Result<super::ConfigSetup, super::Error> {
+        super::ConfigSetup::load(
+            #[cfg(feature = "cli")]
+            cli,
+        )
+        .await
     }
 
     #[tracing::instrument(skip_all, name = "config")]

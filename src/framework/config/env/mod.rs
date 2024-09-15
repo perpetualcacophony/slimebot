@@ -22,10 +22,12 @@ impl Environment {
     }
 
     #[tracing::instrument(skip_all, name = "env")]
-    pub fn load() -> Result<Self, Error> {
+    pub fn load(path: Option<&Path>) -> Result<Self, Error> {
         use serde::Deserialize;
 
-        let path = Path::from_var().unwrap_or_default();
+        let path = path
+            .cloned()
+            .unwrap_or_else(|| Path::from_var().unwrap_or_default());
         tracing::debug!(?path, "looking for environment configuration at {path:?}");
 
         let text = path.read()?;
@@ -40,7 +42,7 @@ impl Environment {
 
 #[derive(serde::Deserialize, Clone)]
 #[serde(transparent)]
-struct Path {
+pub struct Path {
     inner: std::path::PathBuf,
 }
 
@@ -75,6 +77,16 @@ impl Default for Path {
 impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::path::Path::fmt(&self.inner, f)
+    }
+}
+
+impl std::str::FromStr for Path {
+    type Err = <std::path::PathBuf as std::str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            inner: std::str::FromStr::from_str(s)?,
+        })
     }
 }
 

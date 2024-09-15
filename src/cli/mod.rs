@@ -1,7 +1,7 @@
 #[derive(clap::Parser)]
 pub struct Cli {
     #[arg(long)]
-    env_path: Option<String>,
+    pub env_path: Option<crate::framework::config::env::Path>,
 
     #[command(subcommand)]
     pub command: Command,
