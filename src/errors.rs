@@ -291,7 +291,7 @@ impl ErrorHandler {
     }
 } */
 
-pub trait ErrorEmbed: std::fmt::Display {
+/* pub trait ErrorEmbed: std::fmt::Display {
     fn create_embed(&self, ctx: Context<'_, PoiseData, Error>) -> serenity::CreateEmbed;
 
     /*     async fn send_embed(
@@ -350,3 +350,4 @@ impl<T: ErrorEmbedOptions> ErrorEmbed for T {
         embed
     }
 }
+ */

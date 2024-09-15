@@ -16,6 +16,4 @@ pub fn init_tracing() {
             .expect("hard-coded env filter should be valid"),
         )
         .init();
-
-    trace!("setup tracing");
 }
