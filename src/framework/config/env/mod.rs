@@ -21,6 +21,7 @@ impl Environment {
         &self.config_file
     }
 
+    #[tracing::instrument(skip_all, name = "env")]
     pub fn load() -> Result<Self, Error> {
         use serde::Deserialize;
 

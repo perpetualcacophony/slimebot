@@ -29,6 +29,7 @@ pub struct ConfigSetup {
 }
 
 impl ConfigSetup {
+    #[tracing::instrument(skip_all, name = "config")]
     pub async fn load() -> Result<Self, Error> {
         let env = Environment::load()?;
         let app = Config::load(&env)?;

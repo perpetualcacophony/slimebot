@@ -12,12 +12,18 @@ impl Secrets {
         &self.bot_token
     }
 
+    #[tracing::instrument(skip_all, name = "secrets")]
     pub async fn load(env: &super::Environment) -> Result<Self, Error> {
         match &env.secrets {
-            super::env::Secrets::Dev { token } => Ok(Self {
-                bot_token: (*token).to_owned(),
-                db: None,
-            }),
+            super::env::Secrets::Dev { token } => {
+                tracing::warn!(
+                    "loading secrets from environment; this should not be used in production!"
+                );
+                Ok(Self {
+                    bot_token: (*token).to_owned(),
+                    db: None,
+                })
+            }
             #[cfg(feature = "vault")]
             super::env::Secrets::Vault(vault) => vault::Store::from_env(vault).load().await,
         }

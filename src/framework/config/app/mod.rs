@@ -33,6 +33,7 @@ impl AppConfig {
         super::ConfigSetup::load().await
     }
 
+    #[tracing::instrument(skip_all, name = "config")]
     pub(super) fn load(env: &Environment) -> Result<Self, Error> {
         ::config::Config::builder()
             .add_source(::config::File::new(
