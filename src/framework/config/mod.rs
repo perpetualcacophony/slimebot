@@ -9,7 +9,7 @@ pub use env::Environment;
 mod secrets;
 pub use secrets::Secrets;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
     #[error("problem loading environment: {0}")]
     Env(#[from] env::Error),
@@ -32,20 +32,17 @@ impl ConfigSetup<'_> {
     pub async fn load() -> Result<Self, Error> {
         let env = Environment::load()?;
         let app = Config::load(&env)?;
-        let secrets = Secrets::load().await?;
+        let secrets = Secrets::load(&env).await?;
 
         Ok(Self { env, app, secrets })
     }
 
     pub fn mongodb(&self) -> mongodb::options::ClientOptions {
-        #[cfg(feature = "vault")]
-        let credential = mongodb::options::Credential::builder()
-            .username(self.secrets.db_username().to_owned())
-            .password(self.secrets.db_password().to_owned())
-            .build();
-
-        #[cfg(not(feature = "vault"))]
-        let credential = None;
+        let credential = self
+            .secrets
+            .db
+            .as_ref()
+            .map(secrets::DbSecrets::mongo_credential);
 
         mongodb::options::ClientOptions::builder()
             .app_name("slimebot".to_owned())

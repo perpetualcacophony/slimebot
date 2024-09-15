@@ -93,12 +93,14 @@ impl AppConfig {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
     #[error("file read error: {0}")]
+    #[event(level = ERROR)]
     Read(config::ConfigError),
 
     #[error("parsing error: {0}")]
+    #[event(level = ERROR)]
     Parse(config::ConfigError),
 }
 
