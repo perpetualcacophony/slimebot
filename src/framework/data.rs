@@ -4,10 +4,8 @@ use crate::commands::wordle::core::WordleData;
 use mongodb::Database;
 
 use chrono::Utc;
-use tracing::{info, warn};
-use tracing_unwrap::ResultExt;
 
-use super::Secrets;
+use super::{config::ConfigSetup, Config};
 
 pub mod error;
 pub use error::Error as DataError;
@@ -18,11 +16,9 @@ pub(crate) type UtcDateTime = chrono::DateTime<Utc>;
 
 #[derive(Debug, Clone)]
 pub struct PoiseData {
-    pub(crate) config: super::config::Config,
+    config: Config,
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
-
-    pub(crate) secrets: Secrets,
 
     #[cfg(feature = "wordle")]
     pub(crate) wordle: WordleData,
@@ -38,7 +34,7 @@ pub struct PoiseData {
 }
 
 impl PoiseData {
-    pub(crate) async fn new() -> Result<Self> {
+    pub(crate) async fn new(config: ConfigSetup) -> Result<Self> {
         dotenvy::dotenv().ok();
 
         let nvee_path = if cfg!(feature = "docker") {
@@ -49,38 +45,9 @@ impl PoiseData {
 
         nvee::from_path(nvee_path).ok();
 
-        let config_file = if let Ok(path) = std::env::var("SLIMEBOT_TOML") {
-            info!(path, "looking for config file with SLIMEBOT_TOML...");
-            path
-        } else {
-            #[cfg(not(feature = "docker"))]
-            let path = "./slimebot.toml".to_owned();
-
-            #[cfg(feature = "docker")]
-            let path = "/slimebot.toml".to_owned();
-
-            warn!(path, "SLIMEBOT_TOML env unset, using default path");
-            path
-        };
-
-        let config: super::config::Config = ::config::Config::builder()
-            .add_source(::config::File::new(&config_file, config::FileFormat::Toml))
-            .build()
-            .expect_or_log("config file could not be loaded")
-            .try_deserialize()
-            .expect_or_log("configuration could not be parsed");
-
-        info!("config loaded");
-
-        #[cfg(feature = "vault")]
-        let secrets = Secrets::from_vault().await?;
-
-        #[cfg(not(feature = "vault"))]
-        let secrets = Secrets::secret_files(&config.secrets_dir())
-            .await
-            .map_err(crate::framework::secrets::Error::from)?;
-
-        let db = super::db::database(&secrets);
+        let db = mongodb::Client::with_options(config.mongodb())
+            .expect("building client should not fail")
+            .database("slimebot");
 
         let started = Utc::now();
 
@@ -99,11 +66,9 @@ impl PoiseData {
         let dynasty = dynasty2::Dynasty::new();
 
         Ok(Self {
-            config,
+            config: config.finish(),
             db,
             started,
-
-            secrets,
 
             #[cfg(feature = "wordle")]
             wordle,
@@ -118,7 +83,7 @@ impl PoiseData {
         })
     }
 
-    pub(crate) const fn config(&self) -> &super::config::Config {
+    pub(crate) fn config(&self) -> &Config {
         &self.config
     }
 

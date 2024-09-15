@@ -58,6 +58,7 @@ dynasty2 = { git = "https://github.com/perpetualcacophony/dynasty2", optional = 
 dotenvy = "0.15.7"
 vaultrs = { version = "0.7.2", optional = true }
 nvee = { git = "https://github.com/perpetualcacophony/nvee" }
+toml = "0.8.19"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

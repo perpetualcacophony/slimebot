@@ -113,6 +113,9 @@ pub enum Error {
 
     #[error(transparent)]
     Data(#[from] crate::framework::DataError),
+
+    #[error(transparent)]
+    Config(#[from] crate::framework::config::Error),
 }
 
 #[derive(Debug, thiserror::Error, TracingError)]

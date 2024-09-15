@@ -1,8 +1,8 @@
-use crate::framework::secrets;
+use crate::framework::config;
 
 #[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
-    #[error("error loading secrets: {0}")]
+    #[error("error loading configuration: {0}")]
     #[event(level = ERROR)]
-    Secrets(#[from] secrets::Error),
+    Config(#[from] config::Error),
 }

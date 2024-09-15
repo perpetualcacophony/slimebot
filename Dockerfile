@@ -25,7 +25,7 @@ RUN cargo +nightly chef cook \
     --release \
     --target x86_64-unknown-linux-musl \
     --recipe-path recipe.json \
-    --features "docker full"
+    --features "docker"
 
 # copy the rest of the source code to builder
 COPY . .
