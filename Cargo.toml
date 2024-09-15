@@ -59,6 +59,7 @@ dotenvy = "0.15.7"
 vaultrs = { version = "0.7.2", optional = true }
 nvee = { git = "https://github.com/perpetualcacophony/nvee" }
 toml = "0.8.19"
+clap = { version = "4.5.17", features = ["derive", "cargo"], optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -69,11 +70,12 @@ built = { version = "0.7.4", features = ["git2"] }
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [features]
-default = []
+default = ["cli"]
 wordle = ["dep:kwordle"]
 nortverse = []
 dynasty = ["dep:dynasty2"]
 full = ["wordle", "nortverse"]
+cli = ["dep:clap"]
 
 docker = ["full", "vault"]
 docker-secrets = []

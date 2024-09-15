@@ -33,6 +33,12 @@ mod built_info {
 
 mod commands;
 
+#[cfg(feature = "cli")]
+mod cli;
+
+#[cfg(feature = "cli")]
+use cli::Cli;
+
 #[tokio::main]
 async fn main() {
     let result: Result<()> = try {
@@ -40,41 +46,59 @@ async fn main() {
 
         framework::logging::init_tracing();
 
-        let build = if built_info::DEBUG {
-            let branch = built_info::GIT_HEAD_REF
-                .map(|s| s.trim_start_matches("/refs/heads/"))
-                .unwrap_or("DETACHED");
+        #[cfg(feature = "cli")]
+        use clap::Parser;
 
-            format!(
-                "development branch {} (`{}`)",
-                branch,
-                built_info::GIT_COMMIT_HASH_SHORT.expect("should be built with a git repo")
-            )
-        } else {
-            format!("release {}", built_info::PKG_VERSION)
-        };
+        #[cfg(feature = "cli")]
+        let cli = Cli::parse();
 
-        info!("{build}");
+        async fn start() -> Result<()> {
+            let build = if built_info::DEBUG {
+                let branch = built_info::GIT_HEAD_REF
+                    .map(|s| s.trim_start_matches("/refs/heads/"))
+                    .unwrap_or("DETACHED");
 
-        let config = framework::Config::setup().await?;
+                format!(
+                    "development branch {} (`{}`)",
+                    branch,
+                    built_info::GIT_COMMIT_HASH_SHORT.expect("should be built with a git repo")
+                )
+            } else {
+                format!("release {}", built_info::PKG_VERSION)
+            };
 
-        let client = serenity::Client::builder(config.token(), GatewayIntents::all());
+            info!("{build}");
 
-        if let Some(flavor_text) = config.logs.flavor_text() {
-            info!("{flavor_text}")
+            let config = framework::Config::setup().await?;
+
+            let client = serenity::Client::builder(config.token(), GatewayIntents::all());
+
+            if let Some(flavor_text) = config.logs.flavor_text() {
+                info!("{flavor_text}")
+            }
+
+            let framework = framework::poise::build(config);
+
+            let mut client = client
+                .framework(framework)
+                .await
+                .expect("client should be valid");
+
+            client
+                .start()
+                .await
+                .expect("client should not return error");
+
+            Ok(())
         }
 
-        let framework = framework::poise::build(config);
+        #[cfg(feature = "cli")]
+        if cli.command.is_start() {
+            start().await?;
+        }
 
-        let mut client = client
-            .framework(framework)
-            .await
-            .expect("client should be valid");
-
-        client
-            .start()
-            .await
-            .expect("client should not return error");
+        #[cfg(not(feature = "cli"))]
+        start().await?;
     };
 
     if let Err(err) = result {
