@@ -25,22 +25,35 @@ pub enum Error {
 pub struct ConfigSetup {
     pub app: Config,
     pub env: Environment,
+    env_path: env::Path,
     secrets: Secrets,
 }
 
 impl ConfigSetup {
     #[tracing::instrument(skip_all, name = "config")]
     pub async fn load(#[cfg(feature = "cli")] cli: &crate::Cli) -> Result<Self, Error> {
-        #[cfg(not(feature = "cli"))]
-        let env = Environment::load(None)?;
+        let env_path = {
+            #[cfg(feature = "cli")]
+            {
+                cli.env_path
+                    .clone()
+                    .unwrap_or_else(|| env::Path::from_var().unwrap_or_default())
+            }
 
-        #[cfg(feature = "cli")]
-        let env = Environment::load(cli.env_path.as_ref())?;
+            #[cfg(not(feature = "cli"))]
+            env::Path::from_var().unwrap_or_default()
+        };
 
+        let env = Environment::load(&env_path)?;
         let app = Config::load(&env)?;
         let secrets = Secrets::load(&env).await?;
 
-        Ok(Self { env, app, secrets })
+        Ok(Self {
+            env,
+            app,
+            secrets,
+            env_path,
+        })
     }
 
     pub fn mongodb(&self) -> mongodb::options::ClientOptions {
@@ -63,6 +76,10 @@ impl ConfigSetup {
 
     pub fn finish(self) -> Config {
         self.app
+    }
+
+    pub fn env_path(&self) -> &env::Path {
+        &self.env_path
     }
 }
 

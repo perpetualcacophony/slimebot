@@ -22,12 +22,9 @@ impl Environment {
     }
 
     #[tracing::instrument(skip_all, name = "env")]
-    pub fn load(path: Option<&Path>) -> Result<Self, Error> {
+    pub fn load(path: &Path) -> Result<Self, Error> {
         use serde::Deserialize;
 
-        let path = path
-            .cloned()
-            .unwrap_or_else(|| Path::from_var().unwrap_or_default());
         tracing::debug!(?path, "looking for environment configuration at {path:?}");
 
         let text = path.read()?;
@@ -64,7 +61,7 @@ impl Path {
         Self { inner: s.into() }
     }
 
-    fn from_var() -> Option<Self> {
+    pub fn from_var() -> Option<Self> {
         std::env::var("SLIMEBOT_ENV_PATH")
             .map(Self::from_string)
             .ok()

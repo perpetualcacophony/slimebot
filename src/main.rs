@@ -110,11 +110,21 @@ async fn main() {
             let config = framework::Config::setup(&cli).await?;
 
             if command.config() {
-                println!("{}\n{}", "configuration:".underline().green(), config.app);
+                println!(
+                    "{} ({})\n{}",
+                    "configuration:".underline().green(),
+                    config.env.config_file(),
+                    config.app
+                );
             }
 
             if command.env() {
-                print!("{}\n{}", "environment:".underline().green(), config.env);
+                print!(
+                    "{} ({:?})\n{}",
+                    "environment:".underline().green(),
+                    config.env_path(),
+                    config.env
+                );
             }
         }
 
