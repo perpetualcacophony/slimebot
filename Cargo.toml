@@ -69,7 +69,7 @@ built = { version = "0.7.4", features = ["git2"] }
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [features]
-default = []
+default = ["dynasty"]
 wordle = ["dep:kwordle"]
 nortverse = []
 dynasty = ["dep:dynasty2"]

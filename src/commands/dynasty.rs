@@ -10,6 +10,12 @@ use crate::utils::{
     Context,
 };
 
+mod client;
+use client::Client;
+
+mod series;
+use series::Series;
+
 #[tracing::instrument(skip_all)]
 #[poise::command(
     slash_command,
