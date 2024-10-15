@@ -36,14 +36,8 @@ impl std::fmt::Display for AppConfig {
 }
 
 impl AppConfig {
-    pub async fn setup<'a>(
-        #[cfg(feature = "cli")] cli: &crate::Cli,
-    ) -> Result<super::ConfigSetup, super::Error> {
-        super::ConfigSetup::load(
-            #[cfg(feature = "cli")]
-            cli,
-        )
-        .await
+    pub async fn setup(cli: crate::Cli) -> Result<super::ConfigSetup, super::Error> {
+        super::ConfigSetup::load(cli).await
     }
 
     #[tracing::instrument(skip_all, name = "config")]

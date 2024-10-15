@@ -27,21 +27,18 @@ pub struct ConfigSetup {
     pub env: Environment,
     env_path: env::Path,
     secrets: Secrets,
+    cli: crate::Cli,
 }
 
 impl ConfigSetup {
     #[tracing::instrument(skip_all, name = "config")]
-    pub async fn load(#[cfg(feature = "cli")] cli: &crate::Cli) -> Result<Self, Error> {
+    pub async fn load(cli: crate::Cli) -> Result<Self, Error> {
         let env_path = {
-            #[cfg(feature = "cli")]
             {
                 cli.env_path
                     .clone()
                     .unwrap_or_else(|| env::Path::from_var().unwrap_or_default())
             }
-
-            #[cfg(not(feature = "cli"))]
-            env::Path::from_var().unwrap_or_default()
         };
 
         let env = Environment::load(&env_path)?;
@@ -53,6 +50,7 @@ impl ConfigSetup {
             app,
             secrets,
             env_path,
+            cli,
         })
     }
 

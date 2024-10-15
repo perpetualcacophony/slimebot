@@ -1,4 +1,4 @@
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Debug, Clone)]
 pub struct Cli {
     #[arg(long)]
     pub env_path: Option<crate::framework::config::env::Path>,
@@ -16,17 +16,15 @@ impl Cli {
     }
 }
 
-#[derive(clap::Subcommand, Default)]
+#[derive(clap::Subcommand, Debug, Clone)]
 pub enum Command {
     Config(Config),
-
-    #[default]
-    Start,
+    Start(Start),
 }
 
 impl Command {
     pub fn is_start(&self) -> bool {
-        matches!(self, Self::Start)
+        matches!(self, Self::Start(..))
     }
 
     pub fn config(&self) -> Option<&Config> {
@@ -38,7 +36,7 @@ impl Command {
     }
 }
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Debug, Clone)]
 #[group(multiple = false)]
 pub struct Config {
     #[arg(long)]
@@ -64,5 +62,17 @@ impl Default for Config {
             env: true,
             config: true,
         }
+    }
+}
+
+#[derive(clap::Args, Debug, Clone)]
+pub struct Start {
+    #[arg(long)]
+    notify: bool,
+}
+
+impl Start {
+    pub fn notify(&self) -> bool {
+        self.notify
     }
 }

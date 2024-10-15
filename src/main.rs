@@ -34,10 +34,7 @@ mod built_info {
 
 mod commands;
 
-#[cfg(feature = "cli")]
 mod cli;
-
-#[cfg(feature = "cli")]
 use cli::Cli;
 
 #[tokio::main]
@@ -45,21 +42,17 @@ async fn main() {
     let result: Result<()> = try {
         dotenvy::dotenv().ok();
 
-        #[cfg(not(feature = "cli"))]
         framework::logging::init_tracing();
 
-        #[cfg(feature = "cli")]
         use clap::Parser;
 
-        #[cfg(feature = "cli")]
         let cli = Cli::parse();
 
-        #[cfg(feature = "cli")]
         if cli.logs_enabled() {
             framework::logging::init_tracing();
         }
 
-        async fn start(#[cfg(feature = "cli")] cli: &Cli) -> Result<()> {
+        async fn start(cli: Cli) -> Result<()> {
             let build = if built_info::DEBUG {
                 let branch = built_info::GIT_HEAD_REF
                     .map(|s| s.trim_start_matches("/refs/heads/"))
@@ -76,11 +69,7 @@ async fn main() {
 
             info!("{build}");
 
-            let config = framework::Config::setup(
-                #[cfg(feature = "cli")]
-                cli,
-            )
-            .await?;
+            let config = framework::Config::setup(cli).await?;
 
             let client = serenity::Client::builder(config.token(), GatewayIntents::all());
 
@@ -103,11 +92,10 @@ async fn main() {
             Ok(())
         }
 
-        #[cfg(feature = "cli")]
         if cli.command.is_start() {
-            start(&cli).await?;
+            start(cli).await?;
         } else if let Some(command) = cli.command.config() {
-            let config = framework::Config::setup(&cli).await?;
+            let config = framework::Config::setup(cli.clone()).await?;
 
             if command.config() {
                 println!(
@@ -127,9 +115,6 @@ async fn main() {
                 );
             }
         }
-
-        #[cfg(not(feature = "cli"))]
-        start().await?;
     };
 
     if let Err(err) = result {
