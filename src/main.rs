@@ -42,8 +42,6 @@ async fn main() {
     let result: Result<()> = try {
         dotenvy::dotenv().ok();
 
-        framework::logging::init_tracing();
-
         use clap::Parser;
 
         let cli = Cli::parse();
