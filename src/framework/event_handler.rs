@@ -132,7 +132,6 @@ async fn event_handler(
             }
         }
 
-        #[cfg(feature = "nortverse")]
         FullEvent::Ready { .. } => data
             .nortverse()
             .clone()

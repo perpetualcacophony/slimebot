@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
 use poise::serenity_prelude as serenity;
-use tracing_unwrap::ResultExt;
-
-use crate::utils::poise::CommandResult;
 
 use super::{
     comic::ComicPage,
@@ -22,67 +17,6 @@ pub struct Nortverse<Data = data::MongoDb> {
 impl Nortverse {
     pub fn from_database(db: &mongodb::Database) -> Self {
         Self::new(data::MongoDb::from_database(db))
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub async fn subscribe_action(
-        &self,
-        cache: Arc<serenity::Cache>,
-        http: Arc<serenity::Http>,
-    ) -> CommandResult {
-        tracing::info!("checking for new comic");
-
-        try {
-            let (comic, updated, old_slug) = self.refresh_latest().await?;
-
-            if updated {
-                tracing::info!(comic.slug = comic.slug(), old.slug = ?old_slug, "new comic found");
-
-                let message = {
-                    comic
-                        .builder()
-                        .in_guild(false)
-                        .include_date(false)
-                        .subscribed(true)
-                        .build_message(&http)
-                        .await?
-                };
-
-                for subscriber in self.subscribers().await? {
-                    let message = message.clone();
-                    let cache = cache.clone();
-                    let http = http.clone();
-
-                    tracing::trace!(user.id = %subscriber, "messaging subscriber");
-
-                    use crate::utils::serenity::UserIdExt;
-
-                    tokio::spawn(async move {
-                        subscriber
-                            .dm_ext((&cache, http.as_ref()), message.clone())
-                            .await
-                            .expect_or_log("failed to send message, skipping...");
-                    });
-                }
-            } else {
-                tracing::trace!("no new comic found")
-            }
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn subscribe_task(self, cache: Arc<serenity::Cache>, http: Arc<serenity::Http>) {
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_mins(60));
-
-            loop {
-                interval.tick().await;
-
-                self.subscribe_action(cache.clone(), http.clone())
-                    .await
-                    .expect_or_log("failed to run subscribe task");
-            }
-        });
     }
 }
 
@@ -186,7 +120,7 @@ where
         }
     }
 
-    async fn subscribers(&self) -> Result<impl Iterator<Item = serenity::UserId>> {
+    pub async fn subscribers(&self) -> Result<impl Iterator<Item = serenity::UserId>> {
         let data = self.data().await;
 
         let vec: Vec<serenity::UserId> = data

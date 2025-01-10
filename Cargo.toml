@@ -62,6 +62,7 @@ toml = "0.8.19"
 clap = { version = "4.5.17", features = ["derive", "cargo"] }
 colored = "2.1.0"
 toml_edit = "0.22.20"
+slimebot-nortverse = { path = "nortverse" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
@@ -74,9 +75,8 @@ git2 = { version = "0.19", features = ["vendored-libgit2"] }
 [features]
 default = []
 wordle = ["dep:kwordle"]
-nortverse = []
 dynasty = ["dep:dynasty2"]
-full = ["wordle", "nortverse"]
+full = ["wordle"]
 
 docker = ["full", "vault"]
 docker-secrets = []

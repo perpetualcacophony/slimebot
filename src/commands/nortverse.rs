@@ -3,17 +3,90 @@ use crate::{
     Context,
 };
 
-mod data;
+pub use slimebot_nortverse::Error;
+use tracing_unwrap::ResultExt;
 
-mod error;
-pub use error::NortverseError as Error;
+#[derive(Debug, Clone)]
+pub struct Nortverse(slimebot_nortverse::Nortverse);
 
-mod comic;
+impl Nortverse {
+    pub fn from_database(db: &mongodb::Database) -> Self {
+        Self(slimebot_nortverse::Nortverse::from_database(db))
+    }
 
-mod client;
-pub use client::Nortverse;
+    #[tracing::instrument(skip_all)]
+    pub async fn subscribe_action(
+        &self,
+        cache: std::sync::Arc<poise::serenity_prelude::Cache>,
+        http: std::sync::Arc<poise::serenity_prelude::Http>,
+    ) -> CommandResult {
+        tracing::info!("checking for new comic");
 
-mod response;
+        try {
+            let (comic, updated, old_slug) = self.0.refresh_latest().await?;
+
+            if updated {
+                tracing::info!(comic.slug = comic.slug(), old.slug = ?old_slug, "new comic found");
+
+                let message = {
+                    comic
+                        .builder()
+                        .in_guild(false)
+                        .include_date(false)
+                        .subscribed(true)
+                        .build_message(&http)
+                        .await?
+                };
+
+                for subscriber in self.0.subscribers().await? {
+                    let message = message.clone();
+                    let cache = cache.clone();
+                    let http = http.clone();
+
+                    tracing::trace!(user.id = %subscriber, "messaging subscriber");
+
+                    use crate::utils::serenity::UserIdExt;
+
+                    tokio::spawn(async move {
+                        subscriber
+                            .dm_ext((&cache, http.as_ref()), message.clone())
+                            .await
+                            .expect_or_log("failed to send message, skipping...");
+                    });
+                }
+            } else {
+                tracing::trace!("no new comic found")
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn subscribe_task(
+        self,
+        cache: std::sync::Arc<poise::serenity_prelude::Cache>,
+        http: std::sync::Arc<poise::serenity_prelude::Http>,
+    ) {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_mins(60));
+
+            loop {
+                interval.tick().await;
+
+                self.subscribe_action(cache.clone(), http.clone())
+                    .await
+                    .expect_or_log("failed to run subscribe task");
+            }
+        });
+    }
+}
+
+impl std::ops::Deref for Nortverse {
+    type Target = slimebot_nortverse::Nortverse;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[tracing::instrument(skip_all)]
 #[poise::command(
