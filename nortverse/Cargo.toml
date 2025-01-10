@@ -29,3 +29,7 @@ tracing-unwrap = "1.0.1"
 thisslime = "0.5.1"
 rand = "0.8.5"
 url = "2.5.4"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+temp-mongo = "0.1.3"

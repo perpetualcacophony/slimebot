@@ -15,7 +15,7 @@ use crate::{
 
 macro_rules! include_str_static {
     ($path:literal) => {
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/", $path))
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../static/", $path))
     };
 }
 
