@@ -5,7 +5,7 @@ const URL_DEFAULT: fn() -> Url =
 
 const KV1_MOUNT_DEFAULT: fn() -> String = || "slimebot".to_owned();
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct VaultEnvironment {
     #[serde(default = "URL_DEFAULT")]
     url: Url,

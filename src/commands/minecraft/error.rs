@@ -1,6 +1,6 @@
 use poise::serenity_prelude as serenity;
 
-use crate::errors::ErrorEmbedOptions as _;
+// use crate::errors::ErrorEmbedOptions as _;
 
 #[derive(Debug, Clone, thiserror::Error, thisslime::TracingError)]
 #[event(level = WARN)]
@@ -70,7 +70,7 @@ impl std::fmt::Display for ErrorAlreadyClaimed {
         )
     }
 }
-
+/*
 impl crate::errors::ErrorEmbed for ErrorAlreadyClaimed {
     fn create_embed(
         &self,
@@ -99,7 +99,7 @@ impl crate::errors::ErrorEmbedOptions for ErrorAlreadyClaimed {
     fn color(&self) -> serenity::Color {
         serenity::Color::GOLD
     }
-}
+} */
 
 #[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {

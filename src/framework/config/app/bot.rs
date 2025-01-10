@@ -1,8 +1,8 @@
 use poise::serenity_prelude::{ActivityData, ChannelId, GuildId};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BotConfig {
     testing_server: Option<GuildId>,
     activity: Option<String>,
@@ -87,11 +87,17 @@ impl BotConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(try_from = "String")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct RepoName {
     user: String,
     repo: String,
+}
+
+impl From<RepoName> for String {
+    fn from(value: RepoName) -> Self {
+        value.to_string()
+    }
 }
 
 impl std::fmt::Display for RepoName {

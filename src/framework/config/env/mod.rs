@@ -9,7 +9,7 @@ pub enum Error {
     Toml(#[from] toml::de::Error),
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct Environment {
     config_file: String,
     pub db: Db,
@@ -22,10 +22,9 @@ impl Environment {
     }
 
     #[tracing::instrument(skip_all, name = "env")]
-    pub fn load() -> Result<Self, Error> {
+    pub fn load(path: &Path) -> Result<Self, Error> {
         use serde::Deserialize;
 
-        let path = Path::from_var().unwrap_or_default();
         tracing::debug!(?path, "looking for environment configuration at {path:?}");
 
         let text = path.read()?;
@@ -38,9 +37,16 @@ impl Environment {
     }
 }
 
-#[derive(serde::Deserialize, Clone)]
+impl std::fmt::Display for Environment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let doc = toml_edit::ser::to_document(self).expect("serializing should not fail");
+        write!(f, "{doc}")
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(transparent)]
-struct Path {
+pub struct Path {
     inner: std::path::PathBuf,
 }
 
@@ -55,7 +61,7 @@ impl Path {
         Self { inner: s.into() }
     }
 
-    fn from_var() -> Option<Self> {
+    pub fn from_var() -> Option<Self> {
         std::env::var("SLIMEBOT_ENV_PATH")
             .map(Self::from_string)
             .ok()
@@ -78,6 +84,16 @@ impl std::fmt::Debug for Path {
     }
 }
 
+impl std::str::FromStr for Path {
+    type Err = <std::path::PathBuf as std::str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            inner: std::str::FromStr::from_str(s)?,
+        })
+    }
+}
+
 mod db;
 pub use db::DbEnvironment as Db;
 
@@ -87,7 +103,7 @@ mod vault;
 #[cfg(feature = "vault")]
 pub use vault::VaultEnvironment as Vault;
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Secrets {
     Dev {

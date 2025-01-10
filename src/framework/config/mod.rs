@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 pub use app::AppConfig as Config;
 
-mod env;
+pub mod env;
 pub use env::Environment;
 
 mod secrets;
@@ -23,19 +23,35 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct ConfigSetup {
-    app: Config,
-    env: Environment,
+    pub app: Config,
+    pub env: Environment,
+    env_path: env::Path,
     secrets: Secrets,
+    cli: crate::Cli,
 }
 
 impl ConfigSetup {
     #[tracing::instrument(skip_all, name = "config")]
-    pub async fn load() -> Result<Self, Error> {
-        let env = Environment::load()?;
+    pub async fn load(cli: crate::Cli) -> Result<Self, Error> {
+        let env_path = {
+            {
+                cli.env_path
+                    .clone()
+                    .unwrap_or_else(|| env::Path::from_var().unwrap_or_default())
+            }
+        };
+
+        let env = Environment::load(&env_path)?;
         let app = Config::load(&env)?;
         let secrets = Secrets::load(&env).await?;
 
-        Ok(Self { env, app, secrets })
+        Ok(Self {
+            env,
+            app,
+            secrets,
+            env_path,
+            cli,
+        })
     }
 
     pub fn mongodb(&self) -> mongodb::options::ClientOptions {
@@ -58,6 +74,10 @@ impl ConfigSetup {
 
     pub fn finish(self) -> Config {
         self.app
+    }
+
+    pub fn env_path(&self) -> &env::Path {
+        &self.env_path
     }
 }
 

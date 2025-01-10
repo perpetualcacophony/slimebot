@@ -45,6 +45,7 @@ impl DbSecrets {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error, thisslime::TracingError)]
 pub enum Error {
     #[error("error when fetching secrets: {0:?}")]

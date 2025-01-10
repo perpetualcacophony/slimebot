@@ -6,13 +6,13 @@ use std::{
 use super::Environment;
 use poise::serenity_prelude::{ChannelId, RoleId};
 use rand::seq::IteratorRandom;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
 mod bot;
 pub use bot::BotConfig;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AppConfig {
     pub secrets_dir: Option<PathBuf>,
 
@@ -28,9 +28,16 @@ pub struct AppConfig {
     pub wordle: WordleConfig,
 }
 
+impl std::fmt::Display for AppConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let doc = toml_edit::ser::to_document(self).expect("serializing should not fail");
+        write!(f, "{doc}")
+    }
+}
+
 impl AppConfig {
-    pub async fn setup<'a>() -> Result<super::ConfigSetup, super::Error> {
-        super::ConfigSetup::load().await
+    pub async fn setup(cli: crate::Cli) -> Result<super::ConfigSetup, super::Error> {
+        super::ConfigSetup::load(cli).await
     }
 
     #[tracing::instrument(skip_all, name = "config")]
@@ -105,7 +112,7 @@ pub enum Error {
     Parse(config::ConfigError),
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogsConfig {
     flavor_texts: Vec<String>,
 }
@@ -126,7 +133,7 @@ impl LogsConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct WatchersConfig {
     #[serde(default)]
     allow_by_default: bool,
@@ -156,13 +163,13 @@ impl WatchersConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct WatchersChannelConfig {
     id: ChannelId,
     allow: bool,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct BugReportsConfig {
     channel: Option<ChannelId>,
 }
@@ -173,7 +180,7 @@ impl BugReportsConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct WordleConfig {
     //pub guesses_file: String,
