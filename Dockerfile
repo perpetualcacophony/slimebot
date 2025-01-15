@@ -8,6 +8,8 @@ FROM chef AS planner
 
 # cargo chef prepare wants these files
 COPY Cargo.toml .
+COPY slimebot/Cargo.toml slimebot/
+COPY nortverse/Cargo.toml nortverse/
 
 # create the cargo chef recipe file
 RUN cargo +nightly chef prepare --recipe-path recipe.json
