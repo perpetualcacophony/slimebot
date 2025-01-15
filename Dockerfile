@@ -8,7 +8,6 @@ FROM chef AS planner
 
 # cargo chef prepare wants these files
 COPY Cargo.toml .
-COPY src/main.rs src/
 
 # create the cargo chef recipe file
 RUN cargo +nightly chef prepare --recipe-path recipe.json
