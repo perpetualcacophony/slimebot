@@ -109,7 +109,7 @@ mod tests {
     use poise::serenity_prelude::UserId;
     use temp_mongo::TempMongo;
 
-    use crate::commands::nortverse::data::NortverseDataAsync;
+    use crate::data::NortverseDataAsync;
 
     use super::MongoDb;
 

@@ -7,8 +7,7 @@ WORKDIR /build
 FROM chef AS planner
 
 # cargo chef prepare wants these files
-COPY Cargo.toml .
-COPY src/main.rs src/
+COPY . .
 
 # create the cargo chef recipe file
 RUN cargo +nightly chef prepare --recipe-path recipe.json
@@ -31,7 +30,7 @@ RUN cargo +nightly chef cook \
 COPY . .
 
 # touch the build script to ensure cargo runs it
-RUN touch build.rs
+RUN touch slimebot/build.rs
 
 # build binary
 RUN cargo +nightly build \

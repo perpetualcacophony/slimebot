@@ -44,7 +44,7 @@ list! {
     eightball{}
     januannie{}
     wordle{"wordle"}
-    nortverse{"nortverse"}
+    nortverse{}
     dynasty{"dynasty"}
 }
 

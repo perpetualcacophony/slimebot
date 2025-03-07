@@ -16,10 +16,9 @@
 
 /wordle/
 
-/macros/Cargo.lock
-/macros/target/
+/*/target/
 
-/Cargo.lock
+*/Cargo.lock
 
 /config
 
