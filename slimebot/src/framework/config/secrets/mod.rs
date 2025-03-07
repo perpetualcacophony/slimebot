@@ -1,4 +1,3 @@
-#[cfg(feature = "vault")]
 mod vault;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -24,7 +23,6 @@ impl Secrets {
                     db: None,
                 })
             }
-            #[cfg(feature = "vault")]
             super::env::Secrets::Vault(vault) => vault::Store::from_env(vault).load().await,
         }
     }
