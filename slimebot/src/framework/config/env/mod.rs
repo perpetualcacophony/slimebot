@@ -13,6 +13,8 @@ pub enum Error {
 pub struct Environment {
     config_file: String,
     pub db: Db,
+
+    #[serde(flatten)]
     pub secrets: Secrets,
 }
 
@@ -97,19 +99,14 @@ impl std::str::FromStr for Path {
 mod db;
 pub use db::DbEnvironment as Db;
 
-#[cfg(feature = "vault")]
 mod vault;
 
-#[cfg(feature = "vault")]
 pub use vault::VaultEnvironment as Vault;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Secrets {
-    Dev {
-        token: String,
-    },
+    Dev { token: String },
 
-    #[cfg(feature = "vault")]
     Vault(Vault),
 }
