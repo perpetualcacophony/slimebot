@@ -18,6 +18,7 @@ pub trait NortverseData {
     }
 }
 
+#[allow(async_fn_in_trait)]
 pub trait NortverseDataAsync {
     type Error: std::error::Error;
 
