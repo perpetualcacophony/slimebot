@@ -27,7 +27,7 @@ pub struct ConfigSetup {
     pub env: Environment,
     env_path: env::Path,
     secrets: Secrets,
-    cli: crate::Cli,
+    pub cli: crate::Cli,
 }
 
 impl ConfigSetup {

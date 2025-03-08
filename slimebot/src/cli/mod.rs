@@ -14,6 +14,14 @@ impl Cli {
     pub fn logs_enabled(&self) -> bool {
         self.logs || self.command.is_start()
     }
+
+    pub fn notify_on_start(&self) -> bool {
+        if let Command::Start(start) = &self.command {
+            start.notify()
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(clap::Subcommand, Debug, Clone)]

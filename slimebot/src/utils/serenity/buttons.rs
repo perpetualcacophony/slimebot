@@ -25,11 +25,11 @@ pub trait AddButton: Sized + Clone {
         self
     }
 
-    fn add_buttons_in_place(&mut self, buttons: &[CreateButton]) {
+    /*     fn add_buttons_in_place(&mut self, buttons: &[CreateButton]) {
         for button in buttons {
             self.add_button_in_place(button.clone());
         }
-    }
+    } */
 }
 
 impl AddButton for CreateInteractionResponseMessage {

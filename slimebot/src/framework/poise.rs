@@ -44,10 +44,12 @@ pub fn build(config: ConfigSetup) -> poise::Framework<PoiseData, Error> {
                 trace!("finished setup, accepting commands");
 
                 if let Some(status_channel) = config.bot.status_channel() {
-                    status_channel
-                        .say_ext(http, "ready!")
-                        .await
-                        .map_err(CommandError::from)?;
+                    if config.cli.notify_on_start() {
+                        status_channel
+                            .say_ext(http, "ready!")
+                            .await
+                            .map_err(CommandError::from)?;
+                    }
                 }
 
                 Ok(PoiseData::new(config).await?)
