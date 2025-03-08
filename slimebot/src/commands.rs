@@ -43,7 +43,7 @@ list! {
     help{}
     eightball{}
     januannie{}
-    wordle{"wordle"}
+    wordle{}
     nortverse{}
     dynasty{"dynasty"}
 }

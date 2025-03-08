@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use poise::serenity_prelude::{User, UserId};
 
-use crate::utils::AsDiscordId;
-
 pub enum Users<'owner> {
     One(&'owner User),
     More {
@@ -50,13 +48,11 @@ impl<'owner> Users<'owner> {
         }
     }
 
-    pub fn contains(&self, user_id: &impl AsDiscordId<UserId>) -> bool {
+    pub fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
     }
 
-    fn get(&self, user_id: &impl AsDiscordId<UserId>) -> Option<&User> {
-        let user_id = user_id.as_id();
-
+    fn get(&self, user_id: UserId) -> Option<&User> {
         if user_id == self.owner().id {
             Some(self.owner())
         } else if let Self::More { others, .. } = self
@@ -101,11 +97,11 @@ impl UserMap {
         self.0.len()
     }
 
-    fn get(&self, user_id: impl AsDiscordId<UserId>) -> Option<&User> {
-        self.as_ref().get(&user_id.as_id())
+    fn get(&self, user_id: UserId) -> Option<&User> {
+        self.as_ref().get(&user_id)
     }
 
-    fn contains(&self, user_id: impl AsDiscordId<UserId>) -> bool {
+    fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
     }
 }
@@ -175,11 +171,11 @@ impl<'user> UserMapBorrowed<'user> {
         Self(HashMap::with_capacity(capacity))
     }
 
-    fn get(&self, user_id: impl AsDiscordId<UserId>) -> Option<&User> {
-        self.as_ref().get(&user_id.as_id()).copied()
+    fn get(&self, user_id: UserId) -> Option<&User> {
+        self.as_ref().get(&user_id).copied()
     }
 
-    fn contains(&self, user_id: impl AsDiscordId<UserId>) -> bool {
+    fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
     }
 }

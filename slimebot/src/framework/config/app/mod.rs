@@ -23,7 +23,6 @@ pub struct AppConfig {
     #[serde(default)]
     pub bug_reports: BugReportsConfig,
 
-    #[cfg(feature = "wordle")]
     #[serde(default)]
     pub wordle: WordleConfig,
 }

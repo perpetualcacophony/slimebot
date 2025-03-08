@@ -53,7 +53,7 @@ kwordle = { git = "https://github.com/perpetualcacophony/kwordle", branch = "mas
     "serde_derive",
     "classic_words",
     "step",
-], version = "0.5.5" }
+], version = "0.5.6" }
 dynasty2 = { git = "https://github.com/perpetualcacophony/dynasty2", optional = true }
 dotenvy = "0.15.7"
 vaultrs = { version = "0.7.2" }

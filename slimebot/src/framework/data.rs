@@ -1,4 +1,3 @@
-#[cfg(feature = "wordle")]
 use crate::commands::wordle::core::WordleData;
 
 use mongodb::Database;
@@ -20,7 +19,6 @@ pub struct PoiseData {
     pub(crate) db: Database,
     pub(crate) started: UtcDateTime,
 
-    #[cfg(feature = "wordle")]
     pub(crate) wordle: WordleData,
 
     //error_tx: ErrorSender,
@@ -50,7 +48,6 @@ impl PoiseData {
 
         let started = Utc::now();
 
-        #[cfg(feature = "wordle")]
         let wordle = WordleData::new(&db);
 
         /* let (error_tx, error_rx) = ErrorHandler::channel();
@@ -68,7 +65,6 @@ impl PoiseData {
             db,
             started,
 
-            #[cfg(feature = "wordle")]
             wordle,
 
             minecraft,
@@ -89,7 +85,6 @@ impl PoiseData {
         &self.db
     }
 
-    #[cfg(feature = "wordle")]
     pub(crate) const fn wordle(&self) -> &WordleData {
         &self.wordle
     }

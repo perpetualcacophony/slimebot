@@ -178,7 +178,7 @@ impl<'a> Game<'a> {
                             break;
                         }
 
-                        if !self.users.contains(&msg.author) {
+                        if !self.users.contains(msg.author.id) {
                             self.users.add(msg.author)
                         }
                     }

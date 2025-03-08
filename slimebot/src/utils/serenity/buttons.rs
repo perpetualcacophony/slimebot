@@ -1,15 +1,12 @@
-/* use poise::{
+use poise::{
     serenity_prelude::{
-        CreateActionRow,
-        CreateButton,
-        CreateInteractionResponseMessage,
-        CreateMessage,
-        //ReactionType,
+        CreateActionRow, CreateButton, CreateInteractionResponseMessage, CreateMessage,
+        ReactionType,
     },
     CreateReply,
-}; */
+};
 
-/* pub trait AddButton: Sized + Clone {
+pub trait AddButton: Sized + Clone {
     fn add_button(mut self, button: CreateButton) -> Self {
         self.add_button_in_place(button);
         self
@@ -64,9 +61,9 @@ impl AddButton for CreateReply {
 
         self
     }
-} */
+}
 
-/* pub trait YesNoButtons: AddButton {
+pub trait YesNoButtons: AddButton {
     fn yes_no_buttons(self) -> Self {
         let yes_emoji = ReactionType::Unicode("✅".to_owned());
         let no_emoji = ReactionType::Unicode("❌".to_owned());
@@ -85,7 +82,7 @@ impl AddButton for CreateReply {
     }
 }
 
-impl<T> YesNoButtons for T where T: AddButton {} */
+impl<T> YesNoButtons for T where T: AddButton {}
 
 /* pub trait AddActionRow {
     fn add_action_row(self, action_row: CreateActionRow) -> Self;
