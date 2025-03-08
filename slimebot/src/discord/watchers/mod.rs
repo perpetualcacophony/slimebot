@@ -21,10 +21,12 @@ macro_rules! include_str_static {
 
 mod haiku;
 
+#[allow(unused, clippy::type_complexity)]
 struct FilterSet<Event> {
     filters: Vec<Box<dyn Fn(&Event) -> bool>>,
 }
 
+#[allow(unused)]
 impl<Event> FilterSet<Event> {
     /// Same as [Self::default].
     fn new() -> Self {
@@ -59,15 +61,17 @@ impl<T> Default for FilterSet<T> {
     }
 }
 
+#[allow(unused)]
 type MessageFilter = FilterSet<Message>;
 
+#[allow(unused)]
 impl MessageFilter {
     fn in_guild(self, guild_id: Option<GuildId>) -> Self {
         self.with(move |msg| msg.guild_id == guild_id)
     }
 
     fn not_own(self, cache: &'static Cache) -> Self {
-        self.with(move |msg| !msg.is_own(cache))
+        self.with(move |msg| msg.author.id != cache.current_user().id)
     }
 
     fn test<'msg>(&self, msg: &'msg Message) -> Option<&'msg Message> {
@@ -75,6 +79,7 @@ impl MessageFilter {
     }
 }
 
+#[allow(unused)]
 trait Handler {
     type Event;
     type CheckOutput = ();

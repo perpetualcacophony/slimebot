@@ -75,3 +75,4 @@ git2 = { version = "0.19", features = ["vendored-libgit2"] }
 [features]
 default = []
 dynasty = ["dep:dynasty2"]
+docker = []
