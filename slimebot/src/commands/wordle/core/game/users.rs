@@ -2,50 +2,32 @@ use std::collections::HashMap;
 
 use poise::serenity_prelude::{User, UserId};
 
-pub enum Users<'owner> {
-    One(&'owner User),
-    More {
-        owner: &'owner User,
-        others: Option<UserMap>,
-    },
+pub struct Users<'owner> {
+    owner: &'owner User,
+    others: Option<UserMap>,
 }
 
 impl<'owner> Users<'owner> {
-    pub fn one(user: &'owner User) -> Self {
-        Self::One(user)
-    }
-
-    pub fn more(owner: &'owner User) -> Self {
-        Self::More {
+    pub fn new(owner: &'owner User) -> Self {
+        Self {
             owner,
             others: None,
         }
     }
 
     pub fn count(&self) -> usize {
-        match self {
-            Self::One(..) => 1,
-            Self::More { others, .. } => others.as_ref().map_or(0, |set| set.len()) + 1,
-        }
+        1 + self.others.as_ref().map_or(0, |set| set.len())
     }
 
     pub fn owner(&self) -> &'owner User {
-        match self {
-            Self::One(owner) => owner,
-            Self::More { owner, .. } => owner,
-        }
+        self.owner
     }
 
     pub fn user_map(&self) -> UserMapBorrowed {
-        match self {
-            Self::One(user) => [*user].into_iter().collect(),
-            Self::More { owner, others } => {
-                let mut new =
-                    UserMapBorrowed::with_capacity(others.as_ref().map_or(1, |map| map.len()));
-                new.insert(owner);
-                new
-            }
-        }
+        let mut new =
+            UserMapBorrowed::with_capacity(self.others.as_ref().map_or(1, |map| map.len()));
+        new.insert(self.owner);
+        new
     }
 
     pub fn contains(&self, user_id: UserId) -> bool {
@@ -55,9 +37,7 @@ impl<'owner> Users<'owner> {
     fn get(&self, user_id: UserId) -> Option<&User> {
         if user_id == self.owner().id {
             Some(self.owner())
-        } else if let Self::More { others, .. } = self
-            && let Some(others) = others
-        {
+        } else if let Some(others) = &self.others {
             others.get(user_id)
         } else {
             None
@@ -65,14 +45,9 @@ impl<'owner> Users<'owner> {
     }
 
     pub fn add(&mut self, user: User) {
-        match self {
-            Self::One(..) => (),
-            Self::More { owner, others } => {
-                if user != **owner {
-                    let map = others.get_or_insert(UserMap::default());
-                    map.insert(user);
-                }
-            }
+        if user != *self.owner {
+            let map = self.others.get_or_insert(UserMap::default());
+            map.insert(user);
         }
     }
 }

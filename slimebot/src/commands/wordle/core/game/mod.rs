@@ -7,12 +7,9 @@ use poise::serenity_prelude::{
 };
 
 use crate::{
-    utils::{
-        poise::ContextExt,
-        serenity::{
-            buttons::YesNoButtons,
-            component_interaction::ComponentInteractionExt as UtilsComponentInteractionExt,
-        },
+    utils::serenity::{
+        buttons::YesNoButtons,
+        component_interaction::ComponentInteractionExt as UtilsComponentInteractionExt,
     },
     Context,
 };
@@ -58,11 +55,7 @@ impl<'a> Game<'a> {
         puzzle: impl Into<Puzzle>,
         options: GameOptions,
     ) -> serenity_prelude::Result<Self> {
-        let users = if ctx.in_guild() {
-            Users::more(ctx.author())
-        } else {
-            Users::one(ctx.author())
-        };
+        let users = Users::new(ctx.author());
 
         let data = ctx.data();
         let puzzle = puzzle.into();
