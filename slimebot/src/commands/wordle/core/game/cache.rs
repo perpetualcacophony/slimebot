@@ -1,4 +1,5 @@
-use std::{collections::HashMap, iter::FusedIterator, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
+// use std::iter::FusedIterator;
 
 use arc_swap::ArcSwap;
 use poise::serenity_prelude::ChannelId;
@@ -19,7 +20,7 @@ impl GamesCache {
         guard.get(&channel_id).map(|arc_swap| arc_swap.load_full())
     }
 
-    pub async fn channel_is_locked(&self, id: ChannelId) -> bool {
+    pub async fn _channel_is_locked(&self, id: ChannelId) -> bool {
         self.get(id).await.is_some()
     }
 
@@ -44,7 +45,7 @@ impl GamesCache {
         self.remove(id).await;
     }
 
-    pub async fn iter(&self) -> Iter {
+    /*     pub async fn iter(&self) -> Iter {
         let vec: Vec<Arc<GameData>> = self
             .0
             .read()
@@ -54,10 +55,10 @@ impl GamesCache {
             .collect();
 
         Iter::new(vec)
-    }
+    } */
 }
 
-#[derive(Default, Clone, Debug)]
+/* #[derive(Default, Clone, Debug)]
 pub struct Iter {
     vec: Vec<Arc<GameData>>,
     next_index: usize,
@@ -88,3 +89,4 @@ impl ExactSizeIterator for Iter {
 }
 
 impl FusedIterator for Iter {}
+ */

@@ -46,7 +46,7 @@ pub struct Game<'a> {
     dailies: &'a DailyWordles,
     cache: &'a GamesCache,
     users: Users<'a>,
-    style: GameStyle,
+    _style: GameStyle,
 }
 
 impl<'a> Game<'a> {
@@ -70,7 +70,7 @@ impl<'a> Game<'a> {
             dailies: data.wordle().wordles(),
             cache: data.wordle().game_data(),
             users,
-            style: options.style,
+            _style: options.style,
         })
     }
 
@@ -143,7 +143,6 @@ impl<'a> Game<'a> {
         GameData {
             puzzle: self.puzzle(),
             guesses: self.guesses.clone(),
-            channel_id: self.channel_id(),
             message_id: self.message_id(),
         }
     }

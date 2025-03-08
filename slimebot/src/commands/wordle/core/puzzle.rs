@@ -52,7 +52,7 @@ impl Puzzle {
         }
     }
 
-    pub fn from_partial(partial: PartialPuzzle, list: &kwordle::WordsList<5>) -> Option<Self> {
+    /*     pub fn from_partial(partial: PartialPuzzle, list: &kwordle::WordsList<5>) -> Option<Self> {
         match partial {
             PartialPuzzle::Random(string) => {
                 Some(Puzzle::Random(kwordle::Word::from_str(list, &string).ok()?))
@@ -61,7 +61,7 @@ impl Puzzle {
                 DailyPuzzle::from_partial(partial, list).map(Puzzle::Daily)
             }
         }
-    }
+    } */
 }
 
 #[derive(Debug, Serialize, Clone)]

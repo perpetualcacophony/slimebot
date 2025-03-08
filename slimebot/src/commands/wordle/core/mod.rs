@@ -1,4 +1,4 @@
-const PUZZLE_ACTIVE_HOURS: i64 = 24;
+//const PUZZLE_ACTIVE_HOURS: i64 = 24;
 
 mod error;
 

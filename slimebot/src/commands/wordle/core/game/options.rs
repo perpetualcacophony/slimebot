@@ -26,7 +26,7 @@ impl GameOptionsBuilder {
         self
     }
 
-    pub fn guesses_limit(mut self, limit: impl Into<Option<usize>>) -> Self {
+    pub fn _guesses_limit(mut self, limit: impl Into<Option<usize>>) -> Self {
         self.guesses_limit = limit.into();
         self
     }

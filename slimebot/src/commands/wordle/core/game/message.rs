@@ -112,14 +112,14 @@ impl GameMessage {
         Ok(())
     }
 
-    pub async fn delete(&mut self, cache_http: impl CacheHttp) -> Result<()> {
+    pub async fn _delete(&mut self, cache_http: impl CacheHttp) -> Result<()> {
         self.msg.delete(cache_http).await?;
 
         Ok(())
     }
 
-    pub async fn resend(&mut self, ctx: GameContext<'_>) -> Result<()> {
-        self.delete(ctx).await?;
+    pub async fn _resend(&mut self, ctx: GameContext<'_>) -> Result<()> {
+        self._delete(ctx).await?;
         //self.reply_loading(ctx).await?;
         Ok(())
     }

@@ -15,21 +15,21 @@ impl<'owner> Users<'owner> {
         }
     }
 
-    pub fn count(&self) -> usize {
-        1 + self.others.as_ref().map_or(0, |set| set.len())
+    pub fn _count(&self) -> usize {
+        1 + self.others.as_ref().map_or(0, |set| set._len())
     }
 
     pub fn owner(&self) -> &'owner User {
         self.owner
     }
 
-    pub fn user_map(&self) -> UserMapBorrowed {
-        let mut new =
-            UserMapBorrowed::with_capacity(self.others.as_ref().map_or(1, |map| map.len()));
-        new.insert(self.owner);
-        new
-    }
-
+    /*     pub fn user_map(&self) -> UserMapBorrowed {
+           let mut new =
+               UserMapBorrowed::with_capacity(self.others.as_ref().map_or(1, |map| map.len()));
+           new.insert(self.owner);
+           new
+       }
+    */
     pub fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
     }
@@ -56,19 +56,19 @@ impl<'owner> Users<'owner> {
 struct UserMap(HashMap<UserId, User>);
 
 impl UserMap {
-    fn new() -> Self {
+    /*     fn new() -> Self {
         Self(HashMap::with_capacity(1))
     }
 
     fn iter(&self) -> std::collections::hash_map::Iter<'_, UserId, User> {
         self.0.iter()
-    }
+    } */
 
     fn insert(&mut self, user: User) {
         self.0.insert(user.id, user);
     }
 
-    fn len(&self) -> usize {
+    fn _len(&self) -> usize {
         self.0.len()
     }
 
@@ -76,9 +76,9 @@ impl UserMap {
         self.as_ref().get(&user_id)
     }
 
-    fn contains(&self, user_id: UserId) -> bool {
+    /*     fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
-    }
+    } */
 }
 
 impl From<HashMap<UserId, User>> for UserMap {
@@ -130,7 +130,7 @@ impl From<UserMapBorrowed<'_>> for UserMap {
 struct UserMapBorrowed<'user>(HashMap<UserId, &'user User>);
 
 impl<'user> UserMapBorrowed<'user> {
-    fn new() -> Self {
+    /*     fn new() -> Self {
         Self::default()
     }
 
@@ -140,19 +140,20 @@ impl<'user> UserMapBorrowed<'user> {
 
     fn len(&self) -> usize {
         self.0.len()
-    }
+    } */
 
     fn with_capacity(capacity: usize) -> Self {
         Self(HashMap::with_capacity(capacity))
     }
 
+    /*
     fn get(&self, user_id: UserId) -> Option<&User> {
         self.as_ref().get(&user_id).copied()
     }
 
     fn contains(&self, user_id: UserId) -> bool {
         self.get(user_id).is_some()
-    }
+    } */
 }
 
 impl Default for UserMapBorrowed<'_> {
@@ -191,6 +192,7 @@ impl<'map, 'user> IntoIterator for &'map UserMapBorrowed<'user> {
     }
 }
 
+#[allow(unused)]
 mod new {
     use std::{collections::HashMap, marker::PhantomData};
 
