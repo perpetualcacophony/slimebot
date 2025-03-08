@@ -23,9 +23,10 @@ impl Die {
     }
 
     // convenience version of [`roll_with`] that doesn't use a cached Rng
-    pub fn roll(&self) -> RolledDie {
-        self.roll_with(&mut rand::thread_rng())
-    }
+    /*     pub fn roll(&self) -> RolledDie {
+           self.roll_with(&mut rand::thread_rng())
+       }
+    */
 
     fn roll_with(&self, rng: &mut impl Rng) -> RolledDie {
         let range = 1..=self.faces;

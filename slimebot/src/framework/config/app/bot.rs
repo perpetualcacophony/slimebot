@@ -78,13 +78,13 @@ impl BotConfig {
         self.status_channel
     }
 
-    pub fn github_repo(&self) -> Option<&RepoName> {
+    /*     pub fn github_repo(&self) -> Option<&RepoName> {
         if self.github_repo.is_none() {
             tracing::warn!("no github repository in config");
         }
 
         self.github_repo.as_ref()
-    }
+    } */
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

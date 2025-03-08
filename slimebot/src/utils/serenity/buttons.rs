@@ -1,13 +1,15 @@
-use poise::{
+/* use poise::{
     serenity_prelude::{
-        CreateActionRow, CreateButton, CreateInteractionResponseMessage, CreateMessage,
-        ReactionType,
+        CreateActionRow,
+        CreateButton,
+        CreateInteractionResponseMessage,
+        CreateMessage,
+        //ReactionType,
     },
     CreateReply,
-};
+}; */
 
-
-pub trait AddButton: Sized + Clone {
+/* pub trait AddButton: Sized + Clone {
     fn add_button(mut self, button: CreateButton) -> Self {
         self.add_button_in_place(button);
         self
@@ -26,7 +28,6 @@ pub trait AddButton: Sized + Clone {
         self
     }
 
-    #[allow(dead_code)]
     fn add_buttons_in_place(&mut self, buttons: &[CreateButton]) {
         for button in buttons {
             self.add_button_in_place(button.clone());
@@ -63,9 +64,9 @@ impl AddButton for CreateReply {
 
         self
     }
-}
+} */
 
-pub trait YesNoButtons: AddButton {
+/* pub trait YesNoButtons: AddButton {
     fn yes_no_buttons(self) -> Self {
         let yes_emoji = ReactionType::Unicode("✅".to_owned());
         let no_emoji = ReactionType::Unicode("❌".to_owned());
@@ -84,9 +85,9 @@ pub trait YesNoButtons: AddButton {
     }
 }
 
-impl<T> YesNoButtons for T where T: AddButton {}
+impl<T> YesNoButtons for T where T: AddButton {} */
 
-pub trait AddActionRow {
+/* pub trait AddActionRow {
     fn add_action_row(self, action_row: CreateActionRow) -> Self;
 
     fn add_button_row(self, buttons: Vec<CreateButton>) -> Self
@@ -126,3 +127,4 @@ impl AddActionRows for CreateInteractionResponseMessage {
         self.components(action_rows)
     }
 }
+ */

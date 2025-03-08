@@ -9,6 +9,8 @@ pub trait Backend {
     // read
     async fn player_from_minecraft(&self, username: &str)
         -> Self::Result<Option<serenity::UserId>>;
+
+    #[allow(unused)]
     async fn player_from_discord(&self, id: serenity::UserId) -> Self::Result<Vec<String>>;
 
     // update
@@ -40,6 +42,7 @@ impl<B: Backend> Players<B> {
         self.backend.player_from_minecraft(username).await
     }
 
+    #[allow(unused)]
     pub async fn player_from_discord(&self, id: serenity::UserId) -> B::Result<Vec<String>> {
         self.backend.player_from_discord(id).await
     }
@@ -61,10 +64,13 @@ impl<B> From<B> for Players<B> {
     }
 }
 
+#[allow(unused)]
 pub type HashMap = tokio::sync::RwLock<std::collections::HashMap<String, serenity::UserId>>;
 
+#[allow(unused)]
 pub type PlayersHashMap = Players<HashMap>;
 
+#[allow(unused)]
 impl PlayersHashMap {
     pub fn new() -> Self {
         Self::default()

@@ -1,8 +1,9 @@
-use poise::serenity_prelude::{self, CacheHttp, ChannelId, EditChannel, GuildChannel, Message};
+use poise::serenity_prelude::{CacheHttp, ChannelId, Message};
+//use poise::serenity_prelude::{self, EditChannel, GuildChannel};
 
 use crate::errors::SendMessageError;
 
-trait RenameGuildChannel {
+/* trait RenameGuildChannel {
     async fn rename(
         &mut self,
         cache_http: impl CacheHttp,
@@ -36,7 +37,7 @@ impl RenameChannelId for ChannelId {
     ) -> serenity_prelude::Result<GuildChannel> {
         self.edit(cache_http, EditChannel::new().name(name)).await
     }
-}
+} */
 
 pub trait ChannelIdExt {
     async fn say_ext(

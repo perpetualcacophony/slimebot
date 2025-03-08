@@ -5,6 +5,7 @@ use crate::errors::SendMessageError;
 pub trait AsDiscordId<Id: DiscordId> {
     type Id: DiscordId = Id;
 
+    #[allow(unused)]
     fn as_id(&self) -> Id;
 }
 

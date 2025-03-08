@@ -28,15 +28,15 @@ impl ErrorAlreadyClaimed {
         self.user_name = Some(new)
     }
 
-    pub async fn update_user_name(
-        &mut self,
-        cache_http: impl serenity::CacheHttp,
-    ) -> serenity::Result<()> {
-        let user = self.user_id.to_user(cache_http).await?;
-        self.set_user_name(user.name);
-        Ok(())
-    }
-
+    /*     pub async fn update_user_name(
+           &mut self,
+           cache_http: impl serenity::CacheHttp,
+       ) -> serenity::Result<()> {
+           let user = self.user_id.to_user(cache_http).await?;
+           self.set_user_name(user.name);
+           Ok(())
+       }
+    */
     pub async fn update_user_nick(
         &mut self,
         cache_http: impl serenity::CacheHttp,

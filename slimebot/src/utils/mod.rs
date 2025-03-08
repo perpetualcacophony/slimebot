@@ -2,7 +2,8 @@ pub mod poise;
 pub use poise::Context;
 
 pub mod serenity;
-pub use serenity::AsDiscordId;
+
+//pub use serenity::AsDiscordId;
 
 use crate::errors::Error;
 

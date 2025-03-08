@@ -13,6 +13,7 @@ impl<B> Data<B> {
 }
 
 impl Data<players::HashMap> {
+    #[allow(unused)]
     pub fn new_map() -> Self {
         Self {
             players: Players::<players::HashMap>::new(),

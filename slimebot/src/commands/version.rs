@@ -20,7 +20,11 @@ pub async fn version(ctx: Context<'_>) -> Result<()> {
 async fn _version(ctx: Context<'_>) -> CommandResult {
     let build = if built_info::DEBUG {
         let branch = built_info::GIT_HEAD_REF
-            .map(|s| s.split('/').last().expect("head ref should have slashes"))
+            .map(|s| {
+                s.split('/')
+                    .next_back()
+                    .expect("head ref should have slashes")
+            })
             .unwrap_or("DETACHED");
 
         format!(
