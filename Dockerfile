@@ -35,8 +35,7 @@ RUN touch slimebot/build.rs
 # build binary
 RUN cargo +nightly build \
     --release \
-    --target x86_64-unknown-linux-musl \
-    --features "docker"
+    --target x86_64-unknown-linux-musl
 
 # using alpine for small final image
 FROM alpine AS runtime
