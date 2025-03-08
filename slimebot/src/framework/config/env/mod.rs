@@ -106,7 +106,7 @@ pub use vault::VaultEnvironment as Vault;
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Secrets {
-    Dev { token: String },
+    Dev { token_file: String },
 
     Vault(Vault),
 }

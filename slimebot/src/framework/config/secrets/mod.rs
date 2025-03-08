@@ -14,12 +14,11 @@ impl Secrets {
     #[tracing::instrument(skip_all, name = "secrets")]
     pub async fn load(env: &super::Environment) -> Result<Self, Error> {
         match &env.secrets {
-            super::env::Secrets::Dev { token } => {
-                tracing::warn!(
-                    "loading secrets from environment; this should not be used in production!"
-                );
+            super::env::Secrets::Dev { token_file } => {
+                tracing::warn!("loading token from file at {token_file}");
                 Ok(Self {
-                    bot_token: (*token).to_owned(),
+                    bot_token: std::fs::read_to_string(token_file)
+                        .map_err(|err| Error::BackendError(Box::new(err)))?,
                     db: None,
                 })
             }
